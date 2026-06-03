@@ -15,6 +15,7 @@ export default function LandingPage() {
             src="https://images.unsplash.com/photo-1540959733332-e94e270b2ec0?q=80&w=2000&auto=format&fit=crop" 
             className="w-full h-full object-cover opacity-40 grayscale-[20%]"
             alt="Hero Background"
+            referrerPolicy="no-referrer"
           />
         </div>
         
@@ -91,6 +92,7 @@ export default function LandingPage() {
                     alt={product.name}
                     className="w-full h-full object-cover grayscale-[10%] group-hover:grayscale-0 transition-all duration-700"
                     whileHover={{ scale: 1.05 }}
+                    referrerPolicy="no-referrer"
                   />
                   {product.isLimited && (
                     <div className="absolute top-4 left-4">
@@ -132,6 +134,7 @@ export default function LandingPage() {
                 src="https://images.unsplash.com/photo-1556761175-4b46a572b786?q=80&w=1200&auto=format&fit=crop" 
                 className="w-full aspect-[3/4] object-cover ring-1 ring-white/10"
                 alt="Artisan at work"
+                referrerPolicy="no-referrer"
               />
               <div className="absolute -bottom-10 -right-10 bg-brand-ivory p-12 text-brand-green hidden xl:block border border-black/5">
                 <p className="text-[10px] uppercase tracking-[0.3em] mb-4">The Philosophy</p>
