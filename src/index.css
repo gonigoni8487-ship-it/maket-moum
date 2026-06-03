@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #FDFCF8;
+  --color-foreground: #1A1A1A;
+  --color-brand-green: #1B4332;
+  --color-brand-terracotta: #D66853;
+  --color-brand-ivory: #FDFCF8;
+
+  --color-primary: #1B4332;
+  --color-primary-foreground: #FDFCF8;
+  --color-secondary: #F3F1E7;
+  --color-secondary-foreground: #1B4332;
+  --color-accent: #D66853;
+  --color-accent-foreground: #FDFCF8;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    @apply font-sans;
+  }
+}
+
+.magazine-heading {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+}
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.scroll-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}

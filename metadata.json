@@ -1,0 +1,6 @@
+{
+  "name": "Market Moum (마켓모움)",
+  "description": "Premium Local Brand Growth Platform - Empowering local artisans through AI branding and magazine-style commerce.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
