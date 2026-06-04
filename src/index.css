@@ -33,6 +33,62 @@
   }
 }
 
+/* 🍃 Scenic Green: Organic Tea Mountain & Terraced Fields Theme definition */
+.theme-scenic-green {
+  --color-background: #F4F6F0 !important;
+  --color-foreground: #1A301D !important;
+  --color-brand-green: #1B4D2B !important;     /* Majestic Pine Tea Forest */
+  --color-brand-terracotta: #2E6F40 !important;  /* Lush Green Valley */
+  --color-brand-gold: #7FA343 !important;        /* Sun-tipped Tea sprout gold-green */
+  --color-brand-ivory: #EBEFDF !important;       /* Soft Celeste Mountain Mist */
+
+  --color-primary: #1B4D2B !important;
+  --color-primary-foreground: #FFFFFF !important;
+  --color-secondary: #EBEFDF !important;
+  --color-secondary-foreground: #1A301D !important;
+  --color-accent: #2E6F40 !important;
+  --color-accent-foreground: #FFFFFF !important;
+  --color-gold: #7FA343 !important;
+  --color-gold-foreground: #1B4D2B !important;
+  
+  transition: all 0.5s ease;
+}
+
+/* Master styling overrides when .theme-scenic-green is active */
+.theme-scenic-green .text-\[\#8C1D24\] {
+  color: #2E6F40 !important;
+}
+.theme-scenic-green .bg-\[\#8C1D24\] {
+  background-color: #2E6F40 !important;
+}
+.theme-scenic-green .border-\[\#8C1D24\] {
+  border-color: #2E6F40 !important;
+}
+.theme-scenic-green .border-l-2.border-\[\#8C1D24\] {
+  border-left-color: #2E6F40 !important;
+}
+.theme-scenic-green .bg-\[\#8C1D24\]\/10 {
+  background-color: rgba(46, 111, 64, 0.1) !important;
+}
+.theme-scenic-green .text-\[\#8C1D24\]\/75 {
+  color: rgba(46, 111, 64, 0.75) !important;
+}
+.theme-scenic-green .bg-\[\#FAF9F6\] {
+  background-color: #F4F6F0 !important;
+}
+.theme-scenic-green .bg-\[\#FAF9F6\]\/80 {
+  background-color: rgba(244, 246, 240, 0.8) !important;
+}
+.theme-scenic-green .border-black\/5 {
+  border-color: rgba(27, 77, 43, 0.15) !important;
+}
+.theme-scenic-green .text-brand-green\/80 {
+  color: rgba(26, 48, 29, 0.8) !important;
+}
+.theme-scenic-green .text-brand-green\/60 {
+  color: rgba(26, 48, 29, 0.6) !important;
+}
+
 .magazine-heading {
   font-family: var(--font-serif);
   letter-spacing: -0.02em;

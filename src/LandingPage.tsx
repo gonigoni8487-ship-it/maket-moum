@@ -8,6 +8,7 @@ import LocalCurationHub from './components/LocalCurationHub';
 import MarketingCalendar from './components/MarketingCalendar';
 import SellerApplyForm from './components/SellerApplyForm';
 import chaeBuGonImg from './assets/images/chae_bu_gon_1780579137325.png';
+import wandoNatureScenicImg from './assets/images/wando_nature_scenic_1780581340577.png';
 
 const MDS_DATA = [
   {
@@ -69,7 +70,110 @@ const MDS_DATA = [
   }
 ];
 
-export default function LandingPage() {
+// Beautiful responsive SVG vector illustration representing the organic tea fields & green mountain terraces of the reference image
+function ScenicGreenHeroBackground() {
+  return (
+    <div className="absolute inset-0 w-full h-full bg-[#EBEFDF] overflow-hidden transition-all duration-700">
+      <svg className="absolute w-full h-full min-w-[1200px] left-1/2 -translate-x-1/2" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax slice">
+        {/* Sky gradient */}
+        <rect width="1440" height="900" fill="#EBEFDF" />
+        <path d="M0 0H1440V550C1440 550 1200 450 900 480C600 510 300 440 0 460V0Z" fill="url(#sky-gradient)" opacity="0.7" />
+        
+        {/* Morning sun halo */}
+        <circle cx="720" cy="260" r="340" fill="url(#sun-glow)" opacity="0.45" />
+
+        {/* DISTANT MOUNTAINS - Layer 1 (Celadon Teal-Green) */}
+        <path d="M-100 540 L120 340 L340 400 L560 300 L760 360 L1000 240 L1220 330 L1380 230 L1600 345 L1600 900 L-100 900 Z" fill="#78A07D" opacity="0.3" />
+
+        {/* DISTANT MOUNTAINS - Layer 2 (Rich Scenic Green Ridge) */}
+        <path d="M-100 580 L180 400 L450 460 L680 330 L930 420 L1150 300 L1380 380 L1550 270 L1600 300 L1600 900 L-100 900 Z" fill="#4B774E" opacity="0.45" />
+
+        {/* MIDGROUND MOUNTAINS - (Deep Pine Ridge) */}
+        <path d="M-100 630 L100 450 L340 510 L550 410 L830 500 T1260 410 L1450 350 L1600 410 L1600 900 L-100 900 Z" fill="#325937" opacity="0.7" />
+
+        {/* MIDGROUND HILLS with Clouds resting (from reference image) */}
+        <path d="M-100 680 L240 510 L500 560 L780 430 L1100 530 L1360 410 L1600 490 L1600 900 L-100 900 Z" fill="#224827" />
+
+        {/* Soft clouds resting on mountain valleys */}
+        {/* Cloud A */}
+        <path d="M220 500 C 235 485, 270 485, 285 500 C 298 492, 320 496, 325 508 C 330 520, 310 528, 295 528 L 220 528 Z" fill="#FFFFFF" opacity="0.8" />
+        {/* Cloud B */}
+        <path d="M1040 380 C 1055 365, 1090 365, 1105 380 C 1118 372, 1140 376, 1145 388 C 1150 400, 1130 408, 1115 408 L 1040 408 Z" fill="#FFFFFF" opacity="0.75" />
+        
+        {/* Peaceful Blue Mountain Lake reflecting (from reference image) */}
+        <path d="M550 410 C650 380, 850 380, 950 410 C880 435, 605 435, 550 410 Z" fill="#8BB8CE" opacity="0.7" />
+        <ellipse cx="750" cy="413" rx="180" ry="14" fill="#90C2DC" opacity="0.4" />
+
+        {/* FOREGROUND GRADIENT TERRACED TEA FIELDS (overlapping smooth waves) */}
+        {/* First Broad Terrace */}
+        <path d="M-100 730 Q 180 635, 480 705 T 1080 625 T 1600 675 L 1600 900 L-100 900 Z" fill="#153610" />
+        
+        {/* Organic wavy row layers of green tea shrubs */}
+        <path d="M-100 760 Q 160 665, 460 745 T 1060 655 T 1600 705 L 1600 900 L-100 900 Z" fill="#1C4B15" />
+        <path d="M-100 790 Q 140 695, 440 785 T 1040 685 T 1600 735 L 1600 900 L-100 900 Z" fill="#256420" />
+        <path d="M-100 820 Q 120 725, 420 820 T 1020 710 T 1600 765 L 1600 900 L-100 900 Z" fill="#2F7A2A" />
+        <path d="M-100 850 Q 100 755, 400 850 T 1000 740 T 1600 795 L 1600 900 L-100 900 Z" fill="#3A9434" />
+        <path d="M-100 880 Q 80 785, 380 880 T 980 770 T 1600 825 L 1600 900 L-100 900 Z" fill="#4AA844" />
+
+        {/* Overlaying custom graphic borders to create that neat layered vector line texture */}
+        <path d="M-100 730 Q 180 635, 480 705 T 1080 625 T 1600 675" stroke="#0E240B" strokeWidth="2.5" fill="none" opacity="0.25" />
+        <path d="M-100 760 Q 160 665, 460 745 T 1060 655 T 1600 705" stroke="#153610" strokeWidth="2.5" fill="none" opacity="0.2" strokeDasharray="12 6" />
+        <path d="M-100 790 Q 140 695, 440 785 T 1040 685 T 1600 735" stroke="#153610" strokeWidth="2.5" fill="none" opacity="0.2" />
+        <path d="M-100 820 Q 120 725, 420 820 T 1020 710 T 1600 765" stroke="#153610" strokeWidth="2.5" fill="none" opacity="0.25" strokeDasharray="14 7" />
+        <path d="M-100 850 Q 100 755, 400 850 T 1000 740 T 1600 795" stroke="#153610" strokeWidth="2.5" fill="none" opacity="0.2" />
+        <path d="M-100 880 Q 80 785, 380 880 T 980 770 T 1600 825" stroke="#153610" strokeWidth="2.5" fill="none" opacity="0.2" strokeDasharray="12 6" />
+
+        {/* Cozy light blue Celadon/Sky Creek flowing down the tea valley */}
+        <path d="M750 435 Q 710 495, 780 555 T 830 675 T 750 775 T 620 900" stroke="#E6EFF3" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.9" />
+        <path d="M750 435 Q 710 495, 780 555 T 830 675 T 750 775 T 620 900" stroke="#90C2DC" strokeWidth="4.5" fill="none" strokeLinecap="round" opacity="0.75" />
+
+        {/* Miniature farmers harvesting tea leaves (Directly replicating the Taiwan Small Town image style!) */}
+        {/* Left-side Farmer */}
+        <g transform="translate(190, 715)">
+          {/* Traditional conical straw hat */}
+          <path d="M-16 0 L0 -14 L16 0 Z" fill="#E8C390" stroke="#7A5E35" strokeWidth="1" />
+          {/* Little tunic/robe */}
+          <path d="M-11 0 L-14 17 L14 17 L11 0 Z" fill="#4B81A7" />
+          {/* Little backpack basket */}
+          <rect x="5" y="5" width="9" height="11" rx="1.5" fill="#C5A078" stroke="#7A5E35" strokeWidth="1" />
+        </g>
+
+        {/* Right-Center Farmer */}
+        <g transform="translate(900, 765)">
+          <path d="M-16 0 L0 -14 L16 0 Z" fill="#E8C390" stroke="#7A5E35" strokeWidth="1" />
+          <path d="M-11 0 L-13 17 L13 17 L11 0 Z" fill="#305634" />
+          <rect x="-14" y="4" width="8" height="10" rx="1.5" fill="#C5A078" stroke="#7A5E35" strokeWidth="1" />
+        </g>
+
+        {/* Lower Left Farmer */}
+        <g transform="translate(440, 810)">
+          <path d="M-16 0 L0 -14 L16 0 Z" fill="#E8C390" stroke="#7A5E35" strokeWidth="1" />
+          <path d="M-11 0 L-13 16 L13 16 L11 0 Z" fill="#585078" />
+        </g>
+
+        {/* Fluffy majestic clouds floating in the sky (as seen in the reference) */}
+        <path d="M140 130 C 160 110, 200 110, 220 130 C 235 120, 265 125, 270 140 C 275 155, 250 165, 230 165 L 140 165 Z" fill="#FFFFFF" opacity="0.9" />
+        <path d="M820 160 C 840 140, 880 140, 900 160 C 915 150, 945 155, 950 170 C 955 185, 930 195, 910 195 L 820 195 Z" fill="#FFFFFF" opacity="0.8" />
+        <path d="M1120 110 C 1135 95, 1165 95, 1180 110 C 1191 102, 1214 106, 1218 117 C 1222 128, 1203 136, 1188 136 L 1120 136 Z" fill="#FFFFFF" opacity="0.85" />
+
+        {/* Definitions for Gradients */}
+        <defs>
+          <linearGradient id="sky-gradient" x1="720" y1="0" x2="720" y2="550" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#EBEFDF" />
+            <stop offset="1" stopColor="#C2D1B7" />
+          </linearGradient>
+          <radialGradient id="sun-glow" cx="720" cy="260" r="340" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#FFFAE6" />
+            <stop offset="0.5" stopColor="#FFECA8" stopOpacity="0.4" />
+            <stop offset="1" stopColor="#EBEFDF" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+      </svg>
+    </div>
+  );
+}
+
+export default function LandingPage({ theme = 'original' }: { theme?: 'original' | 'scenic-green' }) {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [selectedMd, setSelectedMd] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -86,15 +190,19 @@ export default function LandingPage() {
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-[#FAF9F6]">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1540959733332-e94e270b2ec0?q=80&w=2000&auto=format&fit=crop" 
-            className="w-full h-full object-cover opacity-40 grayscale-[20%]"
-            alt="Hero Background"
-            referrerPolicy="no-referrer"
-          />
-        </div>
+      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-background transition-all duration-700">
+        {theme === 'scenic-green' ? (
+          <ScenicGreenHeroBackground />
+        ) : (
+          <div className="absolute inset-0 z-0 transition-opacity duration-700">
+            <img 
+              src="https://images.unsplash.com/photo-1540959733332-e94e270b2ec0?q=80&w=2000&auto=format&fit=crop" 
+              className="w-full h-full object-cover opacity-40 grayscale-[20%]"
+              alt="Hero Background"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        )}
         
         <div className="relative z-10 text-center max-w-4xl px-6">
           <motion.div
@@ -104,32 +212,32 @@ export default function LandingPage() {
           >
             {/* Elegant Text Logotype */}
             <div className="flex flex-col items-center mb-8">
-              <span className="text-3xl md:text-5xl font-bold tracking-tight text-brand-green magazine-heading leading-tight">
+              <span className="text-3xl md:text-5xl font-bold tracking-tight text-brand-green magazine-heading leading-tight transition-all duration-300">
                 마켓모움
               </span>
-              <span className="text-[10px] md:text-xs text-[#8C1D24] tracking-[0.3em] font-mono leading-none mt-2 font-semibold uppercase">
+              <span className="text-[10px] md:text-xs text-brand-terracotta tracking-[0.3em] font-mono leading-none mt-2 font-semibold uppercase transition-all duration-300">
                 MARKET MOUM
               </span>
             </div>
 
-            <span className="text-xs md:text-sm uppercase tracking-[0.3em] text-[#8C1D24] font-bold mb-6 block">
+            <span className="text-xs md:text-sm uppercase tracking-[0.3em] text-brand-terracotta font-bold mb-6 block transition-all duration-300">
               생산자 + 스토리 + 팬덤 + 상생 펀딩 공동체
             </span>
-            <h1 className="text-4xl md:text-6xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium">
+            <h1 className="text-4xl md:text-6xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium transition-all duration-300">
               최저가 전쟁을 넘어 <br /> 명인의 이야기를 소유하다
             </h1>
-            <p className="text-sm md:text-xl text-brand-green/80 mb-12 max-w-3xl mx-auto font-light leading-relaxed">
+            <p className="text-sm md:text-xl text-brand-green/80 mb-12 max-w-3xl mx-auto font-light leading-relaxed transition-all duration-300">
               단순히 저렴하게 구매하는 쇼핑몰이 아닙니다. <br />
               마켓모움은 지역에 숨겨진 생산자를 직접 발굴해 브랜드화하고, 
               <strong> ‘공동구매 가격하락 퍼널’</strong>과 <strong>‘예약형 시즌 펀딩’</strong>을 결합해 상생팬덤 생태계를 만듭니다.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/markets" className="bg-brand-green text-[#FAF9F6] px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green/90 transition-all flex items-center gap-2">
+              <Link to="/markets" className="bg-brand-green text-background px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green/90 transition-all flex items-center gap-2 font-semibold">
                 Explore Markets <ArrowRight className="w-4 h-4" />
               </Link>
               <button 
                 onClick={() => setIsApplyModalOpen(true)}
-                className="border border-brand-green text-brand-green px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green hover:text-white transition-all cursor-pointer font-medium"
+                className="border border-brand-green text-brand-green px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green hover:text-white transition-all cursor-pointer font-bold"
               >
                 Become a Seller
               </button>
@@ -143,12 +251,12 @@ export default function LandingPage() {
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         >
-          <div className="bg-white/80 backdrop-blur-sm p-6 border border-black/5 shadow-sm">
-            <p className="text-[10px] uppercase tracking-widest text-[#8C1D24] mb-1">Live popup market</p>
+          <div className="bg-background/80 backdrop-blur-sm p-6 border border-brand-green/10 shadow-sm transition-all duration-300">
+            <p className="text-[10px] uppercase tracking-widest text-brand-terracotta mb-1 font-semibold">Live popup market</p>
             <p className="text-sm magazine-heading">Cheongsong Apple Fest 2024</p>
-            <div className="flex items-center gap-2 mt-2 text-[#8C1D24]">
+            <div className="flex items-center gap-2 mt-2 text-brand-terracotta">
               <Clock className="w-3 h-3" />
-              <span className="text-[10px] font-mono">05:24:12 LEFT</span>
+              <span className="text-[10px] font-mono font-bold">05:24:12 LEFT</span>
             </div>
           </div>
         </motion.div>
@@ -347,9 +455,9 @@ export default function LandingPage() {
           <ScrollReveal>
             <div className="relative">
               <img 
-                src="https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?q=80&w=1200&auto=format&fit=crop" 
+                src={wandoNatureScenicImg} 
                 className="w-full aspect-[3/4] object-cover ring-1 ring-white/10"
-                alt="Traditional Korean Onggi Jars representing Korean artisan legacy"
+                alt="Scenic landscape of Wando coastal islands representing Korean local nature legacy"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute -bottom-10 -right-10 bg-brand-ivory p-12 text-brand-green hidden xl:block border border-black/5">

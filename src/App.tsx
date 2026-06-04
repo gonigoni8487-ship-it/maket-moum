@@ -13,14 +13,14 @@ function LocationProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AnimatedRoutes() {
+function AnimatedRoutes({ theme }: { theme: 'original' | 'scenic-green' }) {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait">
       <Routes location={location}>
         <Route path="/" element={
           <PageWrapper id="home">
-            <LandingPage />
+            <LandingPage theme={theme} />
           </PageWrapper>
         } />
         <Route path="/seller" element={
@@ -36,7 +36,7 @@ function AnimatedRoutes() {
         {/* Fallback */}
         <Route path="*" element={
           <PageWrapper id="fallback">
-            <LandingPage />
+            <LandingPage theme={theme} />
           </PageWrapper>
         } />
       </Routes>
@@ -45,18 +45,36 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
+  const [theme, setTheme] = React.useState<'original' | 'scenic-green'>(() => {
+    return (localStorage.getItem('moum-theme') as 'original' | 'scenic-green') || 'original';
+  });
+
+  React.useEffect(() => {
+    // Sync with body element so background and global styles adapt beautifully
+    const bodyCls = document.body.className;
+    document.body.className = bodyCls
+      .replace(/theme-(original|scenic-green)/g, '')
+      .trim() + ` theme-${theme}`;
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'original' ? 'scenic-green' : 'original';
+    setTheme(nextTheme);
+    localStorage.setItem('moum-theme', nextTheme);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <div className="min-h-screen bg-background font-sans selection:bg-brand-terracotta selection:text-white">
-          <Navbar />
+        <div className={`min-h-screen bg-background text-foreground font-sans selection:bg-brand-terracotta selection:text-white theme-${theme} transition-colors duration-500`}>
+          <Navbar theme={theme} toggleTheme={toggleTheme} />
           <LocationProvider>
             <main>
-              <AnimatedRoutes />
+              <AnimatedRoutes theme={theme} />
             </main>
           </LocationProvider>
           
-          <footer className="bg-brand-green text-white py-20 px-6">
+          <footer className="bg-brand-green text-white py-20 px-6 transition-colors duration-500">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 border-b border-white/10 pb-20 mb-20">
               <div className="space-y-6">
                 <Link to="/" className="flex flex-col group py-1">
