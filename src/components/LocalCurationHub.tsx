@@ -91,6 +91,7 @@ export default function LocalCurationHub() {
       textColor: 'text-amber-800',
       metrics: { seaBreeze: 80, savory: 65, sweetness: 40, richness: 95 },
       priceMod: 0,
+      image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=400&auto=format&fit=crop'
     },
     {
       id: 'jerky-2',
@@ -107,6 +108,7 @@ export default function LocalCurationHub() {
       textColor: 'text-emerald-800',
       metrics: { seaBreeze: 75, savory: 80, sweetness: 35, richness: 85 },
       priceMod: 1500,
+      image: 'https://images.unsplash.com/photo-1627834377411-8da5f4f09de8?q=80&w=400&auto=format&fit=crop'
     },
     {
       id: 'jerky-3',
@@ -123,6 +125,7 @@ export default function LocalCurationHub() {
       textColor: 'text-amber-900',
       metrics: { seaBreeze: 60, savory: 100, sweetness: 30, richness: 90 },
       priceMod: 2000,
+      image: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?q=80&w=400&auto=format&fit=crop'
     },
     {
       id: 'jerky-4',
@@ -139,6 +142,7 @@ export default function LocalCurationHub() {
       textColor: 'text-rose-800',
       metrics: { seaBreeze: 20, savory: 80, sweetness: 95, richness: 85 },
       priceMod: 1000,
+      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?q=80&w=400&auto=format&fit=crop'
     },
     {
       id: 'jerky-5',
@@ -147,7 +151,7 @@ export default function LocalCurationHub() {
       phase: 2,
       phaseLabel: '2차 라인업 (소량 테스트)',
       description: '이탈리아 움브리아 고산지대 참나무 아래서 엄격히 수작업 수지한 트러플 에센스와 엑스트라 버진 오일의 머스크향이 짙게 배어 있는 프리미엄 아방가르드 에디션입니다.',
-      pairing: '드라이 샴페인, 깊은 탄닌의 피노 누아 오크 에이징 레드 와인',
+      pairing: '드라이 샴페인, 깊은 탄닌의 피노 누아 오크 에이징 RED 와인',
       target: '럭셔리 파티 선물, 부티크 소믈리에 와인바 무드를 일상 싱크로 체험하고 싶은 콜렉터 기질인',
       color: 'bg-indigo-950',
       bgColor: 'bg-indigo-50/50',
@@ -155,6 +159,7 @@ export default function LocalCurationHub() {
       textColor: 'text-indigo-900',
       metrics: { seaBreeze: 40, savory: 85, sweetness: 50, richness: 100 },
       priceMod: 3000,
+      image: 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?q=80&w=400&auto=format&fit=crop'
     }
   ];
 
@@ -174,7 +179,7 @@ export default function LocalCurationHub() {
       minPledge: 20000,
       rewardPlan: '제철 수확 보길도 활장어 한 쌍 진공패키지(6만원 상당) + 연 5% 로컬 환급 포인트 적립',
       expectedReturn: '리워드 실물 수취 + 25% 가치 절감 효과',
-      image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?q=80&w=800&auto=format&fit=crop',
       investorsCount: 437
     },
     {
@@ -200,11 +205,11 @@ export default function LocalCurationHub() {
       location: '부산 기장군 일광읍',
       title: '70년 가문비 전통 기장 옻독 자염 다시마',
       specialty: '전통 자염 공법 수작업 다시마',
-      story: '철저한 수조 조율 and 동해안 센 바람으로 하루 단 100장만 건조 조율',
+      story: '철저한 수온 조율과 동해안 센 바람으로 하루 단 100장만 건조 조율',
       narrative: '기장의 맑은 바람이 암초 위에 머무르는 시간은 짧습니다. 자연 자염 가마솥에서 끓여낸 전통 소금물로 다시마의 결을 소독하고 무쇠 가마솥에 데쳐 아날로그 수작조로 완성합니다.',
       votes: 142,
       goalVotes: 200,
-      image: 'https://images.unsplash.com/photo-1516685018646-549198525c1b?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=800&auto=format&fit=crop',
       highlightTag: '70년 가문비 전통'
     },
     {
@@ -212,12 +217,12 @@ export default function LocalCurationHub() {
       name: '김옥순 할머니',
       location: '경남 통영시 한산면',
       title: '백년 털이질 공법 전통 태양건조 은멸치',
-      specialty: '태양 빛 and 한산도 해안 염풍 건조 은멸치',
+      specialty: '태양 빛과 한산도 해안 염풍 건조 은멸치',
       story: '원물 손상 없이 전통 대나무 정치망(죽방렴)으로 가둔 최상품 은빛 기적',
       narrative: '기성의 고온 열풍 건조기에서 구워낸 멸치와는 빛깔 자체가 다른 은빛 투명함을 지녔습니다. 털어낸 후 옹기에 가벼운 연염을 쳐 가을 햇마루에서 72시간 볕을 쪼였습니다. 원조 할머니 레시피 북을 동봉해 드립니다.',
       votes: 188,
       goalVotes: 200,
-      image: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?q=80&w=800&auto=format&fit=crop',
       highlightTag: '할머니 레시피'
     },
     {
@@ -227,10 +232,10 @@ export default function LocalCurationHub() {
       title: '자연 친화적 가을 활장어 & 전통 장어덮밥 원물 밀판',
       specialty: '다도해 해양 한옥 가두리 최고급 활장어',
       story: '수입산 및 인위적 성장 촉진제를 전면 배제한 고품질 천연 자양 장어 원물',
-      narrative: '보길도의 맑고 깊은 바닷바람 and 햇살에 자연양생한 가울 장어입니다. 입안 가득 터지는 깊은 기름기와 수작업으로 가시를 한 땀 한 땀 발라낸 도톰한 장어포를 마켓모움의 전용 한옥 양념 간장(PB)과 함께 배송합니다.',
+      narrative: '보길도의 맑고 깊은 바닷바람과 햇살에 자연양생한 가을 장어입니다. 입안 가득 터지는 깊은 기름기와 수작업으로 가시를 한 땀 한 땀 발라낸 도톰한 장어포를 마켓모움의 전용 한옥 양념 간장(PB)과 함께 배송합니다.',
       votes: 110,
       goalVotes: 150,
-      image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?q=80&w=800&auto=format&fit=crop',
       highlightTag: '하루 200마리 한정 수공예'
     },
     {
@@ -243,7 +248,7 @@ export default function LocalCurationHub() {
       narrative: '과거 아이들의 웃음소리가 머물던 조천의 작은 폐교 공터를 개조해 만든 귤밭입니다. 공장에서 왁스코팅한 주황빛 공산품 귤과 다른, 자연 그대로의 다채로운 새콤달콤함을 서포트합니다.',
       votes: 75,
       goalVotes: 120,
-      image: 'https://images.unsplash.com/photo-1557800636-894a64c1696f?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?q=80&w=800&auto=format&fit=crop',
       highlightTag: '폐교 개조 귤공장'
     }
   ]);
@@ -532,7 +537,7 @@ export default function LocalCurationHub() {
           <Badge className="bg-[#8C1D24] text-white hover:bg-[#8C1D24]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-3 py-1">
             Moum Next-Gen Local Commerce Frame
           </Badge>
-          <h2 className="text-4xl md:text-6xl magazine-heading font-medium tracking-tight leading-[1.1]">
+          <h2 className="text-2xl md:text-4xl magazine-heading font-medium tracking-tight leading-[1.1]">
             단순한 최저가 쇼핑몰이 아닙니다. <br />
             생산자, 정성, 팬덤의 결합.
           </h2>
@@ -883,7 +888,7 @@ export default function LocalCurationHub() {
           </div>
 
           {/* Right interactive calculator widget */}
-          <div className="lg:col-span-12 xl:col-span-5 bg-brand-green text-white p-6 md:p-8 flex flex-col justify-between space-y-6">
+          <div className="lg:col-span-12 xl:col-span-5 bg-[#1C3A27] text-white p-6 md:p-8 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               <span className="text-[9px] uppercase tracking-widest text-[#8C1D24] font-bold block">Interactive Pledger</span>
               <h4 className="text-xl magazine-heading font-bold text-brand-ivory leading-snug">
@@ -912,11 +917,11 @@ export default function LocalCurationHub() {
 
               {/* Total display of custom selection */}
               <div className="bg-white/10 p-5 border border-white/10 space-y-3 font-mono text-xs">
-                <div className="flex justify-between">
-                  <span className="text-white/60">선택한 총 모액 지원금:</span>
+                <div className="flex justify-between font-bold">
+                  <span className="text-white/60 font-medium">선택한 총 모액 지원금:</span>
                   <span className="text-sm font-bold text-brand-ivory">₩{(userPledgedAmount[activeInvestmentId] || 0).toLocaleString()} 원</span>
                 </div>
-                <div className="flex justify-between text-[#8C1D24] font-bold">
+                <div className="flex justify-between text-[#E9C46A] font-bold">
                   <span>획득 예상 로컬 배당 포인트 (6%):</span>
                   <span>+{(Math.floor((userPledgedAmount[activeInvestmentId] || 0) * 0.06)).toLocaleString()} P</span>
                 </div>
@@ -924,7 +929,7 @@ export default function LocalCurationHub() {
                   <span className="text-white/60">제공 예정 실물 리워드:</span>
                   <span className="font-sans text-[11px] text-[#FAF9F6] text-right max-w-[180px] font-light">
                     {(userPledgedAmount[activeInvestmentId] || 0) > 0 
-                      ? `${activeProject.producer.split(' ')[0]} 명인 가을 직배송 한글 목합 콜라보 패키지 보전권 확보!`
+                      ? `${activeProject.producer.split(' ')[0]} 명인 가을 직배송 패키지 보전권 확보!`
                       : '금액을 선택해 리워드를 예측해 보세요.'}
                   </span>
                 </div>
@@ -948,8 +953,8 @@ export default function LocalCurationHub() {
                     exit={{ opacity: 0 }}
                     className="p-4 bg-white/10 border border-white/20 text-[11px] font-light text-brand-ivory/90 leading-relaxed text-center"
                   >
-                    🎉 축하합니다! 귀하는 <strong>{activeProject.producer}</strong> 명인의 정식 엔젤 서포터 멤버로 시스템에 임시 전임 등제되었습니다! <br />
-                    베타 정밀 통합 장막 가동 시 예약 순위에 맞춰 로컬 영수증이 정식 발급됩니다.
+                    🎉 축하합니다! 귀하는 <strong>{activeProject.producer}</strong> 명인의 정식 엔젤 서포터 멤버로 시스템에 신속 등록되었습니다! <br />
+                    예약 우선권 가동 시 이메일 영수증이 정식 자동 발송됩니다.
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1033,34 +1038,45 @@ export default function LocalCurationHub() {
                     return (
                       <motion.div
                         key={idx}
-                        whileHover={{ scale: 1.02 }}
+                        whileHover={{ scale: 1.03, y: -2 }}
                         onClick={() => setActiveSlotIdx(idx)}
-                        className={`w-32 md:w-36 p-4 border flex flex-col justify-between aspect-square cursor-pointer transition-all relative select-none ${
+                        className={`w-36 md:w-40 p-3.5 border flex flex-col justify-between aspect-square cursor-pointer transition-all relative select-none overflow-hidden rounded-none shadow-sm ${
                           isActive 
-                            ? 'bg-white border-[#8C1D24] ring-2 ring-[#8C1D24]/20 shadow-sm' 
-                            : 'bg-white border-black/5 hover:border-brand-green/30'
+                            ? 'bg-[#FDFCF7] border-[#8C1D24] ring-2 ring-[#8C1D24]/10' 
+                            : 'bg-white border-black/10 hover:border-[#8C1D24]/40 hover:shadow'
                         }`}
                       >
-                        {/* Circle slot decorator */}
-                        <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-mono text-slate-400 font-semibold">슬롯 0{idx+1}</span>
-                          <span className={`w-2.5 h-2.5 rounded-full ${assignedFlavor.color}`} />
+                        {/* Circle slot decorator & color dot */}
+                        <div className="flex justify-between items-center z-10">
+                          <span className="text-[10px] font-mono text-slate-505 font-semibold bg-white/80 px-1 rounded-none">SLOT 0{idx+1}</span>
+                          <span className={`w-2.5 h-2.5 rounded-full ${assignedFlavor.color} border border-white`} />
                         </div>
 
-                        {/* Text details */}
-                        <div className="text-center py-2">
-                          <p className="text-[11px] font-sans font-bold leading-tight line-clamp-2 text-brand-green">
-                            {assignedFlavor.name.split(' ')[0]} <br />
-                            <span className="text-[9px] text-foreground/45 font-light block mt-0.5 font-sans leading-none">{assignedFlavor.name.split(' ').slice(1).join(' ') || '기본공'}</span>
+                        {/* Thumbnail Image and Label details */}
+                        <div className="text-center py-1 flex flex-col items-center justify-center z-10">
+                          <div className="w-12 h-12 rounded-full overflow-hidden mb-1.5 border border-black/10 bg-slate-50 flex-shrink-0 shadow-sm relative group-hover:scale-105 transition-transform">
+                            <img 
+                              src={assignedFlavor.image} 
+                              alt={assignedFlavor.name} 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          
+                          <p className="text-[11px] font-sans font-bold leading-tight line-clamp-1 text-brand-green">
+                            {assignedFlavor.name.split(' ')[0]}
                           </p>
+                          <span className="text-[9px] text-foreground/50 font-light block mt-0.5 font-sans leading-none line-clamp-1 truncate max-w-full">
+                            {assignedFlavor.name.split(' ').slice(1).join(' ') || '기본공'}
+                          </span>
                         </div>
 
                         {/* Selection check indicator */}
-                        <div className="flex justify-between items-end">
-                          <span className="text-[9px] font-mono text-slate-400 font-bold">
+                        <div className="flex justify-between items-end z-10 pt-1 border-t border-black/5">
+                          <span className="text-[9px] font-mono text-slate-500 font-bold">
                             {assignedFlavor.priceMod > 0 ? `+₩${assignedFlavor.priceMod.toLocaleString()}` : '기본'}
                           </span>
-                          <Badge variant="outline" className={`text-[8px] rounded-none px-1 py-0 border-none leading-none ${
+                          <Badge variant="outline" className={`text-[8px] rounded-none px-1.5 py-0 border-none leading-none scale-90 ${
                             assignedFlavor.phase === 1 ? 'text-emerald-700 bg-emerald-50' : 'text-indigo-800 bg-indigo-50'
                           }`}>
                             {assignedFlavor.phase === 1 ? '1차' : '2차'}
@@ -1069,7 +1085,7 @@ export default function LocalCurationHub() {
 
                         {/* Top corner active pin */}
                         {isActive && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-[#8C1D24] text-[8px] text-white font-mono px-1.5 py-0.5 rounded-none uppercase font-bold animate-pulse shadow-sm">
+                          <span className="absolute -top-1.5 -right-1.5 bg-[#8C1D24] text-[8px] text-white font-mono px-2 py-0.5 rounded-none uppercase font-bold animate-pulse shadow-sm z-20">
                             Active
                           </span>
                         )}
@@ -1097,14 +1113,27 @@ export default function LocalCurationHub() {
                     <button
                       key={flavor.id}
                       onClick={() => handleAssignFlavorToActiveSlot(flavor.id)}
-                      className={`text-left p-3.5 border transition-all rounded-none cursor-pointer flex flex-col justify-between h-52 hover:shadow-md ${
+                      className={`text-left p-3 border transition-all rounded-none cursor-pointer flex flex-col justify-between h-72 hover:shadow-md overflow-hidden relative ${
                         selectedJerkyId === flavor.id 
                           ? 'border-brand-green bg-[#F7F6EE]/30' 
-                          : 'border-black/5 bg-white'
+                          : 'border-black/10 bg-white'
                       }`}
                       onMouseEnter={() => setSelectedJerkyId(flavor.id)}
                     >
                       <div className="space-y-1.5 w-full">
+                        {/* Beautiful Header Image banner matching product flavor */}
+                        <div className="w-full h-20 overflow-hidden relative border-b border-black/5 -mt-3 -mx-3 mb-2 bg-slate-50">
+                          <img 
+                            src={flavor.image} 
+                            alt={flavor.name} 
+                            className="w-full h-full object-cover transition-transform hover:scale-105 duration-500"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute top-1 right-1 bg-black/60 text-white font-mono text-[7px] px-1 py-0.5 leading-none">
+                            {flavor.engName.replace('Abalone Jerky', '').trim()}
+                          </div>
+                        </div>
+
                         <div className="flex justify-between items-center w-full">
                           <span className={`text-[8px] rounded-none px-1.5 py-0.5 font-bold uppercase ${
                             isPhase1 
@@ -1118,7 +1147,7 @@ export default function LocalCurationHub() {
                           </span>
                         </div>
                         <h5 className="text-xs font-bold text-brand-green font-sans leading-tight">{flavor.name}</h5>
-                        <p className="text-[10px] text-foreground/50 font-light line-clamp-4 leading-snug">{flavor.description}</p>
+                        <p className="text-[10px] text-foreground/50 font-light line-clamp-3 leading-snug">{flavor.description}</p>
                       </div>
 
                       <div className="pt-2 w-full border-t border-black/5 flex justify-between items-center text-[9px] font-mono text-slate-400">

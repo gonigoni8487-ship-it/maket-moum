@@ -5,7 +5,6 @@ import { ScrollReveal } from './components/Animated';
 import { PRODUCTS, BRAND_PACKAGES } from './constants';
 import { Link } from 'react-router-dom';
 import LocalCurationHub from './components/LocalCurationHub';
-import logoImg from './assets/images/market_moum_logo_1780557786342.png';
 
 const MDS_DATA = [
   {
@@ -99,23 +98,20 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: "easeOut" }}
           >
-            {/* Elegant Golden Seal Emblem */}
-            <div className="flex justify-center mb-8">
-              <div className="relative w-28 h-28 border-2 border-[#D4AF37]/50 bg-[#111] p-0.5 rounded-full shadow-2xl flex items-center justify-center group hover:border-[#D4AF37] transition-all duration-500">
-                <img 
-                  src={logoImg} 
-                  alt="Market Moum Gold Tortoise Emblem" 
-                  className="w-full h-full object-cover rounded-full transition-transform duration-700 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 rounded-full border border-white/5 pointer-events-none" />
-              </div>
+            {/* Elegant Text Logotype */}
+            <div className="flex flex-col items-center mb-8">
+              <span className="text-3xl md:text-5xl font-bold tracking-tight text-brand-green magazine-heading leading-tight">
+                마켓모움
+              </span>
+              <span className="text-[10px] md:text-xs text-[#8C1D24] tracking-[0.3em] font-mono leading-none mt-2 font-semibold uppercase">
+                MARKET MOUM
+              </span>
             </div>
 
             <span className="text-xs md:text-sm uppercase tracking-[0.3em] text-[#8C1D24] font-bold mb-6 block">
               생산자 + 스토리 + 팬덤 + 상생 펀딩 공동체
             </span>
-            <h1 className="text-5xl md:text-8xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium">
+            <h1 className="text-4xl md:text-6xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium">
               최저가 전쟁을 넘어 <br /> 명인의 이야기를 소유하다
             </h1>
             <p className="text-sm md:text-xl text-brand-green/80 mb-12 max-w-3xl mx-auto font-light leading-relaxed">
@@ -263,14 +259,13 @@ export default function LandingPage() {
               <span className="text-xs font-bold uppercase tracking-[0.3em] text-[#8C1D24] flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4" /> 100% Verified by Curators
               </span>
-              <h2 className="text-4xl md:text-6xl magazine-heading text-brand-green leading-[1.1] font-medium">
-                전현직 백화점·대형마트 MD가 <br />
-                직접 산지를 누벼 <span className="italic font-serif text-[#8C1D24]">엄격히 검증한 명품 원물</span>
+              <h2 className="text-2xl md:text-4xl magazine-heading text-brand-green leading-[1.1] font-medium">
+                전문가 베테랑 MD와 AI 시스템이 <br />
+                함께 연대하여 <span className="italic font-serif text-[#8C1D24]">체계적으로 검증한 명품 원물</span>
               </h2>
               <p className="text-sm md:text-base text-brand-green/80 font-light leading-relaxed">
-                우리가 매일 식탁에 올리는 가치를 위해 최고의 유통 전문가들이 연대했습니다. 
-                신세계, 현대백화점 및 이마트 출신의 오랜 카테고리 전문가(MD)들이 직접 전국의 해안 암초와 산비탈 경작지를 누빕니다. 
-                단순 수치화된 가격 등가 교환을 정면 거부하며, 타협 없는 철학과 지속 가능한 정성만을 가려 대중에게 투명하게 보급합니다.
+                전 신세계, 롯데백화점, 이마트, 롯데마트 임직원 출신의 각 분야 전문 MD 경력자들의 안목과 독자적인 AI 시스템이 만났습니다. 
+                현재의 소비 트렌드를 한발 앞서 파악하고 예측하여, 가장 정교하고 엄격한 체계적 검증을 통과한 지속 가능한 로컬 명품만을 선별하여 제안합니다.
               </p>
             </div>
           </ScrollReveal>
