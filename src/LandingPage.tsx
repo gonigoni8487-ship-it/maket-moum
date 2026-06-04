@@ -1,11 +1,21 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, Clock, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowRight, Clock, Star, Copy, X, ShoppingBag } from 'lucide-react';
 import { ScrollReveal } from './components/Animated';
-import { PRODUCTS } from './constants';
+import { PRODUCTS, BRAND_PACKAGES } from './constants';
 import { Link } from 'react-router-dom';
 
 export default function LandingPage() {
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [orderMode, setOrderMode] = useState<boolean>(false);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   return (
     <div className="w-full">
       {/* Hero Section */}
@@ -85,7 +95,10 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           {PRODUCTS.map((product, idx) => (
             <ScrollReveal key={product.id} delay={idx * 0.1}>
-              <div className="group cursor-pointer">
+              <div 
+                className="group cursor-pointer" 
+                onClick={() => { setSelectedProduct(product); setOrderMode(false); }}
+              >
                 <div className="relative overflow-hidden aspect-[4/5] bg-[#F3F1E7] mb-6">
                   <motion.img 
                     src={product.image} 
@@ -102,21 +115,21 @@ export default function LandingPage() {
                     </div>
                   )}
                   <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-full group-hover:translate-y-0 transition-transform bg-brand-green/90 text-white flex justify-between items-center">
-                    <span className="text-xs uppercase tracking-widest text-white">View Details</span>
+                    <span className="text-xs uppercase tracking-widest text-white font-medium">View Details</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-lg magazine-heading mb-1">{product.name}</h3>
-                    <p className="text-sm text-foreground/40 font-light italic">By {product.artisan}</p>
+                    <p className="text-sm text-foreground/40 font-light italic text-[#1B4332]/70">By {product.artisan}</p>
                   </div>
-                  <p className="text-lg font-serif">₩{product.price.toLocaleString()}</p>
+                  <p className="text-lg font-serif text-[#1B4332]">₩{product.price.toLocaleString()}</p>
                 </div>
                 {product.isLimited && (
                   <div className="mt-4 flex items-center gap-2 text-brand-terracotta">
                     <Clock className="w-3 h-3" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest">Ends in {product.timeLeft}</span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest font-semibold">Ends in {product.timeLeft}</span>
                   </div>
                 )}
               </div>
@@ -194,15 +207,176 @@ export default function LandingPage() {
             모든 위대한 브랜드는 작은 시작으로부터 나옵니다
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Link to="/apply" className="bg-brand-green text-white px-12 py-6 text-sm uppercase tracking-widest">
+            <Link to="/seller" className="bg-brand-green text-white px-12 py-6 text-sm uppercase tracking-widest">
               입점 신청하기
             </Link>
-            <Link to="/about" className="text-brand-green underline underline-offset-8 text-sm uppercase tracking-widest">
+            <Link to="/seller" className="text-brand-green underline underline-offset-8 text-sm uppercase tracking-widest">
               Our Process
             </Link>
           </div>
         </ScrollReveal>
       </section>
+
+      {/* Product Detail Modal Overlay */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+            onClick={() => { setSelectedProduct(null); setOrderMode(false); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-[#FDFCF8] text-[#1B4332] max-w-5xl w-full border border-black/5 flex flex-col md:flex-row relative shadow-2xl overflow-hidden my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => { setSelectedProduct(null); setOrderMode(false); }}
+                className="absolute top-6 right-6 z-10 p-2 hover:bg-black/5 rounded-full transition-all text-[#1B4332]"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              {/* Product Image Panel (Left) */}
+              <div className="w-full md:w-1/2 relative bg-[#F3F1E7] aspect-[4/5] md:aspect-auto md:min-h-[600px] overflow-hidden">
+                <img 
+                  src={selectedProduct.image} 
+                  alt={selectedProduct.name} 
+                  className="w-full h-full object-cover grayscale-[10%] hover:scale-[1.02] transition-transform duration-[1.5s]"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                
+                {/* Floating Artisan Designation */}
+                <div className="absolute bottom-8 left-8 text-white">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#D66853] mb-1 font-semibold">CURATED PARTNER BRAND</p>
+                  <p className="text-xl font-medium magazine-heading text-brand-ivory opacity-95">{selectedProduct.artisan}</p>
+                  <p className="text-xs font-light opacity-75 mt-0.5">Premium Traditional Craftsmanship</p>
+                </div>
+              </div>
+
+              {/* Detailed Content Panel (Right) */}
+              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-between overflow-y-auto max-h-[85vh] md:max-h-[650px] scrollbar-thin">
+                <div>
+                  {/* Tags Group */}
+                  <div className="flex flex-wrap items-center gap-2 mb-6">
+                    <span className="bg-brand-green/10 text-brand-green text-[9px] px-2.5 py-1 tracking-widest uppercase font-mono font-semibold">
+                      {selectedProduct.category}
+                    </span>
+                    {selectedProduct.isLimited && (
+                      <span className="bg-brand-terracotta/10 text-[#D66853] text-[9px] px-2.5 py-1 tracking-widest uppercase font-mono font-semibold">
+                        POP-UP LIMITED ({selectedProduct.stock} Left)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Title & Price */}
+                  <h3 className="text-2xl md:text-3xl magazine-heading text-brand-green leading-[1.2] mb-3">
+                    {selectedProduct.name}
+                  </h3>
+                  <p className="text-2.5xl font-serif text-[#1B4332] mb-6">
+                    ₩{selectedProduct.price.toLocaleString()}
+                    <span className="text-[11px] text-foreground/45 font-sans italic ml-3 font-normal">무료 보장배동 및 오동나무 명인 목함 포함 패키지</span>
+                  </p>
+
+                  <div className="w-full h-px bg-[#1B4332]/10 mb-6"></div>
+
+                  {/* Brand Copy & Story Block */}
+                  {BRAND_PACKAGES[selectedProduct.id] ? (
+                    <div className="space-y-6">
+                      {/* Tagline */}
+                      <div>
+                        <p className="text-[9px] uppercase tracking-[0.25em] text-[#D66853] mb-1 font-semibold">Brand Tagline</p>
+                        <h4 className="text-lg italic font-medium text-[#1B4332] tracking-tight font-serif leading-[1.3] pl-2 border-l-2 border-brand-terracotta">
+                          "{BRAND_PACKAGES[selectedProduct.id].tagline}"
+                        </h4>
+                      </div>
+
+                      {/* Decoded Brand Narrative */}
+                      <div>
+                        <p className="text-[9px] uppercase tracking-[0.25em] text-foreground/45 mb-2 font-semibold">The Story & Philosophy (스토리 & 철학)</p>
+                        <p className="text-xs text-[#1B4332]/85 leading-relaxed font-light bg-brand-green/[0.02] p-5 italic border border-[#1B4332]/5">
+                          {BRAND_PACKAGES[selectedProduct.id].story}
+                        </p>
+                      </div>
+
+                      {/* Dynamic USP Bullets */}
+                      <div>
+                        <p className="text-[9px] uppercase tracking-[0.25em] text-foreground/45 mb-2 font-semibold">Signature Craft Merits (특장점 요약)</p>
+                        <ul className="space-y-2">
+                          {BRAND_PACKAGES[selectedProduct.id].details.map((detail: string, i: number) => (
+                            <li key={i} className="text-xs text-foreground/80 font-light flex items-start gap-2.5">
+                              <span className="text-[#D66853] font-bold mt-0.5">✓</span>
+                              <span>{detail}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Social Media Content Options (상세페이지 대표 카피) */}
+                      <div className="pt-2">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-[9px] uppercase tracking-[0.25em] text-[#D66853] font-semibold">AI Generated Representative Copy (대표 상세페이지 문구)</p>
+                          <button 
+                            onClick={() => handleCopy(BRAND_PACKAGES[selectedProduct.id].marketingCopy, selectedProduct.id)}
+                            className="text-[10px] uppercase tracking-wider text-brand-green hover:text-brand-terracotta font-mono flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            {copiedId === selectedProduct.id ? 'Copied!' : 'Copy Copywriting'}
+                          </button>
+                        </div>
+                        <div className="bg-[#1B4332] text-white/95 p-5 font-mono text-[10px] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto border border-black/5 rounded-none scrollbar-thin">
+                          {BRAND_PACKAGES[selectedProduct.id].marketingCopy}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-foreground/40 mb-1">Description (제품 기본 설명)</p>
+                        <p className="text-xs text-foreground/70 leading-relaxed font-light">
+                          {selectedProduct.description}
+                        </p>
+                      </div>
+                      <div className="bg-[#F3F1E7]/80 p-5 text-center text-xs font-light text-foreground/60 border border-black/5">
+                        귀하의 브랜드 철학과 스토리 패키지는 <span className="font-semibold text-brand-green">Seller Center &gt; AI Branding</span> 탭에서 생성할 수 있습니다.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Purchase Action Panel */}
+                <div className="mt-8 pt-6 border-t border-[#1B4332]/10 z-0">
+                  {orderMode ? (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-brand-green/10 border border-brand-green/30 p-5 text-center rounded-none"
+                    >
+                      <p className="text-xs text-brand-green font-semibold mb-1 flex items-center justify-center gap-1.5">
+                        ✨ Order proposal dispatched to {selectedProduct.artisan}!
+                      </p>
+                      <p className="text-[10px] font-light text-[#1B4332] opacity-80">
+                        귀하의 주문 제안과 스토어 콜라보 초대가 장인에게 자동으로 전달되었습니다.
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <button 
+                      onClick={() => setOrderMode(true)}
+                      className="w-full bg-brand-green text-white hover:bg-[#153427] py-4.5 rounded-none text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow"
+                    >
+                      <ShoppingBag className="w-4 h-4" /> Collaborate & Place Order (주문 제안 넣기)
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
