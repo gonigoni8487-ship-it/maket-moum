@@ -26,6 +26,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import freshwaterEelImg from '../assets/images/freshwater_eel_1780579685433.png';
+import farmsGlowAbaloneImg from '../assets/images/farms_glow_abalone_1780536038721.png';
+import abaloneJerkyImg1 from '../assets/images/abalone_jerky_1_1780580185788.png';
+import abaloneJangImg1 from '../assets/images/abalone_jang_1_1780580202821.png';
 
 // Types for Curation Hub
 interface LocalProducer {
@@ -91,7 +95,7 @@ export default function LocalCurationHub() {
       textColor: 'text-amber-800',
       metrics: { seaBreeze: 80, savory: 65, sweetness: 40, richness: 95 },
       priceMod: 0,
-      image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=400&auto=format&fit=crop'
+      image: abaloneJerkyImg1
     },
     {
       id: 'jerky-2',
@@ -108,7 +112,7 @@ export default function LocalCurationHub() {
       textColor: 'text-emerald-800',
       metrics: { seaBreeze: 75, savory: 80, sweetness: 35, richness: 85 },
       priceMod: 1500,
-      image: 'https://images.unsplash.com/photo-1627834377411-8da5f4f09de8?q=80&w=400&auto=format&fit=crop'
+      image: farmsGlowAbaloneImg
     },
     {
       id: 'jerky-3',
@@ -125,7 +129,7 @@ export default function LocalCurationHub() {
       textColor: 'text-amber-900',
       metrics: { seaBreeze: 60, savory: 100, sweetness: 30, richness: 90 },
       priceMod: 2000,
-      image: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?q=80&w=400&auto=format&fit=crop'
+      image: abaloneJangImg1
     },
     {
       id: 'jerky-4',
@@ -142,7 +146,7 @@ export default function LocalCurationHub() {
       textColor: 'text-rose-800',
       metrics: { seaBreeze: 20, savory: 80, sweetness: 95, richness: 85 },
       priceMod: 1000,
-      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?q=80&w=400&auto=format&fit=crop'
+      image: abaloneJerkyImg1
     },
     {
       id: 'jerky-5',
@@ -159,7 +163,7 @@ export default function LocalCurationHub() {
       textColor: 'text-indigo-900',
       metrics: { seaBreeze: 40, savory: 85, sweetness: 50, richness: 100 },
       priceMod: 3000,
-      image: 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?q=80&w=400&auto=format&fit=crop'
+      image: abaloneJangImg1
     }
   ];
 
@@ -171,15 +175,15 @@ export default function LocalCurationHub() {
   const [investmentProjects, setInvestmentProjects] = useState<InvestmentProject[]>([
     {
       id: 'inv-1',
-      title: '보길도 성창수 장어 장주의 ‘황금 장어 사료 선투자’ 펀드',
+      title: '풍천 장어 주인장의 ‘황금 양념장어,소금구이 출시전’ 최저가로 선주문',
       producer: '성창수 어부',
-      location: '전남 완도군 보길면',
+      location: '전북 남원시 아영면',
       targetAmount: 50000000,
       currentAmount: 38500000,
       minPledge: 20000,
-      rewardPlan: '제철 수확 보길도 활장어 한 쌍 진공패키지(6만원 상당) + 연 5% 로컬 환급 포인트 적립',
-      expectedReturn: '리워드 실물 수취 + 25% 가치 절감 효과',
-      image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?q=80&w=800&auto=format&fit=crop',
+      rewardPlan: '출시 전 풍천 황금 양념장어 & 소금구이 선주문 패키지(8만원 상당) + 연 5% 로컬 환급 포인트 적립',
+      expectedReturn: '정식 출시전 최저가 선주문 실물 배송 + 30% 시중가 장벽 절감 효과',
+      image: freshwaterEelImg,
       investorsCount: 437
     },
     {
@@ -228,15 +232,15 @@ export default function LocalCurationHub() {
     {
       id: 'prod-3',
       name: '성창수 어부',
-      location: '전남 완도군 보길면',
-      title: '자연 친화적 가을 활장어 & 전통 장어덮밥 원물 밀판',
-      specialty: '다도해 해양 한옥 가두리 최고급 활장어',
-      story: '수입산 및 인위적 성장 촉진제를 전면 배제한 고품질 천연 자양 장어 원물',
-      narrative: '보길도의 맑고 깊은 바닷바람과 햇살에 자연양생한 가을 장어입니다. 입안 가득 터지는 깊은 기름기와 수작업으로 가시를 한 땀 한 땀 발라낸 도톰한 장어포를 마켓모움의 전용 한옥 양념 간장(PB)과 함께 배송합니다.',
+      location: '전북 남원시 아영면',
+      title: '자연 친화적 풍천 민물장어 황금 양념장어 & 소금구이 출시전 선주문',
+      specialty: '남원 아영면 청정 민물 최상급 풍천 장어',
+      story: '수입산 0% 단호 배제, 아영면의 맑은 지하수와 장인의 황금 비전 양념 공법',
+      narrative: '전북 남원시 아영면의 맑고 영양 가득한 물줄기에서 자연양생한 최상급 풍천 민물장어입니다. 장인의 손길로 가시를 한 땀 한 땀 정교하게 발라 구워낸 소금구이와 특허받은 비법 숙성 소스를 바른 황금 양념장어를 출시 전 최고 혜택가로 가장 먼저 맛보실 수 있는 특별 선주문 마켓입니다.',
       votes: 110,
       goalVotes: 150,
-      image: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?q=80&w=800&auto=format&fit=crop',
-      highlightTag: '하루 200마리 한정 수공예'
+      image: freshwaterEelImg,
+      highlightTag: '남원 아영 풍천장어 출시전 선주문'
     },
     {
       id: 'prod-4',
@@ -830,7 +834,7 @@ export default function LocalCurationHub() {
                       : 'bg-white text-slate-400 border-black/5 hover:text-brand-green'
                   }`}
                 >
-                  {p.id === 'inv-1' ? '🐟 1. 완도 장어양식장' : '🍊 2. 제주 조천 감귤농장'}
+                  {p.id === 'inv-1' ? '🐟 1. 남원 풍천 장어양식장' : '🍊 2. 제주 조천 감귤농장'}
                 </button>
               ))}
             </div>

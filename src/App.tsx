@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import Navbar from './components/Navbar';
 import LandingPage from './LandingPage';
 import SellerCenter from './SellerCenter';
+import ApplyPage from './ApplyPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,6 +26,11 @@ function AnimatedRoutes() {
         <Route path="/seller" element={
           <PageWrapper id="seller">
             <SellerCenter />
+          </PageWrapper>
+        } />
+        <Route path="/apply" element={
+          <PageWrapper id="apply">
+            <ApplyPage />
           </PageWrapper>
         } />
         {/* Fallback */}

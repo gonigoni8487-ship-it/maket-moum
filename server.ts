@@ -151,6 +151,57 @@ async function startServer() {
     }
   });
 
+  // AI Seasonal Marketing Strategy Developer
+  app.post("/api/ai/marketing-calendar", async (req, res) => {
+    try {
+      const { month, productName, productInfo, monthKeywords } = req.body;
+
+      const promptText = `
+        You are a highly acclaimed premium retail marketing director at "마켓모움" (Market Moum) - a boutique South Korean local food & craft platform.
+        You are generating a customized monthly marketing campaign and curation concept for an artisan's product.
+        
+        [Target Profile]:
+        - Target Month: ${month}월
+        - Selected Month's Micro-trends & Keywords: ${monthKeywords}
+        - Product Name: ${productName}
+        - Product Description/Core Craft: ${productInfo}
+
+        Reflect the specific vibe, seasonal shifts (e.g., Spring/Summer/Autumn/Winter, Chuseok/Solnal Seollal, or hot weather), and micro-trends of ${month}월 in South Korea.
+        The returned suggestions must be written in elegant, poetic, and highly persuasive Korean (prose matching high-end curator style like 29CM, Rawrow, or Market Kurly).
+        
+        Return the result as a single, valid JSON object. Do NOT wrap in markdown unless it is standard CJS JSON. The keys inside the JSON MUST be:
+        {
+          "campaignTitle": "A highly elegant, poetic, custom-tailored campaign title for this month (e.g., '5월의 햇살을 닮은, 온기를 전하는 종가 삼색 포세트')",
+          "seasonalHook": "1-2 elegant sentences connecting this product with the specific weather, mood, or traditional occasions of this month.",
+          "promotionIdea": "A customized product configuration, modern package upgrade, or specialized limited-edition promotion concept tailored to this month (e.g., custom leather card tags, traditional linen wrapper with handwritten letters).",
+          "curatorTip": "A professional MD's golden checklist tip on listing strategy, pricing, target hashtags, or display tips to maximize sales this month.",
+          "hashtags": ["#four", "#custom", "#hashtags", "#here"]
+        }
+      `;
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: [{ parts: [{ text: promptText }] }],
+        config: { 
+          responseMimeType: "application/json",
+          temperature: 0.95
+        }
+      });
+      
+      let text = response.text;
+      if (text.includes("```json")) {
+        text = text.split("```json")[1].split("```")[0];
+      } else if (text.includes("```")) {
+        text = text.split("```")[1].split("```")[0];
+      }
+
+      res.json(JSON.parse(text.trim()));
+    } catch (error) {
+      console.error("AI Marketing Calendar Plan Error:", error);
+      res.status(500).json({ error: "Failed to generate marketing campaign guide" });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Layout, BarChart, Package, Sparkles, Send, CheckCircle2 } from 'lucide-react';
+import { Plus, Layout, BarChart, Package, Sparkles, Send, CheckCircle2, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import DetailPageBuilder from './components/DetailPageBuilder';
+import MarketingCalendar from './components/MarketingCalendar';
 
 import dashboardCoverImg from './assets/images/dashboard_cover_1780525482200.png';
 import brandingCoverImg from './assets/images/branding_cover_1780525497518.png';
@@ -75,6 +76,9 @@ export default function SellerCenter() {
             </TabsTrigger>
             <TabsTrigger value="pb-matching" className="rounded-none border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:bg-transparent px-8 py-4 text-[10px] uppercase tracking-widest">
               <Package className="w-4 h-4 mr-2" /> PB Matching
+            </TabsTrigger>
+            <TabsTrigger value="marketing-calendar" className="rounded-none border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:bg-transparent px-8 py-4 text-[10px] uppercase tracking-widest">
+              <CalendarDays className="w-4 h-4 mr-2" /> 마케팅 캘린더
             </TabsTrigger>
           </TabsList>
 
@@ -621,7 +625,7 @@ export default function SellerCenter() {
                         <div className="space-y-1.5 flex-1">
                           <h5 className="font-bold text-brand-green leading-none">가상의 한옥 스토리 시장 조사 및 볼륨업</h5>
                           <p className="text-[11px] text-foreground/60 leading-relaxed font-light">
-                            우리가 예비로 기틀 잡은 PB 사료 선구입 활장어 덮밥장 스토리를 "만약 전복과 깊은 들개 생기름이 결합된다면 서포트하실 마음이 있으신가요?"라는 설문형 극장 글로 게시해 시장 화력을 타진하고, 누적 일일 100명 미식 동맹 대업 돌파를 기념해 체험단 동맹에 날개를 답니다.
+                            우리가 예비로 기틀 잡은 남원 풍천 황금 양념장어 및 소금구이 선주문 스토리를 "만약 전통 옹기 숙성 비법 간장 소스와 결합된다면 서포트하실 마음이 있으신가요?"라는 설문형 극장 글로 게시해 시장 화력을 타진하고, 누적 일일 100명 미식 동맹 대업 돌파를 기념해 체험단 동맹에 날개를 답니다.
                           </p>
                         </div>
                       </div>
@@ -796,6 +800,12 @@ export default function SellerCenter() {
                   </div>
                 ))}
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="marketing-calendar" className="space-y-8 outline-none animate-fade-in">
+            <div className="bg-white p-8 border border-black/5">
+              <MarketingCalendar />
             </div>
           </TabsContent>
         </Tabs>

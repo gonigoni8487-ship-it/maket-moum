@@ -5,6 +5,9 @@ import { ScrollReveal } from './components/Animated';
 import { PRODUCTS, BRAND_PACKAGES } from './constants';
 import { Link } from 'react-router-dom';
 import LocalCurationHub from './components/LocalCurationHub';
+import MarketingCalendar from './components/MarketingCalendar';
+import SellerApplyForm from './components/SellerApplyForm';
+import chaeBuGonImg from './assets/images/chae_bu_gon_1780579137325.png';
 
 const MDS_DATA = [
   {
@@ -42,26 +45,26 @@ const MDS_DATA = [
       "대한민국 전통식품명인(대한명인) 협회 공인 브랜드 브랜딩 심사위원",
       "현 마켓모움 전통발효/가공 1등급 안심 선발 리드"
     ],
-    verifiedProducts: ["장성조 한옥 종가 간장 PB", "보길도 가을 장어포 프리미엄 세트"],
+    verifiedProducts: ["장성조 한옥 종가 간장 PB", "남원 풍천 황금 양념장어 세트"],
     badgeColor: "bg-[#ec4899]/10 text-[#ec4899]"
   },
   {
     id: "md-3",
-    name: "박준형 수석 바이어",
-    englishName: "Jun-hyung Park",
-    role: "수석 해산 및 자연원물 큐레이터",
-    formerCompany: "전 이마트 수산·축산 프리미엄 소싱 총괄 MD",
-    experience: "전국 160개 포구와 도축장을 누빈 현장 중심 바이어",
-    image: "https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?q=80&w=500&auto=format&fit=crop",
-    quote: "“고온 열풍기로 몇 시간 만에 대량으로 말린 멸치는 은빛 투명함이 서리지 않습니다. 바닷바람 and 가벼운 마루 볕으로 72시간 볕을 조율해야만 진짜 은빛이 탄생합니다.”",
-    philosophy: "당장 내다 팔아 이윤을 채우는 대형 마트 유통 방식의 폐해를 통감하고, '어촌 상생 연염 공법' 등 자연 순환식 어획 및 포구를 엄선하여 수매합니다.",
+    name: "채부곤 수석 바이어",
+    englishName: "Bu-gon Chae",
+    role: "수석 농수산물 프리미엄 소싱 큐레이터",
+    formerCompany: "전 메가마트, 롯데마트 농수산물 프리미엄 소싱 총괄",
+    experience: "전국 산지의 밭과 들녘, 과수원을 누빈 현장 중심 바이어",
+    image: chaeBuGonImg,
+    quote: "“빠른 유통과 회전율에 치여 인위적으로 숙성시킨 과실과 농산물은 장인의 정직한 고집을 온전히 담지 못합니다. 산지의 계절풍과 정직한 흙을 직접 수십 번 확인하고야 마침내 수매를 결정합니다.”",
+    philosophy: "소비 촉진을 목표로 인공 비료와 화학 방부 처리를 일삼는 획일화된 대량 소싱 구도를 전면 거부합니다. 장인의 고부가가치 노력과 원가율을 완전히 보장해 드리고, 다이렉트 상생 가격하락 채널을 안건화함으로써 상호 존중하는 자립 생태계를 만듭니다.",
     history: [
-      "이마트 본사 프리미엄 수산 및 산지 상생 상품개발 바이어 (2011 ~ 2022)",
-      "피코크(PEACOCK) 국산 수산 상품화 프로젝트 우수 추진 바이어 선정",
-      "동해안 기장 일광읍 어촌계 & 보길도 어가 어선단 선주 직송 프로젝트 기획",
-      "현 마켓모움 하이퍼 로컬 수산 어가 상생 협력 총괄 수석 바이어"
+      "메가마트 & 롯데마트 본사 농수산물 프리미엄 소싱 총괄 MD (2010 ~ 2023)",
+      "전국 우수 로컬 브랜드 직송 런칭 기획 및 산지 수공예 농산 수매 총괄",
+      "농림축산식품부 지정 안심 고화질 먹거리 가치 검증 위원 부장",
+      "현 마켓모움 로컬 농수산 상품개발 및 어가/농가 상생 협력 총괄 수석 바이어"
     ],
-    verifiedProducts: ["정성 가득 가마 햇마루 연염 햇멸치", "제철 활장어 진공 패키지"],
+    verifiedProducts: ["청송 사과 꿀청 (Cheongsong Honey Apple Jam)"],
     badgeColor: "bg-[#06b6d4]/10 text-[#06b6d4]"
   }
 ];
@@ -72,6 +75,7 @@ export default function LandingPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [orderMode, setOrderMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'community' | 'store'>('community');
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState<boolean>(false);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -123,9 +127,12 @@ export default function LandingPage() {
               <Link to="/markets" className="bg-brand-green text-[#FAF9F6] px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green/90 transition-all flex items-center gap-2">
                 Explore Markets <ArrowRight className="w-4 h-4" />
               </Link>
-              <Link to="/seller" className="border border-brand-green text-brand-green px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green hover:text-white transition-all">
+              <button 
+                onClick={() => setIsApplyModalOpen(true)}
+                className="border border-brand-green text-brand-green px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green hover:text-white transition-all cursor-pointer font-medium"
+              >
                 Become a Seller
-              </Link>
+              </button>
             </div>
           </motion.div>
         </div>
@@ -325,6 +332,15 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* 2026 Marketing Calendar Section */}
+      <section className="bg-white py-24 px-6 border-b border-black/5">
+        <div className="max-w-7xl mx-auto">
+          <ScrollReveal>
+            <MarketingCalendar />
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* Brand Story Section */}
       <section className="bg-brand-green py-32 text-white">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
@@ -394,10 +410,13 @@ export default function LandingPage() {
             모든 위대한 브랜드는 작은 시작으로부터 나옵니다
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Link to="/seller" className="bg-brand-green text-white px-12 py-6 text-sm uppercase tracking-widest">
+            <button 
+              onClick={() => setIsApplyModalOpen(true)}
+              className="bg-brand-green text-white px-12 py-6 text-sm uppercase tracking-widest hover:bg-[#153427] transition-all cursor-pointer font-bold font-sans"
+            >
               입점 신청하기
-            </Link>
-            <Link to="/seller" className="text-brand-green underline underline-offset-8 text-sm uppercase tracking-widest">
+            </button>
+            <Link to="/seller" className="text-brand-green underline underline-offset-8 text-sm uppercase tracking-widest hover:text-brand-terracotta transition-colors">
               Our Process
             </Link>
           </div>
@@ -679,6 +698,34 @@ export default function LandingPage() {
                     확인 및 닫기
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {isApplyModalOpen && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+            onClick={() => setIsApplyModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-[#FDFCF8] text-[#111111] max-w-2xl w-full border border-black/5 relative shadow-2xl my-8 p-6 md:p-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setIsApplyModalOpen(false)}
+                className="absolute top-6 right-6 z-10 p-2 hover:bg-black/5 rounded-full transition-all text-[#111111] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="pt-4 max-h-[75vh] overflow-y-auto pr-1">
+                <SellerApplyForm onSuccess={() => setIsApplyModalOpen(false)} />
               </div>
             </motion.div>
           </div>
