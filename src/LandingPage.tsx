@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Clock, Star, Copy, X, ShoppingBag } from 'lucide-react';
+import { ArrowRight, Clock, Star, Copy, X, ShoppingBag, Compass, Store } from 'lucide-react';
 import { ScrollReveal } from './components/Animated';
 import { PRODUCTS, BRAND_PACKAGES } from './constants';
 import { Link } from 'react-router-dom';
+import LocalCurationHub from './components/LocalCurationHub';
 
 export default function LandingPage() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [orderMode, setOrderMode] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'community' | 'store'>('community');
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -35,15 +37,16 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: "easeOut" }}
           >
-            <span className="text-sm uppercase tracking-[0.3em] text-brand-green mb-6 block">
-              The Artisan Curation
+            <span className="text-xs md:text-sm uppercase tracking-[0.3em] text-brand-[#D66853] font-bold mb-6 block">
+              생산자 + 스토리 + 팬덤 + 상생 펀딩 공동체
             </span>
-            <h1 className="text-6xl md:text-8xl magazine-heading text-brand-green mb-8 leading-[1.1]">
-              로컬 장인의 숨은 가치를 <br /> 브랜드로 만나다
+            <h1 className="text-5xl md:text-8xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium">
+              최저가 전쟁을 넘어 <br /> 명인의 이야기를 소유하다
             </h1>
-            <p className="text-lg md:text-xl text-brand-green/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-              전국의 숨은 고수들이 제안하는 진정한 로컬 라이프스타일. <br />
-              마켓모움은 지역 브랜드의 성장을 돕고 지속 가능한 가치를 연결합니다.
+            <p className="text-sm md:text-xl text-brand-green/80 mb-12 max-w-3xl mx-auto font-light leading-relaxed">
+              단순히 저렴하게 구매하는 쇼핑몰이 아닙니다. <br />
+              마켓모움은 지역에 숨겨진 생산자를 직접 발굴해 브랜드화하고, 
+              <strong> ‘공동구매 가격하락 퍼널’</strong>과 <strong>‘예약형 시즌 펀딩’</strong>을 결합해 상생팬덤 생태계를 만듭니다.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/markets" className="bg-brand-green text-white px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green/90 transition-all flex items-center gap-2">
@@ -73,70 +76,109 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* Limited Time Section */}
-      <section className="py-32 px-6 max-w-7xl mx-auto">
-        <ScrollReveal>
-          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
-            <div className="max-w-xl">
-              <h2 className="text-4xl md:text-5xl magazine-heading text-brand-green mb-6">
-                진행 중인 팝업 마켓
-              </h2>
-              <p className="text-foreground/60 leading-relaxed font-light">
-                한정된 기간 동안만 열리는 검증된 로컬 팝업입니다. <br />
-                지금 이 순간이 아니면 만나보기 어려운 가치들을 발견하세요.
-              </p>
-            </div>
-            <Link to="/markets" className="text-xs uppercase tracking-widest border-b border-brand-green pb-2 hover:text-brand-terracotta hover:border-brand-terracotta transition-all">
-              View All Active Markets
-            </Link>
+      {/* Platform Concept Selector Tabs */}
+      <section className="bg-[#FAF9F5] border-y border-black/5 py-10 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="space-y-1 text-center md:text-left">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-[#D66853] font-semibold">Select Curated Platform Mode</span>
+            <h3 className="text-xl magazine-heading text-brand-green font-medium">마켓모움의 차별화 큐레이션 관문</h3>
           </div>
-        </ScrollReveal>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {PRODUCTS.map((product, idx) => (
-            <ScrollReveal key={product.id} delay={idx * 0.1}>
-              <div 
-                className="group cursor-pointer" 
-                onClick={() => { setSelectedProduct(product); setOrderMode(false); }}
-              >
-                <div className="relative overflow-hidden aspect-[4/5] bg-[#F3F1E7] mb-6">
-                  <motion.img 
-                    src={product.image} 
-                    alt={product.name}
-                    className="w-full h-full object-cover grayscale-[10%] group-hover:grayscale-0 transition-all duration-700"
-                    whileHover={{ scale: 1.05 }}
-                    referrerPolicy="no-referrer"
-                  />
-                  {product.isLimited && (
-                    <div className="absolute top-4 left-4">
-                      <span className="bg-brand-terracotta text-white text-[10px] px-3 py-1 uppercase tracking-widest">
-                        Limited Time
-                      </span>
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-full group-hover:translate-y-0 transition-transform bg-brand-green/90 text-white flex justify-between items-center">
-                    <span className="text-xs uppercase tracking-widest text-white font-medium">View Details</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-lg magazine-heading mb-1">{product.name}</h3>
-                    <p className="text-sm text-foreground/40 font-light italic text-[#1B4332]/70">By {product.artisan}</p>
-                  </div>
-                  <p className="text-lg font-serif text-[#1B4332]">₩{product.price.toLocaleString()}</p>
-                </div>
-                {product.isLimited && (
-                  <div className="mt-4 flex items-center gap-2 text-brand-terracotta">
-                    <Clock className="w-3 h-3" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest font-semibold">Ends in {product.timeLeft}</span>
-                  </div>
-                )}
-              </div>
-            </ScrollReveal>
-          ))}
+          
+          <div className="flex bg-[#F3F1E7] border border-black/5 p-1.5 justify-center max-w-lg w-full md:w-auto">
+            <button 
+              onClick={() => setActiveTab('community')}
+              className={`flex-1 md:px-8 py-3.5 text-[11px] uppercase tracking-widest font-mono transition-all font-bold flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === 'community' 
+                  ? 'bg-brand-green text-white shadow-sm' 
+                  : 'bg-transparent text-brand-green/60 hover:text-brand-green'
+              }`}
+            >
+              <Compass className="w-4 h-4" /> 1. 로컬 미식 공동체 (Curation Hub)
+            </button>
+            <button 
+              onClick={() => setActiveTab('store')}
+              className={`flex-1 md:px-8 py-3.5 text-[11px] uppercase tracking-widest font-mono transition-all font-bold flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === 'store' 
+                  ? 'bg-brand-green text-white shadow-sm' 
+                  : 'bg-transparent text-brand-green/60 hover:text-brand-green'
+              }`}
+            >
+              <Store className="w-4 h-4" /> 2. 팝업 직매장 (Pop-Up Store)
+            </button>
+          </div>
         </div>
       </section>
+
+      {activeTab === 'community' ? (
+        <section className="py-24 px-6 max-w-7xl mx-auto animate-fade-in">
+          <LocalCurationHub />
+        </section>
+      ) : (
+        /* Limited Time Section */
+        <section className="py-32 px-6 max-w-7xl mx-auto animate-fade-in">
+          <ScrollReveal>
+            <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+              <div className="max-w-xl">
+                <h2 className="text-4xl md:text-5xl magazine-heading text-brand-green mb-6">
+                  진행 중인 팝업 마켓
+                </h2>
+                <p className="text-foreground/60 leading-relaxed font-light">
+                  한정된 기간 동안만 열리는 검증된 로컬 팝업입니다. <br />
+                  지금 이 순간이 아니면 만나보기 어려운 가치들을 발견하세요.
+                </p>
+              </div>
+              <Link to="/markets" className="text-xs uppercase tracking-widest border-b border-brand-green pb-2 hover:text-brand-terracotta hover:border-brand-terracotta transition-all">
+                View All Active Markets
+              </Link>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            {PRODUCTS.map((product, idx) => (
+              <ScrollReveal key={product.id} delay={idx * 0.1}>
+                <div 
+                  className="group cursor-pointer" 
+                  onClick={() => { setSelectedProduct(product); setOrderMode(false); }}
+                >
+                  <div className="relative overflow-hidden aspect-[4/5] bg-[#F3F1E7] mb-6">
+                    <motion.img 
+                      src={product.image} 
+                      alt={product.name}
+                      className="w-full h-full object-cover grayscale-[10%] group-hover:grayscale-0 transition-all duration-700"
+                      whileHover={{ scale: 1.05 }}
+                      referrerPolicy="no-referrer"
+                    />
+                    {product.isLimited && (
+                      <div className="absolute top-4 left-4">
+                        <span className="bg-brand-terracotta text-white text-[10px] px-3 py-1 uppercase tracking-widest">
+                          Limited Time
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-full group-hover:translate-y-0 transition-transform bg-brand-green/90 text-white flex justify-between items-center">
+                      <span className="text-xs uppercase tracking-widest text-white font-medium">View Details</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg magazine-heading mb-1">{product.name}</h3>
+                      <p className="text-sm text-foreground/40 font-light italic text-[#1B4332]/70">By {product.artisan}</p>
+                    </div>
+                    <p className="text-lg font-serif text-[#1B4332]">₩{product.price.toLocaleString()}</p>
+                  </div>
+                  {product.isLimited && (
+                    <div className="mt-4 flex items-center gap-2 text-brand-terracotta">
+                      <Clock className="w-3 h-3" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest font-semibold">Ends in {product.timeLeft}</span>
+                    </div>
+                  )}
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Brand Story Section */}
       <section className="bg-brand-green py-32 text-white">
@@ -144,9 +186,9 @@ export default function LandingPage() {
           <ScrollReveal>
             <div className="relative">
               <img 
-                src="https://images.unsplash.com/photo-1556761175-4b46a572b786?q=80&w=1200&auto=format&fit=crop" 
+                src="https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?q=80&w=1200&auto=format&fit=crop" 
                 className="w-full aspect-[3/4] object-cover ring-1 ring-white/10"
-                alt="Artisan at work"
+                alt="Traditional Korean Onggi Jars representing Korean artisan legacy"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute -bottom-10 -right-10 bg-brand-ivory p-12 text-brand-green hidden xl:block border border-black/5">

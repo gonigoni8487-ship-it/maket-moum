@@ -26,3 +26,33 @@ export interface Artisan {
   image: string;
   location: string;
 }
+
+export interface DetailPageData {
+  intro: {
+    title: string;
+    subtitle: string;
+    summary: string;
+  };
+  legacy_story: {
+    headline: string;
+    narrative: string;
+  };
+  sensory_profile: {
+    visual: string;
+    touch_text: string;
+    atmosphere: string;
+  };
+  features: {
+    number: string;
+    title: string;
+    explain: string;
+  }[];
+  lifestyle_matching: {
+    headline: string;
+    matching_points: string[];
+  };
+  guide: {
+    usage: string;
+    storage: string;
+  };
+}

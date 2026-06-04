@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import DetailPageBuilder from './components/DetailPageBuilder';
 
 import dashboardCoverImg from './assets/images/dashboard_cover_1780525482200.png';
 import brandingCoverImg from './assets/images/branding_cover_1780525497518.png';
@@ -13,6 +14,7 @@ import analyticsCoverImg from './assets/images/analytics_cover_1780525510386.png
 import pbCoverImg from './assets/images/pb_cover_1780525524480.png';
 
 export default function SellerCenter() {
+  const [brandingSubTab, setBrandingSubTab] = useState<'identity' | 'detail-page'>('identity');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -113,162 +115,192 @@ export default function SellerCenter() {
           </TabsContent>
 
           <TabsContent value="ai-branding" className="outline-none">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {/* Form Side */}
-              <div className="space-y-8">
-                <Card className="rounded-none border-black/5 bg-white">
-                  <CardHeader className="space-y-3">
-                    <div>
-                      <CardTitle className="magazine-heading text-2xl text-brand-green">Create Brand Identity</CardTitle>
-                      <CardDescription className="text-xs">제품 정보만 입력하세요. 나머지는 AI가 생성합니다.</CardDescription>
-                    </div>
-                    <div className="pt-2 flex flex-wrap gap-2 items-center">
-                      <span className="text-[9px] uppercase tracking-wider text-foreground/45">시작 고르기:</span>
-                      <button 
-                        onClick={() => setFormData({
-                          name: '팜스네이브 Farms Glow 프리미엄 전복장',
-                          info: '완도 미역귀와 청정 다시마를 먹고 자란 두툼하고 신선한 대물 참전복만을 엄선. 황동 고리백자와 장전통 옹기에서 명인의 비법 15가지 약초 간장 황금 배합비로 짜지 않게 저온 옹기 숙성하여 한과 자개급 정기 패키지로 배송.',
-                          tone: 'Sophisticated & Minimal'
-                        })}
-                        className="bg-[#1B4332]/5 text-brand-green hover:bg-[#1B4332]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
-                      >
-                        🦪 팜스네이브 전복장
-                      </button>
-                      <button 
-                        onClick={() => setFormData({
-                          name: '청송 사과 꿀청',
-                          info: '경북 청송 고랭지 특유의 일교차로 당도와 사근거림이 완벽한 가을 부사만을 골라 수작업 슬라이스. 인공 백설탕이나 색소 없이 오직 산들바람 가을 천연 야생화 꿀만으로 숙성.',
-                          tone: 'Traditional & Warm'
-                        })}
-                        className="bg-[#1B4332]/5 text-brand-green hover:bg-[#1B4332]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
-                      >
-                        🍎 청송 사과 꿀청
-                      </button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase tracking-widest">Product Name</label>
-                      <input 
-                        className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green" 
-                        placeholder="e.g. 제주 유채 꿀비누"
-                        value={formData.name}
-                        onChange={e => setFormData({...formData, name: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase tracking-widest">Product Info & Craftmanship</label>
-                      <textarea 
-                        className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-sm h-32 focus:outline-none focus:ring-1 focus:ring-brand-green" 
-                        placeholder="장인의 작업 방식이나 원재료의 특별함을 적어주세요."
-                        value={formData.info}
-                        onChange={e => setFormData({...formData, info: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase tracking-widest">Brand Tone</label>
-                      <select 
-                        className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                        value={formData.tone}
-                        onChange={e => setFormData({...formData, tone: e.target.value})}
-                      >
-                        <option>Sophisticated & Minimal</option>
-                        <option>Traditional & Warm</option>
-                        <option>Bold & Modern</option>
-                        <option>Rustic & Artisan</option>
-                      </select>
-                    </div>
-                    <Button 
-                      className="w-full rounded-none bg-brand-green text-white h-14 uppercase tracking-widest text-xs disabled:opacity-50"
-                      onClick={handleGenerate}
-                      disabled={isGenerating || !formData.name}
-                    >
-                      {isGenerating ? 'Generating Identity...' : 'Generate Brand Package'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Result Side */}
-              <div className="relative">
-                {!aiResult && !isGenerating && (
-                  <div className="h-full border border-black/5 bg-white p-8 flex flex-col justify-between min-h-[500px]">
-                    <div className="relative h-56 w-full bg-[#F3F1E7]/50 overflow-hidden mb-6">
-                      <img src={brandingCoverImg} className="w-full h-full object-cover grayscale-[15%]" alt="Branding visual mood" referrerPolicy="no-referrer" />
-                      <div className="absolute inset-0 bg-black/5"></div>
-                    </div>
-                    <div className="text-center pb-8 flex-1 flex flex-col items-center justify-center">
-                      <Sparkles className="w-8 h-8 mb-4 text-brand-green/70" />
-                      <p className="magazine-heading text-xl text-brand-green mb-2">Ready for Branding</p>
-                      <p className="text-xs font-light text-foreground/60 max-w-xs mx-auto">
-                        왼쪽 제품 프로필을 입력하시면 AI가 스토리형 슬로건, 철학을 담은 라이프스타일 스토리, 사회관계망 가이드 카피를 조립해 드립니다.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {isGenerating && (
-                  <div className="h-full bg-brand-green/[0.02] border border-black/5 flex flex-col items-center justify-center p-20 text-center min-h-[500px]">
-                    <motion.div 
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                    >
-                      <Sparkles className="w-12 h-12 mb-6 text-brand-green" />
-                    </motion.div>
-                    <p className="magazine-heading text-xl mb-4">Crafting Your Story</p>
-                    <p className="text-xs font-light text-foreground/40 italic">장인의 철학과 제품의 가치를 분석하여 <br /> 최적의 브랜딩 키워드를 도출하고 있습니다...</p>
-                  </div>
-                )}
-
-                {aiResult && (
-                  <motion.div 
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="space-y-6"
-                  >
-                    <Card className="rounded-none border-brand-green/20 bg-white overflow-hidden">
-                      <div className="h-2 bg-brand-green"></div>
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <Badge variant="outline" className="text-[8px] uppercase tracking-widest rounded-none border-brand-green text-brand-green">AI Generated Assets</Badge>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Send className="w-3 h-3" /></Button>
-                        </div>
-                        <CardTitle className="magazine-heading text-3xl text-brand-green mt-4 tracking-tight italic">
-                          "{aiResult.tagline}"
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-8">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Brand Story</label>
-                          <p className="text-sm font-light leading-relaxed text-foreground/80 bg-brand-green/[0.03] p-4 italic">
-                            {aiResult.story}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Signature Selling Points</label>
-                          <ul className="space-y-3">
-                            {aiResult.details.map((detail: string, i: number) => (
-                              <li key={i} className="text-xs font-light flex items-center gap-3">
-                                <CheckCircle2 className="w-4 h-4 text-brand-green" /> {detail}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Instagram Marketing Copy</label>
-                          <p className="text-[11px] font-mono leading-relaxed bg-[#1B4332] text-white/90 p-6">
-                            {aiResult.marketingCopy}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Button className="w-full rounded-none border-brand-green border-2 bg-transparent text-brand-green hover:bg-brand-green hover:text-white h-14 uppercase tracking-widest text-[10px]">
-                      Apply This Branding to Product Page
-                    </Button>
-                  </motion.div>
-                )}
-              </div>
+            {/* Elegant Sub tab switcher */}
+            <div className="flex bg-[#F3F1E7]/80 border border-black/5 p-1 justify-start mb-8 max-w-md">
+              <button 
+                onClick={() => setBrandingSubTab('identity')}
+                className={`flex-1 py-3 text-[10px] uppercase tracking-widest font-mono transition-all font-semibold cursor-pointer ${
+                  brandingSubTab === 'identity' 
+                    ? 'bg-brand-green text-white' 
+                    : 'bg-transparent text-brand-green/60 hover:text-brand-green'
+                }`}
+              >
+                1. Brand Identity Pack
+              </button>
+              <button 
+                onClick={() => setBrandingSubTab('detail-page')}
+                className={`flex-1 py-3 text-[10px] uppercase tracking-widest font-mono transition-all font-semibold cursor-pointer ${
+                  brandingSubTab === 'detail-page' 
+                    ? 'bg-brand-green text-white' 
+                    : 'bg-transparent text-brand-green/60 hover:text-brand-green'
+                }`}
+              >
+                2. Premium Detail Page
+              </button>
             </div>
+
+            {brandingSubTab === 'identity' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
+                {/* Form Side */}
+                <div className="space-y-8">
+                  <Card className="rounded-none border-black/5 bg-white">
+                    <CardHeader className="space-y-3">
+                      <div>
+                        <CardTitle className="magazine-heading text-2xl text-brand-green">Create Brand Identity</CardTitle>
+                        <CardDescription className="text-xs">제품 정보만 입력하세요. 나머지는 AI가 생성합니다.</CardDescription>
+                      </div>
+                      <div className="pt-2 flex flex-wrap gap-2 items-center">
+                        <span className="text-[9px] uppercase tracking-wider text-foreground/45">시작 고르기:</span>
+                        <button 
+                          onClick={() => setFormData({
+                            name: '팜스네이브 Farms Glow 프리미엄 전복장',
+                            info: '완도 미역귀와 청정 다시마를 먹고 자란 두툼하고 신선한 대물 참전복만을 엄선. 황동 고리백자와 장전통 옹기에서 명인의 비법 15가지 약초 간장 황금 배합비로 짜지 않게 저온 옹기 숙성하여 한과 자개급 정기 패키지로 배송.',
+                            tone: 'Sophisticated & Minimal'
+                          })}
+                          className="bg-[#1B4332]/5 text-brand-green hover:bg-[#1B4332]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
+                        >
+                          🦪 팜스네이브 전복장
+                        </button>
+                        <button 
+                          onClick={() => setFormData({
+                            name: '청송 사과 꿀청',
+                            info: '경북 청송 고랭지 특유의 일교차로 당도와 사근거림이 완벽한 가을 부사만을 골라 수작업 슬라이스. 인공 백설탕이나 색소 없이 오직 산들바람 가을 천연 야생화 꿀만으로 숙성.',
+                            tone: 'Traditional & Warm'
+                          })}
+                          className="bg-[#1B4332]/5 text-brand-green hover:bg-[#1B4332]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
+                        >
+                          🍎 청송 사과 꿀청
+                        </button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest">Product Name</label>
+                        <input 
+                          className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green" 
+                          placeholder="e.g. 제주 유채 꿀비누"
+                          value={formData.name}
+                          onChange={e => setFormData({...formData, name: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest">Product Info & Craftmanship</label>
+                        <textarea 
+                          className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-sm h-32 focus:outline-none focus:ring-1 focus:ring-brand-green" 
+                          placeholder="장인의 작업 방식이나 원재료의 특별함을 적어주세요."
+                          value={formData.info}
+                          onChange={e => setFormData({...formData, info: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest">Brand Tone</label>
+                        <select 
+                          className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
+                          value={formData.tone}
+                          onChange={e => setFormData({...formData, tone: e.target.value})}
+                        >
+                          <option>Sophisticated & Minimal</option>
+                          <option>Traditional & Warm</option>
+                          <option>Bold & Modern</option>
+                          <option>Rustic & Artisan</option>
+                        </select>
+                      </div>
+                      <Button 
+                        className="w-full rounded-none bg-brand-green text-white h-14 uppercase tracking-widest text-xs disabled:opacity-50"
+                        onClick={handleGenerate}
+                        disabled={isGenerating || !formData.name}
+                      >
+                        {isGenerating ? 'Generating Identity...' : 'Generate Brand Package'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Result Side */}
+                <div className="relative">
+                  {!aiResult && !isGenerating && (
+                    <div className="h-full border border-black/5 bg-white p-8 flex flex-col justify-between min-h-[500px]">
+                      <div className="relative h-56 w-full bg-[#F3F1E7]/50 overflow-hidden mb-6">
+                        <img src={brandingCoverImg} className="w-full h-full object-cover grayscale-[15%]" alt="Branding visual mood" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-black/5"></div>
+                      </div>
+                      <div className="text-center pb-8 flex-1 flex flex-col items-center justify-center">
+                        <Sparkles className="w-8 h-8 mb-4 text-brand-green/70" />
+                        <p className="magazine-heading text-xl text-brand-green mb-2">Ready for Branding</p>
+                        <p className="text-xs font-light text-foreground/60 max-w-xs mx-auto">
+                          왼쪽 제품 프로필을 입력하시면 AI가 스토리형 슬로건, 철학을 담은 라이프스타일 스토리, 사회관계망 가이드 카피를 조립해 드립니다.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {isGenerating && (
+                    <div className="h-full bg-brand-green/[0.02] border border-black/5 flex flex-col items-center justify-center p-20 text-center min-h-[500px]">
+                      <motion.div 
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Sparkles className="w-12 h-12 mb-6 text-brand-green" />
+                      </motion.div>
+                      <p className="magazine-heading text-xl mb-4">Crafting Your Story</p>
+                      <p className="text-xs font-light text-foreground/40 italic">장인의 철학과 제품의 가치를 분석하여 <br /> 최적의 브랜딩 키워드를 도출하고 있습니다...</p>
+                    </div>
+                  )}
+
+                  {aiResult && (
+                    <motion.div 
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="space-y-6"
+                    >
+                      <Card className="rounded-none border-brand-green/20 bg-white overflow-hidden">
+                        <div className="h-2 bg-brand-green"></div>
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <Badge variant="outline" className="text-[8px] uppercase tracking-widest rounded-none border-brand-green text-brand-green">AI Generated Assets</Badge>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Send className="w-3 h-3" /></Button>
+                          </div>
+                          <CardTitle className="magazine-heading text-3xl text-brand-green mt-4 tracking-tight italic">
+                            "{aiResult.tagline}"
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-8">
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Brand Story</label>
+                            <p className="text-sm font-light leading-relaxed text-foreground/80 bg-brand-green/[0.03] p-4 italic">
+                              {aiResult.story}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Signature Selling Points</label>
+                            <ul className="space-y-3">
+                              {aiResult.details.map((detail: string, i: number) => (
+                                <li key={i} className="text-xs font-light flex items-center gap-3">
+                                  <CheckCircle2 className="w-4 h-4 text-brand-green" /> {detail}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Instagram Marketing Copy</label>
+                            <p className="text-[11px] font-mono leading-relaxed bg-[#1B4332] text-white/90 p-6">
+                              {aiResult.marketingCopy}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Button className="w-full rounded-none border-brand-green border-2 bg-transparent text-brand-green hover:bg-brand-green hover:text-white h-14 uppercase tracking-widest text-[10px]">
+                        Apply This Branding to Product Page
+                      </Button>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="animate-fade-in">
+                <DetailPageBuilder />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-8 outline-none">
