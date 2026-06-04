@@ -1,5 +1,9 @@
-name = "maket-moum1"
+name = "market-moum"
 compatibility_date = "2024-04-03"
+
+[build]
+command = "npm run build"
 
 [assets]
 directory = "./dist"
+
