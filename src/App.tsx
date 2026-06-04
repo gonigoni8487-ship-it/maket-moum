@@ -5,6 +5,7 @@ import LandingPage from './LandingPage';
 import SellerCenter from './SellerCenter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
+import logoImg from './assets/images/market_moum_logo_1780557786342.png';
 
 const queryClient = new QueryClient();
 
@@ -53,7 +54,24 @@ export default function App() {
           <footer className="bg-brand-green text-white py-20 px-6">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 border-b border-white/10 pb-20 mb-20">
               <div className="space-y-6">
-                <Link to="/" className="text-3xl magazine-heading font-bold italic">Market Moum</Link>
+                <Link to="/" className="flex items-center gap-4 group">
+                  <div className="relative w-14 h-14 overflow-hidden border border-[#D4AF37]/30 bg-[#111] p-0.5 rounded-full shadow-lg transition-all duration-300 group-hover:scale-105 group-hover:border-[#D4AF37]">
+                    <img 
+                      src={logoImg} 
+                      alt="Market Moum Logo Footer" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold tracking-tight text-white magazine-heading leading-tight transition-colors group-hover:text-brand-terracotta">
+                      마켓모움
+                    </span>
+                    <span className="text-[9px] text-[#D4AF37] tracking-[0.2em] font-mono leading-none mt-0.5">
+                      MARKET MOUM
+                    </span>
+                  </div>
+                </Link>
                 <p className="text-sm text-white/50 font-light leading-relaxed max-w-xs">
                   로컬 아티스트의 철학을 고해상도 매거진 형식으로 풀어내고 브랜드 성장을 지원하는 비즈니스 엑셀러레이팅 플랫폼입니다.
                 </p>

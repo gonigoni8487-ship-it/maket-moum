@@ -174,7 +174,7 @@ export default function LocalCurationHub() {
       minPledge: 20000,
       rewardPlan: '제철 수확 보길도 활장어 한 쌍 진공패키지(6만원 상당) + 연 5% 로컬 환급 포인트 적립',
       expectedReturn: '리워드 실물 수취 + 25% 가치 절감 효과',
-      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=600&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800&auto=format&fit=crop',
       investorsCount: 437
     },
     {
@@ -187,7 +187,7 @@ export default function LocalCurationHub() {
       minPledge: 10000,
       rewardPlan: '자연 숙성 당도 14Brix 감귤 10kg 나무목함 콜라보 박스(4.5만원 상당) + 무료 웰컴 미식 패스포트',
       expectedReturn: '가장 먼저 첫 수확 감귤 벼루 배송 + 한정판 굿즈',
-      image: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?q=80&w=600&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?q=80&w=800&auto=format&fit=crop',
       investorsCount: 310
     }
   ]);
@@ -204,7 +204,7 @@ export default function LocalCurationHub() {
       narrative: '기장의 맑은 바람이 암초 위에 머무르는 시간은 짧습니다. 자연 자염 가마솥에서 끓여낸 전통 소금물로 다시마의 결을 소독하고 무쇠 가마솥에 데쳐 아날로그 수작조로 완성합니다.',
       votes: 142,
       goalVotes: 200,
-      image: 'https://images.unsplash.com/photo-1516685018646-549198525c1b?q=80&w=600&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1516685018646-549198525c1b?q=80&w=800&auto=format&fit=crop',
       highlightTag: '70년 가문비 전통'
     },
     {
@@ -217,7 +217,7 @@ export default function LocalCurationHub() {
       narrative: '기성의 고온 열풍 건조기에서 구워낸 멸치와는 빛깔 자체가 다른 은빛 투명함을 지녔습니다. 털어낸 후 옹기에 가벼운 연염을 쳐 가을 햇마루에서 72시간 볕을 쪼였습니다. 원조 할머니 레시피 북을 동봉해 드립니다.',
       votes: 188,
       goalVotes: 200,
-      image: 'https://images.unsplash.com/photo-1511140973288-19bf21d7e771?q=80&w=600&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1511140973288-19bf21d7e771?q=80&w=800&auto=format&fit=crop',
       highlightTag: '할머니 레시피'
     },
     {
@@ -230,7 +230,7 @@ export default function LocalCurationHub() {
       narrative: '보길도의 맑고 깊은 바닷바람과 햇살에 자연양생한 가울 장어입니다. 입안 가득 터지는 깊은 기름기와 수작업으로 가시를 한 땀 한 땀 발라낸 도톰한 장어포를 마켓모움의 전용 한옥 양념 간장(PB)과 함께 배송합니다.',
       votes: 110,
       goalVotes: 150,
-      image: 'https://images.unsplash.com/photo-1580442151529-343f2f5e0e27?q=80&w=600&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800&auto=format&fit=crop',
       highlightTag: '하루 200마리 한정 수공예'
     },
     {
@@ -243,7 +243,7 @@ export default function LocalCurationHub() {
       narrative: '과거 아이들의 웃음소리가 머물던 조천의 작은 폐교 공터를 개조해 만든 귤밭입니다. 공장에서 왁스코팅한 주황빛 공산품 귤과 다른, 자연 그대로의 다채로운 새콤달콤함을 서포트합니다.',
       votes: 75,
       goalVotes: 120,
-      image: 'https://images.unsplash.com/photo-1551008475-4533d141445b?q=80&w=600&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?q=80&w=800&auto=format&fit=crop',
       highlightTag: '폐교 개조 귤공장'
     }
   ]);

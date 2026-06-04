@@ -5,18 +5,21 @@
   --font-serif: "Playfair Display", serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  --color-background: #FDFCF8;
-  --color-foreground: #1A1A1A;
-  --color-brand-green: #1B4332;
-  --color-brand-terracotta: #D66853;
-  --color-brand-ivory: #FDFCF8;
+  --color-background: #FAF7F0;
+  --color-foreground: #1E2320;
+  --color-brand-green: #0B2519;
+  --color-brand-terracotta: #C8452D;
+  --color-brand-gold: #C49A55;
+  --color-brand-ivory: #FAF7F0;
 
-  --color-primary: #1B4332;
-  --color-primary-foreground: #FDFCF8;
-  --color-secondary: #F3F1E7;
-  --color-secondary-foreground: #1B4332;
-  --color-accent: #D66853;
-  --color-accent-foreground: #FDFCF8;
+  --color-primary: #0B2519;
+  --color-primary-foreground: #FAF7F0;
+  --color-secondary: #F1ECE1;
+  --color-secondary-foreground: #0B2519;
+  --color-accent: #C8452D;
+  --color-accent-foreground: #FAF7F0;
+  --color-gold: #C49A55;
+  --color-gold-foreground: #0B2519;
 
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
