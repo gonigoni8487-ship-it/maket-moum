@@ -192,8 +192,8 @@ export default function DetailPageBuilder() {
       {/* Input controls on the left */}
       <div className="xl:col-span-5 space-y-8">
         <Card className="rounded-none border-black/5 bg-white shadow-sm overflow-hidden">
-          <div className="bg-[#1B4332] text-white px-6 py-4 flex items-center gap-2">
-            <Compass className="w-5 h-5 text-[#D66853] animate-spin-slow" />
+          <div className="bg-[#111111] text-white px-6 py-4 flex items-center gap-2">
+            <Compass className="w-5 h-5 text-[#8C1D24] animate-spin-slow" />
             <span className="text-xs tracking-[0.2em] uppercase font-mono font-medium">Boutique Editorial Designer</span>
           </div>
           
@@ -216,7 +216,7 @@ export default function DetailPageBuilder() {
                     className={`text-[9px] px-2.5 py-1.5 transition-all flex items-center gap-1.5 font-medium border cursor-pointer ${
                       selectedPreset === p.id 
                         ? 'bg-brand-green text-white border-brand-green' 
-                        : 'bg-[#F3F1E7]/40 text-brand-green border-brand-green/10 hover:bg-[#F3F1E7]/100'
+                        : 'bg-[#FAF9F6]/40 text-brand-green border-brand-green/10 hover:bg-[#FAF9F6]/100'
                     }`}
                   >
                     {p.id === 'p1' ? '🍎' : p.id === 'p2' ? '🕯️' : p.id === 'p3' ? '☕' : '🦪'} {p.name.split(' (')[0]}
@@ -229,7 +229,7 @@ export default function DetailPageBuilder() {
           <CardContent className="space-y-6">
             {/* 1. Product Name */}
             <div className="space-y-1.5">
-              <label className="text-[10px] uppercase tracking-widest text-[#D66853] font-medium flex items-center justify-between">
+              <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] font-medium flex items-center justify-between">
                 <span>01. Product Name (상품명)</span>
                 {productName.length > 0 && <Check className="w-3.5 h-3.5 text-brand-green" />}
               </label>
@@ -246,7 +246,7 @@ export default function DetailPageBuilder() {
 
             {/* 2. Product Type */}
             <div className="space-y-1.5">
-              <label className="text-[10px] uppercase tracking-widest text-[#D66853] font-medium">02. Product Type & Mood category (상품 유형)</label>
+              <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] font-medium">02. Product Type & Mood category (상품 유형)</label>
               <select 
                 className="w-full bg-[#FDFCF8] border border-black/5 p-4 text-xs font-light focus:outline-none focus:ring-1 focus:ring-brand-green cursor-pointer"
                 value={productType}
@@ -261,7 +261,7 @@ export default function DetailPageBuilder() {
 
             {/* 3. Image Selector */}
             <div className="space-y-1.5">
-              <label className="text-[10px] uppercase tracking-widest text-[#D66853] font-medium">03. Visual Image Source (제품 무드컷 사진)</label>
+              <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] font-medium">03. Visual Image Source (제품 무드컷 사진)</label>
               
               <div 
                 onDragEnter={handleDrag}
@@ -281,7 +281,7 @@ export default function DetailPageBuilder() {
                 />
                 
                 {getPreviewImage() ? (
-                  <div className="relative w-full aspect-video h-40 overflow-hidden mb-3 bg-[#F3F1E7]">
+                  <div className="relative w-full aspect-video h-40 overflow-hidden mb-3 bg-[#FAF9F6]">
                     <img 
                       src={getPreviewImage()} 
                       className="w-full h-full object-cover" 
@@ -307,9 +307,9 @@ export default function DetailPageBuilder() {
 
             {/* 4. Target Persona Selector */}
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#D66853] font-medium flex items-center justify-between">
+              <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] font-medium flex items-center justify-between">
                 <span>04. Target Buyer Profile (페르소나 양식)</span>
-                <Badge variant="outline" className="text-[8px] bg-[#FDFCF8] text-[#D66853] font-light font-mono px-2 rounded-none border-[#D66853]/20">Active Alignment</Badge>
+                <Badge variant="outline" className="text-[8px] bg-[#FDFCF8] text-[#8C1D24] font-light font-mono px-2 rounded-none border-[#8C1D24]/20">Active Alignment</Badge>
               </label>
               
               <div className="space-y-2">
@@ -339,7 +339,7 @@ export default function DetailPageBuilder() {
 
             {/* 5. Custom Prompter */}
             <div className="space-y-1.5">
-              <label className="text-[10px] uppercase tracking-widest text-[#D66853] font-medium">
+              <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] font-medium">
                 05. Designer Custom Prompt Instruction (디자이너 지시사항 프롬프트)
               </label>
               <textarea 
@@ -363,7 +363,7 @@ export default function DetailPageBuilder() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 mr-2 text-[#D66853]" />
+                  <Sparkles className="w-4 h-4 mr-2 text-[#8C1D24]" />
                   디자인 및 상세페이지 생성하기
                 </>
               )}
@@ -421,9 +421,9 @@ export default function DetailPageBuilder() {
               최고의 디자이너가 당신의 제품에 서식하는 자연유래 요소들을 분류한 뒤, 수작업의 질감을 살려 감도 높은 커머스 텍스트 레이아웃을 다듬고 있습니다...
             </p>
             <div className="mt-8 flex gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#D66853] animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-2 h-2 rounded-full bg-[#8C1D24] animate-bounce" style={{ animationDelay: '0ms' }}></span>
               <span className="w-2 h-2 rounded-full bg-brand-green animate-bounce" style={{ animationDelay: '150ms' }}></span>
-              <span className="w-2 h-2 rounded-full bg-[#1B4332] animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              <span className="w-2 h-2 rounded-full bg-[#111111] animate-bounce" style={{ animationDelay: '300ms' }}></span>
             </div>
           </div>
         )}
@@ -443,21 +443,21 @@ export default function DetailPageBuilder() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-[#D66853] font-medium">Boutique Production Live</span>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-[#8C1D24] font-medium">Boutique Production Live</span>
               </div>
             </div>
 
             {/* Actual Gorgeous Mock mobile-responsive Detailed Page Preview */}
-            <div className="bg-[#FAF9F5] border border-black/10 text-foreground overflow-hidden max-w-lg mx-auto shadow-xl">
+            <div className="bg-[#FAF9F6] border border-black/10 text-foreground overflow-hidden max-w-lg mx-auto shadow-xl">
               
               {/* BRAND HEADER BAR */}
               <div className="px-6 py-6 border-b border-black/5 flex justify-between items-center bg-white">
                 <span className="text-[10px] tracking-[0.3em] font-mono italic uppercase font-bold text-brand-green">MOUM CURATION</span>
-                <span className="text-[9px] text-[#D66853] tracking-widest font-mono uppercase bg-[#1B4332]/5 py-0.5 px-2">LOCAL MASTERPIECE</span>
+                <span className="text-[9px] text-[#8C1D24] tracking-widest font-mono uppercase bg-[#111111]/5 py-0.5 px-2">LOCAL MASTERPIECE</span>
               </div>
 
               {/* COVER LAYER */}
-              <div className="relative aspect-[3/4] w-full bg-[#F3F1E7] overflow-hidden">
+              <div className="relative aspect-[3/4] w-full bg-[#FAF9F6] overflow-hidden">
                 <img 
                   src={getPreviewImage()} 
                   className="w-full h-full object-cover grayscale-[5%] contrast-[102%]" 
@@ -469,7 +469,7 @@ export default function DetailPageBuilder() {
                 
                 {/* Header title inside Image */}
                 <div className="absolute bottom-10 left-8 right-8 text-white space-y-3">
-                  <Badge className="bg-[#D66853] text-white rounded-none text-[8px] uppercase tracking-[0.35em] mb-1 font-mono hover:bg-[#D66853]/90">
+                  <Badge className="bg-[#8C1D24] text-white rounded-none text-[8px] uppercase tracking-[0.35em] mb-1 font-mono hover:bg-[#8C1D24]/90">
                     {productType.split(' (')[0]}
                   </Badge>
                   <h1 className="text-3xl magazine-heading font-medium tracking-tight leading-snug italic">
@@ -483,15 +483,15 @@ export default function DetailPageBuilder() {
 
               {/* INTRO SUMMARY SECTION */}
               <div className="px-8 py-14 bg-white border-b border-black/5 text-center space-y-6">
-                <div className="w-1.5 h-12 bg-[#D66853] mx-auto opacity-75"></div>
-                <h3 className="text-xs uppercase tracking-[0.25em] text-[#D66853] font-mono font-bold">The Essence Curation</h3>
+                <div className="w-1.5 h-12 bg-[#8C1D24] mx-auto opacity-75"></div>
+                <h3 className="text-xs uppercase tracking-[0.25em] text-[#8C1D24] font-mono font-bold">The Essence Curation</h3>
                 <p className="text-sm font-light text-foreground/80 leading-relaxed max-w-sm mx-auto italic">
                   “ {detailResult.intro.summary} ”
                 </p>
               </div>
 
               {/* LEGACY ARTISAN NARRATIVE */}
-              <div className="px-8 py-16 bg-[#FAF9F5] border-b border-black/5 space-y-8">
+              <div className="px-8 py-16 bg-[#FAF9F6] border-b border-black/5 space-y-8">
                 <div className="space-y-3">
                   <span className="text-[9px] uppercase tracking-[0.25em] text-foreground/45 font-mono block">PART 01. 장인의 한 고집</span>
                   <h2 className="text-2xl magazine-heading font-medium text-brand-green leading-snug">
@@ -499,13 +499,13 @@ export default function DetailPageBuilder() {
                   </h2>
                 </div>
                 
-                <p className="text-xs font-light text-foreground/75 leading-relaxed bg-[#FDFCF8] border-l-2 border-[#1B4332] p-5 italic">
+                <p className="text-xs font-light text-foreground/75 leading-relaxed bg-[#FDFCF8] border-l-2 border-[#111111] p-5 italic">
                   {detailResult.legacy_story.narrative}
                 </p>
                 
                 {/* Subtle detail photo block placeholder styled as fine design box */}
                 <div className="border border-black/5 p-4 bg-white space-y-2 flex gap-4 items-center">
-                  <Info className="w-4 h-4 text-[#D66853] shrink-0" />
+                  <Info className="w-4 h-4 text-[#8C1D24] shrink-0" />
                   <p className="text-[10px] text-foreground/50 font-light leading-relaxed">
                     본 저작 카피는 마켓모움 전속 장인 안혜경 및 명장 연합회의 실제 수작업 제법 감리를 마친 명품 에디션 상세본입니다.
                   </p>
@@ -515,14 +515,14 @@ export default function DetailPageBuilder() {
               {/* SENSORY SPECTRUM GRID */}
               <div className="px-8 py-16 bg-white border-b border-black/5 space-y-10">
                 <div className="text-center">
-                  <span className="text-[9px] uppercase tracking-[0.25em] text-[#D66853] font-mono font-bold">PART 02. 오감의 기록</span>
+                  <span className="text-[9px] uppercase tracking-[0.25em] text-[#8C1D24] font-mono font-bold">PART 02. 오감의 기록</span>
                   <h3 className="text-xl magazine-heading text-brand-green mt-1">Sensory Spectrum</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-3 bg-[#FAF9F5] p-5 border border-black/5 text-center">
-                    <div className="w-8 h-8 rounded-full border border-[#D66853]/20 flex items-center justify-center mx-auto bg-white">
-                      <span className="text-xs text-[#D66853] font-mono">視</span>
+                  <div className="space-y-3 bg-[#FAF9F6] p-5 border border-black/5 text-center">
+                    <div className="w-8 h-8 rounded-full border border-[#8C1D24]/20 flex items-center justify-center mx-auto bg-white">
+                      <span className="text-xs text-[#8C1D24] font-mono">視</span>
                     </div>
                     <div className="text-xs font-semibold text-brand-green font-mono">VISUAL (결의 조율)</div>
                     <p className="text-[10px] font-light text-foreground/70 leading-relaxed pr-1 pl-1">
@@ -530,9 +530,9 @@ export default function DetailPageBuilder() {
                     </p>
                   </div>
 
-                  <div className="space-y-3 bg-[#FAF9F5] p-5 border border-black/5 text-center">
-                    <div className="w-8 h-8 rounded-full border border-[#D66853]/20 flex items-center justify-center mx-auto bg-white">
-                      <span className="text-xs text-[#D66853] font-mono">觸</span>
+                  <div className="space-y-3 bg-[#FAF9F6] p-5 border border-black/5 text-center">
+                    <div className="w-8 h-8 rounded-full border border-[#8C1D24]/20 flex items-center justify-center mx-auto bg-white">
+                      <span className="text-xs text-[#8C1D24] font-mono">觸</span>
                     </div>
                     <div className="text-xs font-semibold text-brand-green font-mono">SENSORIAL (촉감과 미각)</div>
                     <p className="text-[10px] font-light text-foreground/70 leading-relaxed pr-1 pl-1">
@@ -540,9 +540,9 @@ export default function DetailPageBuilder() {
                     </p>
                   </div>
 
-                  <div className="space-y-3 bg-[#FAF9F5] p-5 border border-black/5 text-center">
-                    <div className="w-8 h-8 rounded-full border border-[#D66853]/20 flex items-center justify-center mx-auto bg-white">
-                      <span className="text-xs text-[#D66853] font-mono">氣</span>
+                  <div className="space-y-3 bg-[#FAF9F6] p-5 border border-black/5 text-center">
+                    <div className="w-8 h-8 rounded-full border border-[#8C1D24]/20 flex items-center justify-center mx-auto bg-white">
+                      <span className="text-xs text-[#8C1D24] font-mono">氣</span>
                     </div>
                     <div className="text-xs font-semibold text-brand-green font-mono">ATMOSPHERE (공간 무드)</div>
                     <p className="text-[10px] font-light text-foreground/70 leading-relaxed pr-1 pl-1">
@@ -553,7 +553,7 @@ export default function DetailPageBuilder() {
               </div>
 
               {/* THREE CORE VALUES / FEATURES */}
-              <div className="px-8 py-16 bg-[#FAF9F5] border-b border-black/5 space-y-12">
+              <div className="px-8 py-16 bg-[#FAF9F6] border-b border-black/5 space-y-12">
                 <div>
                   <span className="text-[9px] uppercase tracking-[0.25em] text-foreground/45 font-mono block">PART 03. 세 가지 가치</span>
                   <h3 className="text-2xl magazine-heading text-brand-green font-medium mt-1">Signature Trilogy</h3>
@@ -562,7 +562,7 @@ export default function DetailPageBuilder() {
                 <div className="space-y-8">
                   {detailResult.features.map((fea, idx) => (
                     <div key={idx} className="flex gap-6 items-start">
-                      <span className="text-3xl font-mono text-[#D66853] font-light opacity-60 shrink-0 select-none">
+                      <span className="text-3xl font-mono text-[#8C1D24] font-light opacity-60 shrink-0 select-none">
                         {fea.number}
                       </span>
                       <div className="space-y-1.5 pt-1">
@@ -576,7 +576,7 @@ export default function DetailPageBuilder() {
 
               {/* LIFESTYLE MATCHING SECTION */}
               <div className="px-8 py-16 bg-white border-b border-black/5 space-y-10">
-                <div className="space-y-2 border-l-4 border-[#D66853] pl-4">
+                <div className="space-y-2 border-l-4 border-[#8C1D24] pl-4">
                   <Badge className="bg-brand-green text-white text-[8px] tracking-[0.25em] rounded-none uppercase font-mono px-2 py-0.5">
                     Target Persona Tailored Match
                   </Badge>
@@ -587,7 +587,7 @@ export default function DetailPageBuilder() {
 
                 <div className="space-y-4">
                   {detailResult.lifestyle_matching.matching_points.map((pt, i) => (
-                    <div key={i} className="p-5 bg-[#FAF9F5] border border-black/5 space-y-2 flex gap-4 items-start">
+                    <div key={i} className="p-5 bg-[#FAF9F6] border border-black/5 space-y-2 flex gap-4 items-start">
                       <div className="w-5 h-5 shrink-0 border border-brand-green/20 rounded-full bg-white flex items-center justify-center text-[10px] text-brand-green font-mono">
                         {i + 1}
                       </div>
@@ -602,14 +602,14 @@ export default function DetailPageBuilder() {
               {/* USER MANUAL / CEREMONY & STORAGE */}
               <div className="px-8 py-16 bg-[#FDFCF8] space-y-10">
                 <div className="text-center">
-                  <span className="text-[9px] uppercase tracking-[0.25em] text-[#D66853] font-mono block">RITUALS & STORAGE GUIDE</span>
+                  <span className="text-[9px] uppercase tracking-[0.25em] text-[#8C1D24] font-mono block">RITUALS & STORAGE GUIDE</span>
                   <h3 className="text-lg text-brand-green font-medium font-mono mt-1">올바른 쓰임과 보관법</h3>
                 </div>
 
                 <div className="space-y-6 text-xs font-light leading-relaxed">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-brand-green font-medium border-b border-black/5 pb-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D66853]"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#8C1D24]"></span>
                       <span>공물(工物)을 대하는 의식</span>
                     </div>
                     <p className="text-foreground/70 pl-3 leading-relaxed">
@@ -619,7 +619,7 @@ export default function DetailPageBuilder() {
 
                   <div className="space-y-2 pt-4">
                     <div className="flex items-center gap-2 text-brand-green font-medium border-b border-black/5 pb-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#1B4332]"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#111111]"></span>
                       <span>자연 그대로 보관하는 법</span>
                     </div>
                     <p className="text-foreground/70 pl-3 leading-relaxed">

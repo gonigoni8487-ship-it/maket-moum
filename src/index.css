@@ -5,21 +5,21 @@
   --font-serif: "Playfair Display", serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  --color-background: #FAF7F0;
-  --color-foreground: #1E2320;
-  --color-brand-green: #0B2519;
-  --color-brand-terracotta: #C8452D;
-  --color-brand-gold: #C49A55;
-  --color-brand-ivory: #FAF7F0;
+  --color-background: #FFFFFF;
+  --color-foreground: #111111;
+  --color-brand-green: #151515;
+  --color-brand-terracotta: #8C1D24;
+  --color-brand-gold: #BCA271;
+  --color-brand-ivory: #FAF9F6;
 
-  --color-primary: #0B2519;
-  --color-primary-foreground: #FAF7F0;
-  --color-secondary: #F1ECE1;
-  --color-secondary-foreground: #0B2519;
-  --color-accent: #C8452D;
-  --color-accent-foreground: #FAF7F0;
-  --color-gold: #C49A55;
-  --color-gold-foreground: #0B2519;
+  --color-primary: #151515;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #FAF9F6;
+  --color-secondary-foreground: #111111;
+  --color-accent: #8C1D24;
+  --color-accent-foreground: #FFFFFF;
+  --color-gold: #BCA271;
+  --color-gold-foreground: #151515;
 
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;

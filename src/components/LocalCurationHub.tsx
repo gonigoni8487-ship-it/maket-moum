@@ -133,7 +133,7 @@ export default function LocalCurationHub() {
       description: '국산 의성 마늘을 쪄서 갈아낸 다대기와 프랑스 정통 가염 발효 버터를 풍부하게 융합해 중독적인 단짠의 진풍경을 선사합니다.',
       pairing: '차가운 수제 페일 에일(IPA), 시원한 필스너 라거 캔맥주',
       target: '퇴근 후 주말 밤 시원하게 맥주 혼술 파티와 함께 고급 보양 안주를 스냅하고 싶은 2030 젊은층',
-      color: 'bg-[#D66853]',
+      color: 'bg-[#8C1D24]',
       bgColor: 'bg-rose-50/50',
       borderColor: 'border-rose-200',
       textColor: 'text-rose-800',
@@ -174,7 +174,7 @@ export default function LocalCurationHub() {
       minPledge: 20000,
       rewardPlan: '제철 수확 보길도 활장어 한 쌍 진공패키지(6만원 상당) + 연 5% 로컬 환급 포인트 적립',
       expectedReturn: '리워드 실물 수취 + 25% 가치 절감 효과',
-      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=800&auto=format&fit=crop',
       investorsCount: 437
     },
     {
@@ -187,7 +187,7 @@ export default function LocalCurationHub() {
       minPledge: 10000,
       rewardPlan: '자연 숙성 당도 14Brix 감귤 10kg 나무목함 콜라보 박스(4.5만원 상당) + 무료 웰컴 미식 패스포트',
       expectedReturn: '가장 먼저 첫 수확 감귤 벼루 배송 + 한정판 굿즈',
-      image: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1557800636-894a64c1696f?q=80&w=800&auto=format&fit=crop',
       investorsCount: 310
     }
   ]);
@@ -212,12 +212,12 @@ export default function LocalCurationHub() {
       name: '김옥순 할머니',
       location: '경남 통영시 한산면',
       title: '백년 털이질 공법 전통 태양건조 은멸치',
-      specialty: '태양 빛과 한산도 해안 염풍 건조 은멸치',
+      specialty: '태양 빛 and 한산도 해안 염풍 건조 은멸치',
       story: '원물 손상 없이 전통 대나무 정치망(죽방렴)으로 가둔 최상품 은빛 기적',
       narrative: '기성의 고온 열풍 건조기에서 구워낸 멸치와는 빛깔 자체가 다른 은빛 투명함을 지녔습니다. 털어낸 후 옹기에 가벼운 연염을 쳐 가을 햇마루에서 72시간 볕을 쪼였습니다. 원조 할머니 레시피 북을 동봉해 드립니다.',
       votes: 188,
       goalVotes: 200,
-      image: 'https://images.unsplash.com/photo-1511140973288-19bf21d7e771?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?q=80&w=800&auto=format&fit=crop',
       highlightTag: '할머니 레시피'
     },
     {
@@ -227,10 +227,10 @@ export default function LocalCurationHub() {
       title: '자연 친화적 가을 활장어 & 전통 장어덮밥 원물 밀판',
       specialty: '다도해 해양 한옥 가두리 최고급 활장어',
       story: '수입산 및 인위적 성장 촉진제를 전면 배제한 고품질 천연 자양 장어 원물',
-      narrative: '보길도의 맑고 깊은 바닷바람과 햇살에 자연양생한 가울 장어입니다. 입안 가득 터지는 깊은 기름기와 수작업으로 가시를 한 땀 한 땀 발라낸 도톰한 장어포를 마켓모움의 전용 한옥 양념 간장(PB)과 함께 배송합니다.',
+      narrative: '보길도의 맑고 깊은 바닷바람 and 햇살에 자연양생한 가울 장어입니다. 입안 가득 터지는 깊은 기름기와 수작업으로 가시를 한 땀 한 땀 발라낸 도톰한 장어포를 마켓모움의 전용 한옥 양념 간장(PB)과 함께 배송합니다.',
       votes: 110,
       goalVotes: 150,
-      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=800&auto=format&fit=crop',
       highlightTag: '하루 200마리 한정 수공예'
     },
     {
@@ -243,7 +243,7 @@ export default function LocalCurationHub() {
       narrative: '과거 아이들의 웃음소리가 머물던 조천의 작은 폐교 공터를 개조해 만든 귤밭입니다. 공장에서 왁스코팅한 주황빛 공산품 귤과 다른, 자연 그대로의 다채로운 새콤달콤함을 서포트합니다.',
       votes: 75,
       goalVotes: 120,
-      image: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1557800636-894a64c1696f?q=80&w=800&auto=format&fit=crop',
       highlightTag: '폐교 개조 귤공장'
     }
   ]);
@@ -294,7 +294,7 @@ export default function LocalCurationHub() {
         '구매 금액의 0.5% 로컬 환급 포인트 적립'
       ],
       badge: 'Green Grass',
-      color: 'border-black/5 bg-[#FAF9F5]'
+      color: 'border-black/5 bg-[#FAF9F6]'
     },
     {
       name: '로컬클럽 정기 멤버 (산지친구)',
@@ -307,7 +307,7 @@ export default function LocalCurationHub() {
         '신생 보배 생산자 발굴 무료 시식 키트 제공 (분기 1회)'
       ],
       badge: 'Local Supporter',
-      color: 'border-[#1B4332] bg-white ring-2 ring-[#1B4332]/10'
+      color: 'border-[#111111] bg-white ring-2 ring-[#111111]/10'
     },
     {
       name: '프리미엄 미식 서포터 (장인클럽)',
@@ -320,7 +320,7 @@ export default function LocalCurationHub() {
         '전용 1:1 슬로우 오더 컨설팅 및 나무 목합 맞춤 각인 한글 전용 서비스'
       ],
       badge: 'VIP Master Club',
-      color: 'border-[#D66853] bg-[#FDFCF8] ring-2 ring-[#D66853]/10'
+      color: 'border-[#8C1D24] bg-[#FDFCF8] ring-2 ring-[#8C1D24]/10'
     }
   ];
 
@@ -521,7 +521,7 @@ export default function LocalCurationHub() {
   return (
     <div className="space-y-24 py-6">
       {/* Introduction Magazine-styled Banner */}
-      <div className="bg-[#1B4332] text-white p-10 md:p-16 relative overflow-hidden ring-1 ring-white/10">
+      <div className="bg-[#111111] text-white p-10 md:p-16 relative overflow-hidden ring-1 ring-white/10">
         <div className="absolute right-0 top-0 bottom-0 opacity-10 hidden lg:block w-1/3">
           <div className="w-full h-full border-l border-white/10 rotate-12 translate-x-24 scale-150 flex items-center justify-center">
             <Compass className="w-64 h-64 text-white animate-spin-slow" />
@@ -529,19 +529,19 @@ export default function LocalCurationHub() {
         </div>
         
         <div className="max-w-3xl space-y-6 relative z-10">
-          <Badge className="bg-[#D66853] text-white hover:bg-[#D66853]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-3 py-1">
+          <Badge className="bg-[#8C1D24] text-white hover:bg-[#8C1D24]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-3 py-1">
             Moum Next-Gen Local Commerce Frame
           </Badge>
           <h2 className="text-4xl md:text-6xl magazine-heading font-medium tracking-tight leading-[1.1]">
             단순한 최저가 쇼핑몰이 아닙니다. <br />
             생산자, 정성, 팬덤의 결합.
           </h2>
-          <p className="text-xs md:text-base text-[#FAF9F5]/80 font-light leading-relaxed max-w-2xl">
+          <p className="text-xs md:text-base text-[#FAF9F6]/80 font-light leading-relaxed max-w-2xl">
             전국 각지에 숨어 묵묵히 본질을 빚어내는 중소상공인·장인들을 직접 기획·발굴합니다. <br />
             마켓모움은 획일화된 입점 거래를 거부하고, <strong>‘스토리’</strong>를 부여하며, 
             <strong>‘공동 참여형 가격하락 퍼널’</strong>과 실물 상생을 도모하는 <strong>‘소액 시즌 펀딩’</strong> 구조로 e커머스의 영구적 패러다임 시프트를 선언합니다.
           </p>
-          <div className="pt-2 flex flex-wrap gap-4 text-xs font-mono text-[#D66853] font-bold">
+          <div className="pt-2 flex flex-wrap gap-4 text-xs font-mono text-[#8C1D24] font-bold">
             <span>✓ 최저가 대량양산 제동 [로컬 큐레이션]</span>
             <span>✓ 선주문 기반 재고 파괴 [퍼널 공동구매]</span>
             <span>✓ 충성 팬덤 보장 리워드 [동천 서포터즈]</span>
@@ -552,7 +552,7 @@ export default function LocalCurationHub() {
       {/* CORE INNOVATION 1: The Premium Framework Comparison Block */}
       <section className="space-y-8 bg-white border border-black/5 p-8 md:p-12 shadow-sm">
         <div className="space-y-3">
-          <Badge variant="outline" className="text-[9px] text-[#D66853] border-[#D66853]/30 tracking-widest font-mono uppercase bg-white px-2.5 py-0.5">
+          <Badge variant="outline" className="text-[9px] text-[#8C1D24] border-[#8C1D24]/30 tracking-widest font-mono uppercase bg-white px-2.5 py-0.5">
             Industry Disruption Map
           </Badge>
           <h3 className="text-3xl magazine-heading text-brand-green font-bold">
@@ -568,7 +568,7 @@ export default function LocalCurationHub() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
-              <tr className="border-b border-black/10 text-xs uppercase tracking-widest text-[#1B4332]/50 font-mono">
+              <tr className="border-b border-black/10 text-xs uppercase tracking-widest text-[#111111]/50 font-mono">
                 <th className="py-4 font-semibold pb-3 w-1/5">차별화 축 (Pillars)</th>
                 <th className="py-4 font-semibold pb-3 w-2/5 text-slate-400">기존 이커머스 (쿠팡·오픈마켓 방식)</th>
                 <th className="py-4 font-semibold pb-3 w-2/5 text-brand-green font-bold">마켓모움의 지향 가치 (Moum Commerce)</th>
@@ -576,9 +576,9 @@ export default function LocalCurationHub() {
             </thead>
             <tbody className="divide-y divide-black/5">
               {comparativeFramework.map((item, idx) => (
-                <tr key={idx} className="group hover:bg-[#FAF9F5]/40 transition-colors">
+                <tr key={idx} className="group hover:bg-[#FAF9F6]/40 transition-colors">
                   <td className="py-5 pr-4 align-top">
-                    <span className="text-xs font-bold text-[#D66853] font-mono block">0{idx+1}</span>
+                    <span className="text-xs font-bold text-[#8C1D24] font-mono block">0{idx+1}</span>
                     <span className="text-sm font-semibold text-brand-green">{item.pillar}</span>
                   </td>
                   <td className="py-5 pr-8 text-xs text-slate-400 font-light leading-relaxed space-y-1">
@@ -600,7 +600,7 @@ export default function LocalCurationHub() {
       {/* CORE INNOVATION 2: Gamified Group Buying / Interactive Price-Drop Funnel Campaign */}
       <section className="space-y-8">
         <div className="text-center space-y-2">
-          <Badge variant="outline" className="text-[10px] text-[#D66853] border-[#D66853]/30 tracking-widest font-mono uppercase bg-white px-3 py-1">
+          <Badge variant="outline" className="text-[10px] text-[#8C1D24] border-[#8C1D24]/30 tracking-widest font-mono uppercase bg-white px-3 py-1">
             Dynamic Gamified Price Collapse Simulator
           </Badge>
           <h3 className="text-3xl magazine-heading text-brand-green font-bold">
@@ -619,7 +619,7 @@ export default function LocalCurationHub() {
             {/* Top Product Meta & Curation Intro */}
             <div className="space-y-3">
               <div className="flex gap-2 items-center text-xs">
-                <span className="text-[#D66853] uppercase font-mono tracking-widest font-semibold flex items-center gap-1">
+                <span className="text-[#8C1D24] uppercase font-mono tracking-widest font-semibold flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" /> 전남 완도군 보길도 명인 콜라보 PB
                 </span>
                 <span className="text-foreground/20">|</span>
@@ -637,7 +637,7 @@ export default function LocalCurationHub() {
             {/* Interactive Controller / Slider */}
             <div className="space-y-6 pt-4 border-t border-black/5">
               <div className="flex justify-between items-center">
-                <span className="text-[11px] uppercase tracking-widest text-[#D66853] font-mono font-bold flex items-center gap-1.5 animate-pulse">
+                <span className="text-[11px] uppercase tracking-widest text-[#8C1D24] font-mono font-bold flex items-center gap-1.5 animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-brand-green block" />
                   실시간 참여 화력(서포터즈): {participants}명 돌파!
                 </span>
@@ -645,7 +645,7 @@ export default function LocalCurationHub() {
               </div>
 
               {/* Slider Input */}
-              <div className="bg-[#FAF9F5] p-5 border border-black/5 space-y-4 rounded-none">
+              <div className="bg-[#FAF9F6] p-5 border border-black/5 space-y-4 rounded-none">
                 <input 
                   type="range" 
                   min="1" 
@@ -665,7 +665,7 @@ export default function LocalCurationHub() {
 
               {/* Graphical Progress Bar showing multi-step price collapse */}
               <div className="space-y-2">
-                <div className="w-full bg-[#FAF9F5] h-5 rounded-none overflow-hidden border border-black/5 relative flex">
+                <div className="w-full bg-[#FAF9F6] h-5 rounded-none overflow-hidden border border-black/5 relative flex">
                   <motion.div 
                     initial={{ width: '0%' }}
                     animate={{ width: `${Math.min((participants / 500) * 100, 100)}%` }}
@@ -683,12 +683,12 @@ export default function LocalCurationHub() {
                 {/* Visual guidance message change dynamically based on slider state */}
                 {nextThreshold ? (
                   <p className="text-[11px] font-light text-foreground/50 flex items-center gap-1 pl-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-[#D66853]" /> 
+                    <AlertCircle className="w-3.5 h-3.5 text-[#8C1D24]" /> 
                     다음 가격인하 단계까지 단 <strong className="text-brand-green font-medium font-mono">{nextThreshold.count - participants}명</strong> 남았습니다. 
                     (달성 즉시 전원 <strong className="text-brand-green font-semibold">₩{nextThreshold.price.toLocaleString()}</strong> 자동 가격 락다운!)
                   </p>
                 ) : (
-                  <p className="text-[11px] font-bold text-[#D66853] flex items-center gap-1 pl-1">
+                  <p className="text-[11px] font-bold text-[#8C1D24] flex items-center gap-1 pl-1">
                     🎉 최종 목표 500 세트 판매 대기록 달성 완료! 역사상 전례 없는 최고 할인혜택가 ₩24,900이 적용되어 배송됩니다!
                   </p>
                 )}
@@ -701,7 +701,7 @@ export default function LocalCurationHub() {
                 onClick={handleJoinProject}
                 className={`flex-1 py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-semibold transition-all flex items-center justify-center gap-2 rounded-none border cursor-pointer w-full sm:w-auto ${
                   hasJoined 
-                    ? 'bg-[#D66853] border-[#D66853] text-white hover:bg-[#c05743]' 
+                    ? 'bg-[#8C1D24] border-[#8C1D24] text-white hover:bg-[#c05743]' 
                     : 'bg-brand-green border-brand-green text-white hover:bg-brand-green/95 shadow-sm'
                 }`}
               >
@@ -711,7 +711,7 @@ export default function LocalCurationHub() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4 text-[#FAF9F5] animate-pulse" /> 이 프로젝트 전복장 공구 참여제안 하기
+                    <Sparkles className="w-4 h-4 text-[#FAF9F6] animate-pulse" /> 이 프로젝트 전복장 공구 참여제안 하기
                   </>
                 )}
               </button>
@@ -723,7 +723,7 @@ export default function LocalCurationHub() {
                   alert("카카오 바이럴용 스토리 스마트 초대 링크가 클립보드에 저온 복사되었습니다!");
                   setTimeout(() => setCopiedLink(false), 2000);
                 }}
-                className="py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-medium border border-black/10 bg-[#FAF9F5] text-brand-green hover:bg-black/5 transition-all text-center rounded-none w-full sm:w-auto cursor-pointer"
+                className="py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-medium border border-black/10 bg-[#FAF9F6] text-brand-green hover:bg-black/5 transition-all text-center rounded-none w-full sm:w-auto cursor-pointer"
               >
                 {copiedLink ? "✓ 카카오 초대 링크 복사완료!" : "카카오 친구 초대하기 (₩1,000 하락)"}
               </button>
@@ -731,11 +731,11 @@ export default function LocalCurationHub() {
           </div>
 
           {/* Right panel: "Early Supporter Instant Cashing Refund Calculator" */}
-          <div className="lg:col-span-12 xl:col-span-5 bg-[#FAF9F5] border border-brand-green/10 p-6 md:p-8 flex flex-col justify-between space-y-6">
+          <div className="lg:col-span-12 xl:col-span-5 bg-[#FAF9F6] border border-brand-green/10 p-6 md:p-8 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-[#D66853]" />
-                <span className="text-[10px] uppercase font-mono tracking-widest text-[#D66853] font-bold">Early Supporter Protection Policy</span>
+                <Coins className="w-5 h-5 text-[#8C1D24]" />
+                <span className="text-[10px] uppercase font-mono tracking-widest text-[#8C1D24] font-bold">Early Supporter Protection Policy</span>
               </div>
               <h4 className="text-xl magazine-heading text-brand-green font-bold">
                 얼리서포터 '자동 차액 환급제'
@@ -769,7 +769,7 @@ export default function LocalCurationHub() {
                 <span>+{demoRefund.extraBonus.toLocaleString()}P 적립</span>
               </div>
 
-              <div className="bg-[#1B4332]/5 p-3 flex justify-between font-bold text-brand-green items-center mt-2 border-l-2 border-brand-green rounded-none">
+              <div className="bg-[#111111]/5 p-3 flex justify-between font-bold text-brand-green items-center mt-2 border-l-2 border-brand-green rounded-none">
                 <span className="text-[11px] font-sans">최종 포인트 환급 기대값:</span>
                 <span className="text-base">+{demoRefund.total.toLocaleString()}P</span>
               </div>
@@ -789,12 +789,12 @@ export default function LocalCurationHub() {
       {/* CORE INNOVATION 3: INTERACTIVE "SO-AEK INVESTMENT / PRE-ORDER SEASON FUNDING" (소액 생산자 투자 커뮤니티형 구조) */}
       <section className="space-y-8 bg-[#FDFCF8] border border-black/5 p-8 md:p-12 relative overflow-hidden">
         {/* Decorative badge overlay */}
-        <div className="absolute top-0 right-0 p-8 opacity-5 font-mono text-[100px] font-bold text-[#D66853] pointer-events-none">
+        <div className="absolute top-0 right-0 p-8 opacity-5 font-mono text-[100px] font-bold text-[#8C1D24] pointer-events-none">
           FUND
         </div>
 
         <div className="max-w-3xl space-y-3">
-          <Badge className="bg-[#D66853]/10 text-[#D66853] hover:bg-[#D66853]/20 rounded-none tracking-widest font-mono text-[9px] uppercase px-2.5 py-0.5">
+          <Badge className="bg-[#8C1D24]/10 text-[#8C1D24] hover:bg-[#8C1D24]/20 rounded-none tracking-widest font-mono text-[9px] uppercase px-2.5 py-0.5">
             Investment Connection
           </Badge>
           <h3 className="text-3xl magazine-heading text-brand-green font-bold">
@@ -840,14 +840,14 @@ export default function LocalCurationHub() {
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-6 text-white space-y-1">
-                  <span className="text-[9px] font-mono tracking-widest text-[#D66853] font-bold">ACTIVE LOCAL TARGET SEED</span>
+                  <span className="text-[9px] font-mono tracking-widest text-[#8C1D24] font-bold">ACTIVE LOCAL TARGET SEED</span>
                   <h4 className="text-xl font-bold font-sans tracking-tight">{activeProject.title}</h4>
                   <p className="text-xs font-light text-slate-300">지역 거점: {activeProject.location} | 호스트: {activeProject.producer}</p>
                 </div>
               </div>
 
               {/* Status parameters */}
-              <div className="grid grid-cols-3 gap-4 text-center font-mono py-4 bg-[#FAF9F5] border-y border-black/5">
+              <div className="grid grid-cols-3 gap-4 text-center font-mono py-4 bg-[#FAF9F6] border-y border-black/5">
                 <div className="space-y-1">
                   <span className="text-[10px] text-slate-400 block uppercase">시즌 목표 투자금</span>
                   <strong className="text-sm text-brand-green">₩{activeProject.targetAmount.toLocaleString()}</strong>
@@ -856,22 +856,22 @@ export default function LocalCurationHub() {
                   <span className="text-[10px] text-slate-400 block uppercase">현재 누적 약정금</span>
                   <strong className="text-sm font-bold text-brand-green">
                     ₩{activeProject.currentAmount.toLocaleString()} 
-                    <span className="text-[10px] text-[#D66853] ml-1 bg-[#D66853]/5 px-1.5 py-0.5">
+                    <span className="text-[10px] text-[#8C1D24] ml-1 bg-[#8C1D24]/5 px-1.5 py-0.5">
                       ({Math.round((activeProject.currentAmount / activeProject.targetAmount) * 100)}%)
                     </span>
                   </strong>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] text-slate-400 block uppercase">참여 엔젤 투자자</span>
-                  <strong className="text-sm text-[#D66853]">{activeProject.investorsCount}명 대동</strong>
+                  <strong className="text-sm text-[#8C1D24]">{activeProject.investorsCount}명 대동</strong>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <h5 className="text-xs font-mono font-bold text-[#D66853] uppercase flex items-center gap-1">
+                <h5 className="text-xs font-mono font-bold text-[#8C1D24] uppercase flex items-center gap-1">
                   <Award className="w-4 h-4" /> 리워드 세부 수탁 플랜 (Reward Structure)
                 </h5>
-                <p className="text-xs text-foreground/80 font-light leading-relaxed bg-[#1B4332]/5 p-4 border-l-2 border-brand-green italic">
+                <p className="text-xs text-foreground/80 font-light leading-relaxed bg-[#111111]/5 p-4 border-l-2 border-brand-green italic">
                   "{activeProject.rewardPlan}"
                 </p>
                 <div className="flex justify-between items-center text-[11px] text-foreground/50 pt-1">
@@ -885,7 +885,7 @@ export default function LocalCurationHub() {
           {/* Right interactive calculator widget */}
           <div className="lg:col-span-12 xl:col-span-5 bg-brand-green text-white p-6 md:p-8 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
-              <span className="text-[9px] uppercase tracking-widest text-[#D66853] font-bold block">Interactive Pledger</span>
+              <span className="text-[9px] uppercase tracking-widest text-[#8C1D24] font-bold block">Interactive Pledger</span>
               <h4 className="text-xl magazine-heading font-bold text-brand-ivory leading-snug">
                 정밀 소액 엔젤투자 참여 계산기
               </h4>
@@ -916,13 +916,13 @@ export default function LocalCurationHub() {
                   <span className="text-white/60">선택한 총 모액 지원금:</span>
                   <span className="text-sm font-bold text-brand-ivory">₩{(userPledgedAmount[activeInvestmentId] || 0).toLocaleString()} 원</span>
                 </div>
-                <div className="flex justify-between text-[#D66853] font-bold">
+                <div className="flex justify-between text-[#8C1D24] font-bold">
                   <span>획득 예상 로컬 배당 포인트 (6%):</span>
                   <span>+{(Math.floor((userPledgedAmount[activeInvestmentId] || 0) * 0.06)).toLocaleString()} P</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/60">제공 예정 실물 리워드:</span>
-                  <span className="font-sans text-[11px] text-[#FAF9F5] text-right max-w-[180px] font-light">
+                  <span className="font-sans text-[11px] text-[#FAF9F6] text-right max-w-[180px] font-light">
                     {(userPledgedAmount[activeInvestmentId] || 0) > 0 
                       ? `${activeProject.producer.split(' ')[0]} 명인 가을 직배송 한글 목합 콜라보 패키지 보전권 확보!`
                       : '금액을 선택해 리워드를 예측해 보세요.'}
@@ -935,7 +935,7 @@ export default function LocalCurationHub() {
             <div className="space-y-4">
               <button
                 onClick={handleExecutePledgeSubmit}
-                className="w-full bg-[#D66853] hover:bg-[#c05743] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
+                className="w-full bg-[#8C1D24] hover:bg-[#c05743] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
               >
                 🤝 소액 예약투자 약정 확인 서명하기 (Submit Pledge)
               </button>
@@ -961,13 +961,13 @@ export default function LocalCurationHub() {
       {/* STRATEGIC BRANDING ACTION: Wando Handcrafted Abalone Jerky Showcase & DIY Tastemaker Box */}
       <section className="space-y-8 bg-white border border-black/5 p-8 md:p-12 shadow-sm relative overflow-hidden">
         {/* Decorative watermarked background */}
-        <div className="absolute -right-16 -top-16 opacity-5 font-mono text-[140px] font-bold text-[#1B4332] pointer-events-none rotate-12 select-none">
+        <div className="absolute -right-16 -top-16 opacity-5 font-mono text-[140px] font-bold text-[#111111] pointer-events-none rotate-12 select-none">
           JERKY
         </div>
 
         {/* Headings */}
         <div className="space-y-3 max-w-4xl relative z-10">
-          <Badge className="bg-[#D66853] text-white hover:bg-[#D66853]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-2.5 py-0.5">
+          <Badge className="bg-[#8C1D24] text-white hover:bg-[#8C1D24]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-2.5 py-0.5">
             Product Curation Experiment
           </Badge>
           <h3 className="text-3xl magazine-heading text-brand-green font-bold">
@@ -990,8 +990,8 @@ export default function LocalCurationHub() {
             <div className="space-y-6">
               {/* Size Select button header */}
               <div className="flex flex-col sm:flex-row gap-4 items-baseline justify-between pb-3 border-b border-black/5">
-                <span className="text-xs font-mono font-bold text-[#D66853] uppercase tracking-wider flex items-center gap-1.5">
-                  <Gift className="w-4 h-4 text-[#D66853]" /> 1단계. 기프트 시식 컬렉션 포장 규격 선택:
+                <span className="text-xs font-mono font-bold text-[#8C1D24] uppercase tracking-wider flex items-center gap-1.5">
+                  <Gift className="w-4 h-4 text-[#8C1D24]" /> 1단계. 기프트 시식 컬렉션 포장 규격 선택:
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -999,7 +999,7 @@ export default function LocalCurationHub() {
                     className={`px-4 py-2 text-xs font-mono font-bold border transition-all cursor-pointer ${
                       selectedCustomPackSize === 3 
                         ? 'bg-brand-green border-brand-green text-white font-semibold' 
-                        : 'bg-[#FAF9F5] border-black/5 text-slate-400 hover:text-brand-green'
+                        : 'bg-[#FAF9F6] border-black/5 text-slate-400 hover:text-brand-green'
                     }`}
                   >
                     3구 테이스팅 스타터 (₩29,900~)
@@ -1009,7 +1009,7 @@ export default function LocalCurationHub() {
                     className={`px-4 py-2 text-xs font-mono font-bold border transition-all cursor-pointer ${
                       selectedCustomPackSize === 5 
                         ? 'bg-brand-green border-brand-green text-white font-semibold' 
-                        : 'bg-[#FAF9F5] border-black/5 text-slate-400 hover:text-brand-green'
+                        : 'bg-[#FAF9F6] border-black/5 text-slate-400 hover:text-brand-green'
                     }`}
                   >
                     5구 프리미엄 마스터팩 (₩49,000~)
@@ -1018,7 +1018,7 @@ export default function LocalCurationHub() {
               </div>
 
               {/* Graphic Platter Box Tray Representation with active slot mechanism! */}
-              <div className="bg-[#FAF9F5] border border-black/5 p-6 md:p-8 space-y-4 rounded-none text-center">
+              <div className="bg-[#FAF9F6] border border-black/5 p-6 md:p-8 space-y-4 rounded-none text-center">
                 <div className="flex justify-between items-center text-xs font-mono text-slate-400 pb-2">
                   <span>선택된 포장 목재: 명인 각인 수제 오동함</span>
                   <span>상자 내부 슬롯을 클릭해 맛 투입 대기</span>
@@ -1037,7 +1037,7 @@ export default function LocalCurationHub() {
                         onClick={() => setActiveSlotIdx(idx)}
                         className={`w-32 md:w-36 p-4 border flex flex-col justify-between aspect-square cursor-pointer transition-all relative select-none ${
                           isActive 
-                            ? 'bg-white border-[#D66853] ring-2 ring-[#D66853]/20 shadow-sm' 
+                            ? 'bg-white border-[#8C1D24] ring-2 ring-[#8C1D24]/20 shadow-sm' 
                             : 'bg-white border-black/5 hover:border-brand-green/30'
                         }`}
                       >
@@ -1069,7 +1069,7 @@ export default function LocalCurationHub() {
 
                         {/* Top corner active pin */}
                         {isActive && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-[#D66853] text-[8px] text-white font-mono px-1.5 py-0.5 rounded-none uppercase font-bold animate-pulse shadow-sm">
+                          <span className="absolute -top-1.5 -right-1.5 bg-[#8C1D24] text-[8px] text-white font-mono px-1.5 py-0.5 rounded-none uppercase font-bold animate-pulse shadow-sm">
                             Active
                           </span>
                         )}
@@ -1086,7 +1086,7 @@ export default function LocalCurationHub() {
 
             {/* Flavor Options Selection Grid */}
             <div className="space-y-4">
-              <span className="text-xs font-mono font-bold text-[#D66853] uppercase tracking-wider block">
+              <span className="text-xs font-mono font-bold text-[#8C1D24] uppercase tracking-wider block">
                 2단계. 품평회용 완도 전복포 5가지 맛 레시피 발굴단 (슬롯 입력):
               </span>
 
@@ -1113,7 +1113,7 @@ export default function LocalCurationHub() {
                           }`}>
                             {flavor.phaseLabel.split(' ')[0]}
                           </span>
-                          <span className="text-[9px] text-[#D66853] font-mono font-bold">
+                          <span className="text-[9px] text-[#8C1D24] font-mono font-bold">
                             {flavor.priceMod > 0 ? `+${flavor.priceMod.toLocaleString()}` : '기본가'}
                           </span>
                         </div>
@@ -1133,11 +1133,11 @@ export default function LocalCurationHub() {
           </div>
 
           {/* RIGHT: Analytical Dashboard & Target Assessment */}
-          <div className="lg:col-span-12 xl:col-span-4 bg-[#FAF9F5] border border-brand-green/10 p-6 md:p-8 flex flex-col justify-between space-y-6">
+          <div className="lg:col-span-12 xl:col-span-4 bg-[#FAF9F6] border border-brand-green/10 p-6 md:p-8 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#D66853]" />
-                <span className="text-[10px] uppercase font-mono tracking-widest text-[#D66853] font-bold">Dynamic Flavor Analytics</span>
+                <Sparkles className="w-5 h-5 text-[#8C1D24]" />
+                <span className="text-[10px] uppercase font-mono tracking-widest text-[#8C1D24] font-bold">Dynamic Flavor Analytics</span>
               </div>
               <h4 className="text-xl magazine-heading text-brand-green font-bold">
                 실시간 박스 품평 분석기
@@ -1150,7 +1150,7 @@ export default function LocalCurationHub() {
 
             {/* Simulated Radar-like attributes bar graph */}
             <div className="space-y-3 pt-2">
-              <span className="text-[10px] font-mono font-bold text-[#D66853] block uppercase tracking-wider">나의 세트 배합 평점:</span>
+              <span className="text-[10px] font-mono font-bold text-[#8C1D24] block uppercase tracking-wider">나의 세트 배합 평점:</span>
               <div className="bg-white p-4 border border-black/5 space-y-3">
                 
                 {/* Metric 1 */}
@@ -1159,7 +1159,7 @@ export default function LocalCurationHub() {
                     <span>• 바다향 아로마 (Ocean Scent)</span>
                     <span className="font-semibold">{calculatedAvg.seaBreeze}%</span>
                   </div>
-                  <div className="w-full bg-[#FAF9F5] h-1.5 rounded-none overflow-hidden border border-black/5">
+                  <div className="w-full bg-[#FAF9F6] h-1.5 rounded-none overflow-hidden border border-black/5">
                     <motion.div 
                       key={calculatedAvg.seaBreeze} 
                       initial={{ width: 0 }} 
@@ -1175,7 +1175,7 @@ export default function LocalCurationHub() {
                     <span>• 고소한 바디감 (Savory Tone)</span>
                     <span className="font-semibold">{calculatedAvg.savory}%</span>
                   </div>
-                  <div className="w-full bg-[#FAF9F5] h-1.5 rounded-none overflow-hidden border border-black/5">
+                  <div className="w-full bg-[#FAF9F6] h-1.5 rounded-none overflow-hidden border border-black/5">
                     <motion.div 
                       key={calculatedAvg.savory} 
                       initial={{ width: 0 }} 
@@ -1191,12 +1191,12 @@ export default function LocalCurationHub() {
                     <span>• 단짠 대중성 (Sweet & Savory)</span>
                     <span className="font-semibold">{calculatedAvg.sweetness}%</span>
                   </div>
-                  <div className="w-full bg-[#FAF9F5] h-1.5 rounded-none overflow-hidden border border-black/5">
+                  <div className="w-full bg-[#FAF9F6] h-1.5 rounded-none overflow-hidden border border-black/5">
                     <motion.div 
                       key={calculatedAvg.sweetness} 
                       initial={{ width: 0 }} 
                       animate={{ width: `${calculatedAvg.sweetness}%` }} 
-                      className="bg-[#D66853] h-full" 
+                      className="bg-[#8C1D24] h-full" 
                     />
                   </div>
                 </div>
@@ -1207,7 +1207,7 @@ export default function LocalCurationHub() {
                     <span>• 천연 감칠맛 (Rich Gluten)</span>
                     <span className="font-semibold">{calculatedAvg.richness}%</span>
                   </div>
-                  <div className="w-full bg-[#FAF9F5] h-1.5 rounded-none overflow-hidden border border-black/5">
+                  <div className="w-full bg-[#FAF9F6] h-1.5 rounded-none overflow-hidden border border-black/5">
                     <motion.div 
                       key={calculatedAvg.richness} 
                       initial={{ width: 0 }} 
@@ -1231,22 +1231,22 @@ export default function LocalCurationHub() {
               </p>
               <div>
                 <span className="text-[10px] text-slate-400 block uppercase">미식 페어링 시너지 주종</span>
-                <strong className="text-xs text-[#D66853] font-bold font-sans">🍾 {recommendation.drinks}</strong>
+                <strong className="text-xs text-[#8C1D24] font-bold font-sans">🍾 {recommendation.drinks}</strong>
               </div>
             </div>
 
             {/* Final Calculation of Custom Box Price */}
             <div className="space-y-3">
-              <div className="flex justify-between text-xs font-mono font-bold text-[#D66853] uppercase tracking-wider">
+              <div className="flex justify-between text-xs font-mono font-bold text-[#8C1D24] uppercase tracking-wider">
                 <span>실제 세트 가치 대지:</span>
                 <span>총 {selectedCustomPackSize}구 세트</span>
               </div>
               
-              <div className="bg-[#1B4332] text-white p-4 flex justify-between font-bold items-center rounded-none shadow-sm pb-5">
+              <div className="bg-[#111111] text-white p-4 flex justify-between font-bold items-center rounded-none shadow-sm pb-5">
                 <span className="text-xs font-sans tracking-tight">수작 전복포 묶음 특가:</span>
                 <div className="text-right">
                   <span className="text-lg font-mono">₩{customBoxPrice.toLocaleString()}</span>
-                  <span className="text-[9px] font-mono block text-[#FAF9F5]/60 leading-none">5% 로컬 포인트 별도 적립</span>
+                  <span className="text-[9px] font-mono block text-[#FAF9F6]/60 leading-none">5% 로컬 포인트 별도 적립</span>
                 </div>
               </div>
             </div>
@@ -1258,7 +1258,7 @@ export default function LocalCurationHub() {
                   setJerkyPreorderStatus(true);
                   setTimeout(() => setJerkyPreorderStatus(false), 6000);
                 }}
-                className="w-full bg-[#D66853] hover:bg-[#c05743] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
+                className="w-full bg-[#8C1D24] hover:bg-[#c05743] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
               >
                 🤝 이 조합 그대로 베타 시식단 신청 및 알림받기
               </button>
@@ -1269,7 +1269,7 @@ export default function LocalCurationHub() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="p-4 bg-white border border-brand-green/20 text-[11px] text-[#1B4332] leading-relaxed text-center font-sans font-light"
+                    className="p-4 bg-white border border-brand-green/20 text-[11px] text-[#111111] leading-relaxed text-center font-sans font-light"
                   >
                     🎉 <strong>고품격 똠전 조합 가치 접수 완료!</strong> <br />
                     [{recommendation.persona.split(' ')[0]}] 성향으로 예비 신청되었습니다! <br />
@@ -1287,10 +1287,10 @@ export default function LocalCurationHub() {
       <section className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-baseline gap-4">
           <div>
-            <Badge variant="outline" className="text-[10px] text-[#1B4332] border-[#1B4332]/30 tracking-widest font-mono uppercase bg-white px-3 py-1">
+            <Badge variant="outline" className="text-[10px] text-[#111111] border-[#111111]/30 tracking-widest font-mono uppercase bg-white px-3 py-1">
               Active Discovery & Incubation Stand
             </Badge>
-            <h3 className="text-3xl magazine-heading text-[#1B4332] font-bold mt-2">
+            <h3 className="text-3xl magazine-heading text-[#111111] font-bold mt-2">
               숨은 지역 생산자·중소상공인 영성 가판대
             </h3>
           </div>
@@ -1312,7 +1312,7 @@ export default function LocalCurationHub() {
                 key={prod.id} 
                 className="bg-white border border-black/5 flex flex-col justify-between overflow-hidden shadow-sm hover:border-brand-green/30 transition-all rounded-none"
               >
-                <div className="relative aspect-video bg-[#F3F1E7] overflow-hidden">
+                <div className="relative aspect-video bg-[#FAF9F6] overflow-hidden">
                   <img 
                     src={prod.image} 
                     alt={prod.name} 
@@ -1323,10 +1323,10 @@ export default function LocalCurationHub() {
                   
                   {/* Geographic and Artisan details overlay */}
                   <div className="absolute top-4 left-4 flex gap-1.5 items-center bg-white/95 text-brand-green text-[9px] tracking-widest uppercase font-mono py-1 px-2.5 shadow-sm font-semibold">
-                    <MapPin className="w-3 h-3 text-[#D66853]" /> {prod.location}
+                    <MapPin className="w-3 h-3 text-[#8C1D24]" /> {prod.location}
                   </div>
 
-                  <span className="absolute top-4 right-4 bg-[#D66853] text-white text-[8px] tracking-[0.2em] font-mono uppercase py-1 px-2.5 font-bold">
+                  <span className="absolute top-4 right-4 bg-[#8C1D24] text-white text-[8px] tracking-[0.2em] font-mono uppercase py-1 px-2.5 font-bold">
                     {prod.highlightTag}
                   </span>
 
@@ -1360,9 +1360,9 @@ export default function LocalCurationHub() {
                     </div>
 
                     {/* Miniature Progress Slider */}
-                    <div className="w-full bg-[#FAF9F5] h-2 rounded-none overflow-hidden border border-black/5">
+                    <div className="w-full bg-[#FAF9F6] h-2 rounded-none overflow-hidden border border-black/5">
                       <div 
-                        className={`h-full ${isFull ? 'bg-[#D66853]' : 'bg-brand-green'}`}
+                        className={`h-full ${isFull ? 'bg-[#8C1D24]' : 'bg-brand-green'}`}
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>
@@ -1373,7 +1373,7 @@ export default function LocalCurationHub() {
                       disabled={isFull}
                       className={`w-full py-3.5 px-4 font-mono text-[10px] uppercase tracking-widest font-semibold transition-all border text-center rounded-none cursor-pointer ${
                         isFull 
-                          ? 'bg-[#1B4332]/5 border-black/5 text-foreground/35' 
+                          ? 'bg-[#111111]/5 border-black/5 text-foreground/35' 
                           : 'bg-white border-brand-green text-brand-green hover:bg-brand-green hover:text-white'
                       }`}
                     >
@@ -1421,7 +1421,7 @@ export default function LocalCurationHub() {
                       ? 'bg-foreground/50 text-white' 
                       : tier.badge === 'Local Supporter' 
                       ? 'bg-brand-green text-white' 
-                      : 'bg-[#D66853] text-white'
+                      : 'bg-[#8C1D24] text-white'
                   }`}>
                     {tier.badge}
                   </Badge>
@@ -1433,7 +1433,7 @@ export default function LocalCurationHub() {
                   <h4 className="text-lg font-bold text-brand-green tracking-tight font-sans">{tier.name}</h4>
                   <div className="flex items-baseline gap-1 pt-1">
                     <span className="text-3xl font-serif text-brand-green font-medium">{tier.price}</span>
-                    <span className="text-[10px] text-[#D66853] font-mono tracking-widest font-semibold uppercase">{tier.price !== '무료' && '/ 매월'}</span>
+                    <span className="text-[10px] text-[#8C1D24] font-mono tracking-widest font-semibold uppercase">{tier.price !== '무료' && '/ 매월'}</span>
                   </div>
                   <p className="text-xs font-light text-foreground/60 leading-normal pt-2">{tier.desc}</p>
                 </div>
@@ -1442,11 +1442,11 @@ export default function LocalCurationHub() {
 
                 {/* Perks listings */}
                 <div className="space-y-3.5">
-                  <span className="text-[9px] uppercase tracking-widest text-[#D66853] font-mono font-bold block">독점 혜택권 (Perks)</span>
+                  <span className="text-[9px] uppercase tracking-widest text-[#8C1D24] font-mono font-bold block">독점 혜택권 (Perks)</span>
                   <ul className="space-y-2.5">
                     {tier.perks.map((p, pIdx) => (
                       <li key={pIdx} className="text-xs font-light text-foreground/80 flex items-start gap-2.5 leading-relaxed">
-                        <CheckCircle className={`w-4 h-4 shrink-0 mt-0.5 ${idx === 2 ? 'text-[#D66853]' : 'text-brand-green'}`} />
+                        <CheckCircle className={`w-4 h-4 shrink-0 mt-0.5 ${idx === 2 ? 'text-[#8C1D24]' : 'text-brand-green'}`} />
                         <span>{p}</span>
                       </li>
                     ))}
@@ -1461,7 +1461,7 @@ export default function LocalCurationHub() {
                   idx === 1 
                     ? 'bg-brand-green text-white hover:bg-[#153427] shadow-sm' 
                     : idx === 2 
-                    ? 'bg-[#D66853] text-white hover:bg-[#c05743] shadow-sm'
+                    ? 'bg-[#8C1D24] text-white hover:bg-[#c05743] shadow-sm'
                     : 'bg-white border border-black/10 text-brand-green hover:bg-black/5'
                 }`}
               >
@@ -1472,10 +1472,10 @@ export default function LocalCurationHub() {
         </div>
 
         {/* Dynamic Interactive element: Interactive "This Month's Curation Box Preview" */}
-        <div className="bg-[#FAF9F5] border border-black/10 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8 rounded-none">
+        <div className="bg-[#FAF9F6] border border-black/10 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8 rounded-none">
           <div className="space-y-3 max-w-xl">
-            <span className="text-[9px] uppercase tracking-[0.25em] text-[#D66853] font-mono font-bold block flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-[#D66853]" /> 2026년 6월 ‘이달의 장인 실물로컬 박스’ 공개구성
+            <span className="text-[9px] uppercase tracking-[0.25em] text-[#8C1D24] font-mono font-bold block flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-[#8C1D24]" /> 2026년 6월 ‘이달의 장인 실물로컬 박스’ 공개구성
             </span>
             <h4 className="text-xl magazine-heading text-brand-green leading-snug">
               "지리산 봄안개 표고와 옹기 전복이 빚은 미식 앙상블"
@@ -1505,7 +1505,7 @@ export default function LocalCurationHub() {
 
       {/* Core Summary concluding banner of user pride values */}
       <div className="border border-dashed border-black/10 bg-white p-8 md:p-12 text-center text-xs space-y-4 max-w-3xl mx-auto rounded-none">
-        <Sparkles className="w-6 h-6 text-[#D66853] mx-auto animate-pulse" />
+        <Sparkles className="w-6 h-6 text-[#8C1D24] mx-auto animate-pulse" />
         <p className="font-serif italic text-base text-brand-green leading-relaxed max-w-xl mx-auto">
           “생산자는 자랑스럽게 제조와 성실성에만 전념을 다하고, <br />
           플랫폼은 그들이 지닌 깊은 가치와 세기를 매거진처럼 아름답게 가공하여 전국의 단골 팬덤과 연결합니다.”

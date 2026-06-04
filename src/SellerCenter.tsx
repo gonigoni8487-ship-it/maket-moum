@@ -45,7 +45,7 @@ export default function SellerCenter() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F1E7]/50 pt-32 pb-20">
+    <div className="min-h-screen bg-[#FAF9F6]/50 pt-32 pb-20">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
           <div>
@@ -90,7 +90,7 @@ export default function SellerCenter() {
               </div>
               <div className="absolute right-0 top-0 bottom-0 w-1/2 md:w-2/3 h-full grayscale-[10%] opacity-90 hidden sm:block">
                 <img src={dashboardCoverImg} className="w-full h-full object-cover" alt="Artisan workshop view" referrerPolicy="no-referrer" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#F3F1E7]/100 via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#FAF9F6]/100 via-transparent to-transparent"></div>
               </div>
             </div>
 
@@ -116,7 +116,7 @@ export default function SellerCenter() {
 
           <TabsContent value="ai-branding" className="outline-none">
             {/* Elegant Sub tab switcher */}
-            <div className="flex bg-[#F3F1E7]/80 border border-black/5 p-1 justify-start mb-8 max-w-xl">
+            <div className="flex bg-[#FAF9F6]/80 border border-black/5 p-1 justify-start mb-8 max-w-xl">
               <button 
                 onClick={() => setBrandingSubTab('identity')}
                 className={`flex-1 py-3 text-[10px] uppercase tracking-widest font-mono transition-all font-semibold cursor-pointer ${
@@ -167,7 +167,7 @@ export default function SellerCenter() {
                             info: '완도 미역귀와 청정 다시마를 먹고 자란 두툼하고 신선한 대물 참전복만을 엄선. 황동 고리백자와 장전통 옹기에서 명인의 비법 15가지 약초 간장 황금 배합비로 짜지 않게 저온 옹기 숙성하여 한과 자개급 정기 패키지로 배송.',
                             tone: 'Sophisticated & Minimal'
                           })}
-                          className="bg-[#1B4332]/5 text-brand-green hover:bg-[#1B4332]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
+                          className="bg-[#111111]/5 text-brand-green hover:bg-[#111111]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
                         >
                           🦪 팜스네이브 전복장
                         </button>
@@ -177,7 +177,7 @@ export default function SellerCenter() {
                             info: '경북 청송 고랭지 특유의 일교차로 당도와 사근거림이 완벽한 가을 부사만을 골라 수작업 슬라이스. 인공 백설탕이나 색소 없이 오직 산들바람 가을 천연 야생화 꿀만으로 숙성.',
                             tone: 'Traditional & Warm'
                           })}
-                          className="bg-[#1B4332]/5 text-brand-green hover:bg-[#1B4332]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
+                          className="bg-[#111111]/5 text-brand-green hover:bg-[#111111]/10 text-[9px] px-2 py-1.5 font-medium transition-colors border border-brand-green/10 cursor-pointer"
                         >
                           🍎 청송 사과 꿀청
                         </button>
@@ -230,7 +230,7 @@ export default function SellerCenter() {
                 <div className="relative">
                   {!aiResult && !isGenerating && (
                     <div className="h-full border border-black/5 bg-white p-8 flex flex-col justify-between min-h-[500px]">
-                      <div className="relative h-56 w-full bg-[#F3F1E7]/50 overflow-hidden mb-6">
+                      <div className="relative h-56 w-full bg-[#FAF9F6]/50 overflow-hidden mb-6">
                         <img src={brandingCoverImg} className="w-full h-full object-cover grayscale-[15%]" alt="Branding visual mood" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/5"></div>
                       </div>
@@ -276,13 +276,13 @@ export default function SellerCenter() {
                         </CardHeader>
                         <CardContent className="space-y-8">
                           <div>
-                            <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Brand Story</label>
+                            <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] mb-3 block">Brand Story</label>
                             <p className="text-sm font-light leading-relaxed text-foreground/80 bg-brand-green/[0.03] p-4 italic">
                               {aiResult.story}
                             </p>
                           </div>
                           <div>
-                            <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Signature Selling Points</label>
+                            <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] mb-3 block">Signature Selling Points</label>
                             <ul className="space-y-3">
                               {aiResult.details.map((detail: string, i: number) => (
                                 <li key={i} className="text-xs font-light flex items-center gap-3">
@@ -292,8 +292,8 @@ export default function SellerCenter() {
                             </ul>
                           </div>
                           <div>
-                            <label className="text-[10px] uppercase tracking-widest text-[#D66853] mb-3 block">Instagram Marketing Copy</label>
-                            <p className="text-[11px] font-mono leading-relaxed bg-[#1B4332] text-white/90 p-6">
+                            <label className="text-[10px] uppercase tracking-widest text-[#8C1D24] mb-3 block">Instagram Marketing Copy</label>
+                            <p className="text-[11px] font-mono leading-relaxed bg-[#111111] text-white/90 p-6">
                               {aiResult.marketingCopy}
                             </p>
                           </div>
@@ -313,7 +313,7 @@ export default function SellerCenter() {
             ) : (
               <div className="animate-fade-in space-y-12">
                 {/* Visual Header Banner for Monetization */}
-                <div className="bg-[#1B4332] text-[#FAF9F5] p-10 md:p-14 relative overflow-hidden ring-1 ring-white/10 shadow-md">
+                <div className="bg-[#111111] text-[#FAF9F6] p-10 md:p-14 relative overflow-hidden ring-1 ring-white/10 shadow-md">
                   <div className="absolute right-0 top-0 bottom-0 opacity-10 hidden lg:block w-1/3">
                     <div className="w-full h-full border-l border-white/10 rotate-12 translate-x-24 scale-150 flex items-center justify-center">
                       <Sparkles className="w-56 h-56 text-white animate-pulse" />
@@ -321,14 +321,14 @@ export default function SellerCenter() {
                   </div>
                   
                   <div className="max-w-3xl space-y-4 relative z-10">
-                    <Badge className="bg-[#D66853] text-white hover:bg-[#D66853]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-3 py-1">
+                    <Badge className="bg-[#8C1D24] text-white hover:bg-[#8C1D24]/90 rounded-none tracking-widest font-mono text-[9px] uppercase px-3 py-1">
                       Moum AI Monetization Bootstrap
                     </Badge>
                     <h2 className="text-3xl md:text-5xl magazine-heading font-medium tracking-tight leading-tight">
                       AI 로컬 식품 수익화 마스터 가이드 <br />
-                      <span className="italic font-serif text-[#D66853]">“무자본에서 자사 브랜드 런칭까지”</span>
+                      <span className="italic font-serif text-[#8C1D24]">“무자본에서 자사 브랜드 런칭까지”</span>
                     </h2>
-                    <p className="text-xs md:text-sm text-[#FAF9F5]/80 font-light leading-relaxed max-w-2xl">
+                    <p className="text-xs md:text-sm text-[#FAF9F6]/80 font-light leading-relaxed max-w-2xl">
                       조용히 창작하고 준비하는 직장인, 예비 농어민, 1인 셀러를 위해 Google Gemini와 상생 테크를 결합한 최고의 로컬 상생 마케팅 비책입니다. 매일 1~2시간 가치 투자로 수익을 폭발시키세요.
                     </p>
                   </div>
@@ -337,7 +337,7 @@ export default function SellerCenter() {
                 {/* Part 1: Monetization Ideas Brainstorming */}
                 <div className="space-y-6">
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#D66853] font-bold font-mono">01. BRAINSTORMING</span>
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#8C1D24] font-bold font-mono">01. BRAINSTORMING</span>
                     <h3 className="text-2xl magazine-heading text-brand-green font-bold">AI 기성 식품 및 로컬 수익화 아이디어 3선</h3>
                     <p className="text-xs text-foreground/50 font-light">나만의 속도와 성향에 맞춘 AI 레버리지 무자본 비즈니스 모델입니다.</p>
                   </div>
@@ -354,7 +354,7 @@ export default function SellerCenter() {
                           Google Gemini로 전국 숨은 맛집, 전통 식재료 트렌드를 정밀 인덱싱 후 전문적으로 연재합니다. 향후 탄생할 독점 브랜드의 진성 선주문 단골들을 선점 확보하는 핵심 씨앗 채널이 됩니다.
                         </p>
                       </div>
-                      <div className="pt-3 border-t border-black/5 flex justify-between text-[10px] font-mono text-[#D66853]">
+                      <div className="pt-3 border-t border-black/5 flex justify-between text-[10px] font-mono text-[#8C1D24]">
                         <span>✓ 무자본 저위험</span>
                         <span>✓ 블로그형 자산</span>
                       </div>
@@ -371,7 +371,7 @@ export default function SellerCenter() {
                           마케팅 화력이 부재한 우리 동네 명인들의 소리 없는 외침을 돕습니다. 배달앱 메뉴 설명, 스마트플레이스 홍보 문구 초안 작성을 Gemini로 순식간에 고품격 드롭 대행하여 지속 대가를 획득합니다.
                         </p>
                       </div>
-                      <div className="pt-3 border-t border-black/5 flex justify-between text-[10px] font-mono text-[#D66853]">
+                      <div className="pt-3 border-t border-black/5 flex justify-between text-[10px] font-mono text-[#8C1D24]">
                         <span>✓ 압도적 시간대비 효율</span>
                         <span>✓ 즉각 현금 흐름</span>
                       </div>
@@ -388,7 +388,7 @@ export default function SellerCenter() {
                           혼자 고요히 가치에 사유하는 창작 성향에 제격입니다. 특정 타운의 외식 상권 흐름 및 고령 생산자 연출 카피 라이브러리를 Gemini로 집대성해 유료 전자책으로 출판, 평생 연금형 자동 소득을 구축합니다.
                         </p>
                       </div>
-                      <div className="pt-3 border-t border-black/5 flex justify-between text-[10px] font-mono text-[#D66853]">
+                      <div className="pt-3 border-t border-black/5 flex justify-between text-[10px] font-mono text-[#8C1D24]">
                         <span>✓ 평생 자동화 소득</span>
                         <span>✓ 무점포 디지털 자산</span>
                       </div>
@@ -397,9 +397,9 @@ export default function SellerCenter() {
                 </div>
 
                 {/* Part 2: Selected Idea Best Choice Analysis */}
-                <div className="bg-[#FAF9F5] border border-brand-green/10 p-6 md:p-8 space-y-6">
+                <div className="bg-[#FAF9F6] border border-brand-green/10 p-6 md:p-8 space-y-6">
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-[#FAF9F5] border border-[#D66853] text-[#D66853] rounded-none px-2 py-0.5 text-[9px] uppercase font-mono font-bold">Recommended</Badge>
+                    <Badge className="bg-[#FAF9F6] border border-[#8C1D24] text-[#8C1D24] rounded-none px-2 py-0.5 text-[9px] uppercase font-mono font-bold">Recommended</Badge>
                     <span className="text-[10px] uppercase font-mono tracking-widest text-brand-green font-bold">최적의 시너지 큐레이션 검증 아이디어</span>
                   </div>
                   
@@ -418,11 +418,11 @@ export default function SellerCenter() {
                     <div className="md:col-span-4 bg-white p-5 border border-black/5 text-[11px] space-y-3 font-mono rounded-none">
                       <div className="flex justify-between items-center text-brand-green font-bold pb-2 border-b border-black/5">
                         <span>🎯 4대 직계 시너지 분석</span>
-                        <span className="text-[9px] text-[#D66853]">Moum Approved</span>
+                        <span className="text-[9px] text-[#8C1D24]">Moum Approved</span>
                       </div>
                       <ul className="space-y-2 text-foreground/70">
                         <li className="flex justify-between"><span>• 준비 중인 사업과 즉각 연계</span><strong className="text-brand-green">100%</strong></li>
-                        <li className="flex justify-between"><span>• 초기 설비/자본 자금 리스크</span><strong className="text-[#D66853]">0원</strong></li>
+                        <li className="flex justify-between"><span>• 초기 설비/자본 자금 리스크</span><strong className="text-[#8C1D24]">0원</strong></li>
                         <li className="flex justify-between"><span>• 퇴근 후 직장인 병행 안정성</span><strong className="text-brand-green">최상</strong></li>
                         <li className="flex justify-between"><span>• 애드포스트+협찬+공구 확장</span><strong className="text-brand-green">무제한</strong></li>
                       </ul>
@@ -433,7 +433,7 @@ export default function SellerCenter() {
                 {/* Part 3: Roadmap (5 Steps) */}
                 <div className="space-y-8">
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#D66853] font-bold font-mono">02. STEP-BY-STEP ROADMAP</span>
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#8C1D24] font-bold font-mono">02. STEP-BY-STEP ROADMAP</span>
                     <h3 className="text-2xl magazine-heading text-brand-green font-bold">AI 기반 로컬 식품 수익화 준비 5단계 로드맵</h3>
                     <p className="text-xs text-foreground/50 font-light">가치를 빚어내는 아티스트 마케터로 나아가는 고선명 실행 타임라인입니다.</p>
                   </div>
@@ -441,7 +441,7 @@ export default function SellerCenter() {
                   <div className="relative border-l border-brand-green/20 ml-4 pl-8 space-y-8 py-2">
                     {/* Step 1 */}
                     <div className="relative">
-                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F5] border-2 border-[#4f46e5] flex items-center justify-center font-mono text-[9px] font-bold text-[#4f46e5]">1</div>
+                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F6] border-2 border-[#4f46e5] flex items-center justify-center font-mono text-[9px] font-bold text-[#4f46e5]">1</div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold font-mono text-[#4f46e5]">1단계</span>
@@ -456,7 +456,7 @@ export default function SellerCenter() {
 
                     {/* Step 2 */}
                     <div className="relative">
-                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F5] border-2 border-[#10b981] flex items-center justify-center font-mono text-[9px] font-bold text-[#10b981]">2</div>
+                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F6] border-2 border-[#10b981] flex items-center justify-center font-mono text-[9px] font-bold text-[#10b981]">2</div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold font-mono text-[#10b981]">2단계</span>
@@ -471,7 +471,7 @@ export default function SellerCenter() {
 
                     {/* Step 3 */}
                     <div className="relative">
-                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F5] border-2 border-[#f59e0b] flex items-center justify-center font-mono text-[9px] font-bold text-[#f59e0b]">3</div>
+                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F6] border-2 border-[#f59e0b] flex items-center justify-center font-mono text-[9px] font-bold text-[#f59e0b]">3</div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold font-mono text-[#f59e0b]">3단계</span>
@@ -486,7 +486,7 @@ export default function SellerCenter() {
 
                     {/* Step 4 */}
                     <div className="relative">
-                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F5] border-2 border-[#ef4444] flex items-center justify-center font-mono text-[9px] font-bold text-[#ef4444]">4</div>
+                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F6] border-2 border-[#ef4444] flex items-center justify-center font-mono text-[9px] font-bold text-[#ef4444]">4</div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold font-mono text-[#ef4444]">4단계</span>
@@ -501,7 +501,7 @@ export default function SellerCenter() {
 
                     {/* Step 5 */}
                     <div className="relative">
-                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F5] border-2 border-[#8b5cf6] flex items-center justify-center font-mono text-[9px] font-bold text-[#8b5cf6]">5</div>
+                      <div className="absolute -left-[41px] top-1 w-6 h-6 rounded-full bg-[#FAF9F6] border-2 border-[#8b5cf6] flex items-center justify-center font-mono text-[9px] font-bold text-[#8b5cf6]">5</div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold font-mono text-[#8b5cf6]">5단계</span>
@@ -519,7 +519,7 @@ export default function SellerCenter() {
                 {/* Part 4: Innovative Marketing Strategies */}
                 <div className="space-y-8">
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#D66853] font-bold font-mono">03. INNOVATIVE STRATEGIES</span>
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#8C1D24] font-bold font-mono">03. INNOVATIVE STRATEGIES</span>
                     <h3 className="text-2xl magazine-heading text-brand-green font-bold">타겟 도달 및 수익 극대화를 위한 마케팅 혁신 5대 전선</h3>
                     <p className="text-xs text-foreground/50 font-light">기존 유통 채널의 후려치기 문법을 고차원 가치 서사로 일축하는 모움 전용 마케팅 진수입니다.</p>
                   </div>
@@ -577,14 +577,14 @@ export default function SellerCenter() {
                   {/* Left Column: Weekly Action Plan */}
                   <div className="lg:col-span-12 xl:col-span-7 space-y-6">
                     <div className="space-y-1">
-                      <Badge className="bg-[#1B4332] text-[#FAF9F5] rounded-none text-[8px] tracking-widest font-mono uppercase px-2 py-0.5">Four-Week Intensive Schedule</Badge>
+                      <Badge className="bg-[#111111] text-[#FAF9F6] rounded-none text-[8px] tracking-widest font-mono uppercase px-2 py-0.5">Four-Week Intensive Schedule</Badge>
                       <h4 className="text-lg font-bold text-brand-green">초보자를 위한 4주 집중 고속 침투 액션 플랜</h4>
                     </div>
 
-                    <div className="bg-[#FAF9F5] border border-black/5 divide-y divide-black/5 rounded-none font-sans text-xs">
+                    <div className="bg-[#FAF9F6] border border-black/5 divide-y divide-black/5 rounded-none font-sans text-xs">
                       {/* Week 1 */}
                       <div className="p-5 flex gap-4 items-start">
-                        <span className="w-16 font-mono font-bold text-[#D66853] bg-[#D66853]/5 px-2 py-1 text-center border border-[#D66853]/15">Week 1</span>
+                        <span className="w-16 font-mono font-bold text-[#8C1D24] bg-[#8C1D24]/5 px-2 py-1 text-center border border-[#8C1D24]/15">Week 1</span>
                         <div className="space-y-1.5 flex-1">
                           <h5 className="font-bold text-brand-green leading-none">디지털 거점 개설 & 1일 1기록 세우기</h5>
                           <p className="text-[11px] text-foreground/60 leading-relaxed font-light">
@@ -595,7 +595,7 @@ export default function SellerCenter() {
 
                       {/* Week 2 */}
                       <div className="p-5 flex gap-4 items-start">
-                        <span className="w-16 font-mono font-bold text-brand-green bg-[#1B4332]/5 px-2 py-1 text-center border border-brand-green/15">Week 2</span>
+                        <span className="w-16 font-mono font-bold text-brand-green bg-[#111111]/5 px-2 py-1 text-center border border-brand-green/15">Week 2</span>
                         <div className="space-y-1.5 flex-1">
                           <h5 className="font-bold text-brand-green leading-none">고밀도 분석 및 로컬 연대 소통 점화</h5>
                           <p className="text-[11px] text-foreground/60 leading-relaxed font-light">
@@ -606,7 +606,7 @@ export default function SellerCenter() {
 
                       {/* Week 3 */}
                       <div className="p-5 flex gap-4 items-start">
-                        <span className="w-16 font-mono font-bold text-brand-green bg-[#1B4332]/5 px-2 py-1 text-center border border-brand-green/15">Week 3</span>
+                        <span className="w-16 font-mono font-bold text-brand-green bg-[#111111]/5 px-2 py-1 text-center border border-brand-green/15">Week 3</span>
                         <div className="space-y-1.5 flex-1">
                           <h5 className="font-bold text-brand-green leading-none">첫 제휴 파트너 고리 장전 & 현금 전환 맛보기</h5>
                           <p className="text-[11px] text-foreground/60 leading-relaxed font-light">
@@ -617,7 +617,7 @@ export default function SellerCenter() {
 
                       {/* Week 4 */}
                       <div className="p-5 flex gap-4 items-start">
-                        <span className="w-16 font-mono font-bold text-brand-green bg-[#1B4332]/5 px-2 py-1 text-center border border-brand-green/15">Week 4</span>
+                        <span className="w-16 font-mono font-bold text-brand-green bg-[#111111]/5 px-2 py-1 text-center border border-brand-green/15">Week 4</span>
                         <div className="space-y-1.5 flex-1">
                           <h5 className="font-bold text-brand-green leading-none">가상의 한옥 스토리 시장 조사 및 볼륨업</h5>
                           <p className="text-[11px] text-foreground/60 leading-relaxed font-light">
@@ -632,8 +632,8 @@ export default function SellerCenter() {
                   <div className="lg:col-span-12 xl:col-span-5 bg-white border border-brand-green/10 p-6 md:p-8 flex flex-col justify-between space-y-6">
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[#D66853]" />
-                        <span className="text-[10px] uppercase font-mono tracking-widest text-[#D66853] font-bold">Magic Prompt Engine</span>
+                        <Sparkles className="w-4 h-4 text-[#8C1D24]" />
+                        <span className="text-[10px] uppercase font-mono tracking-widest text-[#8C1D24] font-bold">Magic Prompt Engine</span>
                       </div>
                       <h4 className="text-lg magazine-heading text-brand-green font-bold">
                         Gemini 접속 및 초보용 마법 프롬프트
@@ -644,7 +644,7 @@ export default function SellerCenter() {
                     </div>
 
                     {/* Copiable Message Box */}
-                    <div className="p-4 bg-[#FAF9F5] border border-black/5 space-y-4 font-mono text-xs rounded-none">
+                    <div className="p-4 bg-[#FAF9F6] border border-black/5 space-y-4 font-mono text-xs rounded-none">
                       <div className="flex justify-between items-center text-[9px] text-slate-400 border-b border-black/5 pb-2">
                         <span>초보자용 만능 마법 프롬프트</span>
                         <span className="text-brand-green">Copiable Template</span>
@@ -660,7 +660,7 @@ export default function SellerCenter() {
                         navigator.clipboard.writeText(`안녕 Gemini! 나는 로컬 식품 브랜드를 준비 중인 마케팅 전문가야. 오늘 블로그에 '전국에서 가장 유명한 로컬 전통주 5가지와 그에 어울리는 안주 조합'에 대해 라이프스타일 매거진 느낌으로 글을 쓰려고 해. 사람들이 흥미를 느끼고 스토리 깊이 몰입하게 매력적인 카피 제목 3개와 블로그 본문 내용을 아주 상세히 전해줘. 각 술 장인의 특징과 최고급 마케팅 소구점도 포함해주면 참 좋겠어.`);
                         alert("마법의 만능 프롬프트가 정갈하게 클립보드 복사되었습니다! gemini.google.com 에 붙여넣으세요!");
                       }}
-                      className="w-full bg-[#D66853] hover:bg-[#c05743] text-[#FAF9F5] py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer text-center"
+                      className="w-full bg-[#8C1D24] hover:bg-[#c05743] text-[#FAF9F6] py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer text-center"
                     >
                       프롬프트 한판 복사하기
                     </button>
@@ -682,7 +682,7 @@ export default function SellerCenter() {
               {/* Image banner inside analytical cards */}
               <div className="lg:col-span-1 border border-black/5 bg-white p-6 flex flex-col justify-between">
                 <div>
-                  <Badge className="bg-[#D66853] text-white rounded-none tracking-widest text-[8px] uppercase mb-4">Traffic & Growth</Badge>
+                  <Badge className="bg-[#8C1D24] text-white rounded-none tracking-widest text-[8px] uppercase mb-4">Traffic & Growth</Badge>
                   <h3 className="text-xl magazine-heading text-brand-green mb-3">유기적 성장 분석</h3>
                   <p className="text-xs font-light text-foreground/60 leading-relaxed mb-6">
                     로컬 스토어의 가치 지향적 소비 통계입니다. 단순 조회수를 넘어, 브랜드 스토리에 3초 이상 체류하며 로컬 아티스트의 철학을 깊이 경청한 방문자의 비율을 실시간 분석합니다.
@@ -717,7 +717,7 @@ export default function SellerCenter() {
                           <span className="font-semibold text-brand-green">{data.value}</span>
                         </div>
                       </div>
-                      <div className="h-2.5 bg-[#F3F1E7]/80 w-full">
+                      <div className="h-2.5 bg-[#FAF9F6]/80 w-full">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: data.height }}
@@ -739,7 +739,7 @@ export default function SellerCenter() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1 border border-black/5 bg-white p-6 flex flex-col justify-between">
                 <div>
-                  <Badge className="bg-[#D66853] text-white rounded-none tracking-widest text-[8px] uppercase mb-4">Curation Partnership</Badge>
+                  <Badge className="bg-[#8C1D24] text-white rounded-none tracking-widest text-[8px] uppercase mb-4">Curation Partnership</Badge>
                   <h3 className="text-xl magazine-heading text-brand-green mb-3">PB 매칭 및 독점 기회</h3>
                   <p className="text-xs font-light text-foreground/60 leading-relaxed mb-6">
                     백화점, 수제 큐레이션숍, 디자인 북카페 등 프리미엄 오프라인 공간을 가진 파트너와 로컬 크리에이터의 연계를 실시간 지원합니다. 스토어 가치가 상호 수렴하는 기획 입점을 무료 지원합니다.
@@ -781,7 +781,7 @@ export default function SellerCenter() {
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="flex flex-wrap gap-2 mb-2 items-center">
-                          <span className="bg-[#F3F1E7] text-brand-green text-[8px] px-2 py-0.5 tracking-widest uppercase font-mono">{pb.type}</span>
+                          <span className="bg-[#FAF9F6] text-brand-green text-[8px] px-2 py-0.5 tracking-widest uppercase font-mono">{pb.type}</span>
                           <span className={`${pb.color} text-white text-[8px] px-2 py-0.5 tracking-widest uppercase font-mono`}>{pb.score}</span>
                         </div>
                         <h4 className="text-base text-brand-green font-medium">{pb.partner}</h4>

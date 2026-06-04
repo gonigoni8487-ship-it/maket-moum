@@ -83,7 +83,7 @@ export default function LandingPage() {
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-[#F3F1E7]">
+      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-[#FAF9F6]">
         <div className="absolute inset-0 z-0">
           <img 
             src="https://images.unsplash.com/photo-1540959733332-e94e270b2ec0?q=80&w=2000&auto=format&fit=crop" 
@@ -112,7 +112,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <span className="text-xs md:text-sm uppercase tracking-[0.3em] text-[#C8452D] font-bold mb-6 block">
+            <span className="text-xs md:text-sm uppercase tracking-[0.3em] text-[#8C1D24] font-bold mb-6 block">
               생산자 + 스토리 + 팬덤 + 상생 펀딩 공동체
             </span>
             <h1 className="text-5xl md:text-8xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium">
@@ -124,7 +124,7 @@ export default function LandingPage() {
               <strong> ‘공동구매 가격하락 퍼널’</strong>과 <strong>‘예약형 시즌 펀딩’</strong>을 결합해 상생팬덤 생태계를 만듭니다.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/markets" className="bg-brand-green text-[#FAF7F0] px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green/90 transition-all flex items-center gap-2">
+              <Link to="/markets" className="bg-brand-green text-[#FAF9F6] px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green/90 transition-all flex items-center gap-2">
                 Explore Markets <ArrowRight className="w-4 h-4" />
               </Link>
               <Link to="/seller" className="border border-brand-green text-brand-green px-10 py-5 rounded-none text-sm uppercase tracking-widest hover:bg-brand-green hover:text-white transition-all">
@@ -141,9 +141,9 @@ export default function LandingPage() {
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         >
           <div className="bg-white/80 backdrop-blur-sm p-6 border border-black/5 shadow-sm">
-            <p className="text-[10px] uppercase tracking-widest text-[#C8452D] mb-1">Live popup market</p>
+            <p className="text-[10px] uppercase tracking-widest text-[#8C1D24] mb-1">Live popup market</p>
             <p className="text-sm magazine-heading">Cheongsong Apple Fest 2024</p>
-            <div className="flex items-center gap-2 mt-2 text-[#C8452D]">
+            <div className="flex items-center gap-2 mt-2 text-[#8C1D24]">
               <Clock className="w-3 h-3" />
               <span className="text-[10px] font-mono">05:24:12 LEFT</span>
             </div>
@@ -152,14 +152,14 @@ export default function LandingPage() {
       </section>
 
       {/* Platform Concept Selector Tabs */}
-      <section className="bg-[#FAF7F0] border-y border-black/5 py-10 px-6">
+      <section className="bg-[#FAF9F6] border-y border-black/5 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="space-y-1 text-center md:text-left">
-            <span className="text-[10px] uppercase tracking-[0.25em] text-[#C8452D] font-semibold">Select Curated Platform Mode</span>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-[#8C1D24] font-semibold">Select Curated Platform Mode</span>
             <h3 className="text-xl magazine-heading text-brand-green font-medium">마켓모움의 차별화 큐레이션 관문</h3>
           </div>
           
-          <div className="flex bg-[#F1ECE1] border border-black/5 p-1.5 justify-center max-w-lg w-full md:w-auto">
+          <div className="flex bg-[#FAF9F6] border border-black/5 p-1.5 justify-center max-w-lg w-full md:w-auto">
             <button 
               onClick={() => setActiveTab('community')}
               className={`flex-1 md:px-8 py-3.5 text-[11px] uppercase tracking-widest font-mono transition-all font-bold flex items-center justify-center gap-2 cursor-pointer ${
@@ -215,7 +215,7 @@ export default function LandingPage() {
                   className="group cursor-pointer" 
                   onClick={() => { setSelectedProduct(product); setOrderMode(false); }}
                 >
-                  <div className="relative overflow-hidden aspect-[4/5] bg-[#F1ECE1] mb-6">
+                  <div className="relative overflow-hidden aspect-[4/5] bg-[#FAF9F6] mb-6">
                     <motion.img 
                       src={product.image} 
                       alt={product.name}
@@ -238,9 +238,9 @@ export default function LandingPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="text-lg magazine-heading mb-1">{product.name}</h3>
-                      <p className="text-sm text-foreground/40 font-light italic text-[#1B4332]/70">By {product.artisan}</p>
+                      <p className="text-sm text-foreground/40 font-light italic text-[#111111]/70">By {product.artisan}</p>
                     </div>
-                    <p className="text-lg font-serif text-[#1B4332]">₩{product.price.toLocaleString()}</p>
+                    <p className="text-lg font-serif text-[#111111]">₩{product.price.toLocaleString()}</p>
                   </div>
                   {product.isLimited && (
                     <div className="mt-4 flex items-center gap-2 text-brand-terracotta">
@@ -256,16 +256,16 @@ export default function LandingPage() {
       )}
 
       {/* Professional MD verification section */}
-      <section className="bg-[#FAF7F0] border-t border-b border-black/5 py-28 px-6 overflow-hidden">
+      <section className="bg-[#FAF9F6] border-t border-b border-black/5 py-28 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto space-y-16">
           <ScrollReveal>
             <div className="max-w-3xl space-y-6">
-              <span className="text-xs font-bold uppercase tracking-[0.3em] text-[#C8452D] flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-[0.3em] text-[#8C1D24] flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4" /> 100% Verified by Curators
               </span>
               <h2 className="text-4xl md:text-6xl magazine-heading text-brand-green leading-[1.1] font-medium">
                 전현직 백화점·대형마트 MD가 <br />
-                직접 산지를 누벼 <span className="italic font-serif text-[#C8452D]">엄격히 검증한 명품 원물</span>
+                직접 산지를 누벼 <span className="italic font-serif text-[#8C1D24]">엄격히 검증한 명품 원물</span>
               </h2>
               <p className="text-sm md:text-base text-brand-green/80 font-light leading-relaxed">
                 우리가 매일 식탁에 올리는 가치를 위해 최고의 유통 전문가들이 연대했습니다. 
@@ -284,7 +284,7 @@ export default function LandingPage() {
                   className="bg-white border border-black/5 overflow-hidden group cursor-pointer hover:border-brand-green/30 transition-all flex flex-col h-full hover:shadow-md"
                 >
                   {/* MD image panel */}
-                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#F1ECE1]">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#FAF9F6]">
                     <img 
                       src={md.image} 
                       alt={md.name} 
@@ -298,7 +298,7 @@ export default function LandingPage() {
                       </span>
                     </div>
                     <div className="absolute bottom-4 left-4 right-4 text-white">
-                      <p className="text-xs uppercase tracking-widest text-[#C8452D] font-mono mb-0.5">{md.englishName}</p>
+                      <p className="text-xs uppercase tracking-widest text-[#8C1D24] font-mono mb-0.5">{md.englishName}</p>
                       <h4 className="text-lg font-bold magazine-heading leading-tight">{md.name}</h4>
                     </div>
                   </div>
@@ -307,18 +307,18 @@ export default function LandingPage() {
                   <div className="p-6 flex-1 flex flex-col justify-between space-y-6">
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <p className="text-[10px] font-mono font-bold tracking-wider text-[#C8452D]">FORMER CAREER</p>
+                        <p className="text-[10px] font-mono font-bold tracking-wider text-[#8C1D24]">FORMER CAREER</p>
                         <p className="text-xs font-semibold text-brand-green leading-snug">{md.formerCompany}</p>
                       </div>
                       
-                      <p className="text-[11px] leading-relaxed text-[#1B4332]/70 italic font-serif">
+                      <p className="text-[11px] leading-relaxed text-[#111111]/70 italic font-serif">
                         {md.quote}
                       </p>
                     </div>
 
                     <div className="pt-4 border-t border-black/5 flex justify-between items-center text-[10px] uppercase font-mono tracking-widest">
                       <span className="text-foreground/40">{md.experience}</span>
-                      <span className="text-[#C8452D] border-b border-[#C8452D] pb-0.5 font-bold group-hover:text-brand-green group-hover:border-brand-green transition-colors">
+                      <span className="text-[#8C1D24] border-b border-[#8C1D24] pb-0.5 font-bold group-hover:text-brand-green group-hover:border-brand-green transition-colors">
                         이력 및 철학 보기 +
                       </span>
                     </div>
@@ -421,19 +421,19 @@ export default function LandingPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="bg-[#FDFCF8] text-[#1B4332] max-w-5xl w-full border border-black/5 flex flex-col md:flex-row relative shadow-2xl overflow-hidden my-8"
+              className="bg-[#FDFCF8] text-[#111111] max-w-5xl w-full border border-black/5 flex flex-col md:flex-row relative shadow-2xl overflow-hidden my-8"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
               <button 
                 onClick={() => { setSelectedProduct(null); setOrderMode(false); }}
-                className="absolute top-6 right-6 z-10 p-2 hover:bg-black/5 rounded-full transition-all text-[#1B4332]"
+                className="absolute top-6 right-6 z-10 p-2 hover:bg-black/5 rounded-full transition-all text-[#111111]"
               >
                 <X className="w-6 h-6" />
               </button>
 
               {/* Product Image Panel (Left) */}
-              <div className="w-full md:w-1/2 relative bg-[#F1ECE1] aspect-[4/5] md:aspect-auto md:min-h-[600px] overflow-hidden">
+              <div className="w-full md:w-1/2 relative bg-[#FAF9F6] aspect-[4/5] md:aspect-auto md:min-h-[600px] overflow-hidden">
                 <img 
                   src={selectedProduct.image} 
                   alt={selectedProduct.name} 
@@ -444,7 +444,7 @@ export default function LandingPage() {
                 
                 {/* Floating Artisan Designation */}
                 <div className="absolute bottom-8 left-8 text-white">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#C8452D] mb-1 font-semibold">CURATED PARTNER BRAND</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#8C1D24] mb-1 font-semibold">CURATED PARTNER BRAND</p>
                   <p className="text-xl font-medium magazine-heading text-brand-ivory opacity-95">{selectedProduct.artisan}</p>
                   <p className="text-xs font-light opacity-75 mt-0.5">Premium Traditional Craftsmanship</p>
                 </div>
@@ -459,7 +459,7 @@ export default function LandingPage() {
                       {selectedProduct.category}
                     </span>
                     {selectedProduct.isLimited && (
-                      <span className="bg-brand-terracotta/10 text-[#C8452D] text-[9px] px-2.5 py-1 tracking-widest uppercase font-mono font-semibold">
+                      <span className="bg-brand-terracotta/10 text-[#8C1D24] text-[9px] px-2.5 py-1 tracking-widest uppercase font-mono font-semibold">
                         POP-UP LIMITED ({selectedProduct.stock} Left)
                       </span>
                     )}
@@ -469,20 +469,20 @@ export default function LandingPage() {
                   <h3 className="text-2xl md:text-3xl magazine-heading text-brand-green leading-[1.2] mb-3">
                     {selectedProduct.name}
                   </h3>
-                  <p className="text-2.5xl font-serif text-[#1B4332] mb-6">
+                  <p className="text-2.5xl font-serif text-[#111111] mb-6">
                     ₩{selectedProduct.price.toLocaleString()}
                     <span className="text-[11px] text-foreground/45 font-sans italic ml-3 font-normal">무료 보장배송 및 오동나무 명인 목함 포함 패키지</span>
                   </p>
 
-                  <div className="w-full h-px bg-[#1B4332]/10 mb-6"></div>
+                  <div className="w-full h-px bg-[#111111]/10 mb-6"></div>
 
                   {/* Brand Copy & Story Block */}
                   {BRAND_PACKAGES[selectedProduct.id] ? (
                     <div className="space-y-6">
                       {/* Tagline */}
                       <div>
-                        <p className="text-[9px] uppercase tracking-[0.25em] text-[#C8452D] mb-1 font-semibold">Brand Tagline</p>
-                        <h4 className="text-lg italic font-medium text-[#1B4332] tracking-tight font-serif leading-[1.3] pl-2 border-l-2 border-brand-terracotta">
+                        <p className="text-[9px] uppercase tracking-[0.25em] text-[#8C1D24] mb-1 font-semibold">Brand Tagline</p>
+                        <h4 className="text-lg italic font-medium text-[#111111] tracking-tight font-serif leading-[1.3] pl-2 border-l-2 border-brand-terracotta">
                           "{BRAND_PACKAGES[selectedProduct.id].tagline}"
                         </h4>
                       </div>
@@ -490,7 +490,7 @@ export default function LandingPage() {
                       {/* Decoded Brand Narrative */}
                       <div>
                         <p className="text-[9px] uppercase tracking-[0.25em] text-foreground/45 mb-2 font-semibold">The Story & Philosophy (스토리 & 철학)</p>
-                        <p className="text-xs text-[#1B4332]/85 leading-relaxed font-light bg-brand-green/[0.02] p-5 italic border border-[#1B4332]/5">
+                        <p className="text-xs text-[#111111]/85 leading-relaxed font-light bg-brand-green/[0.02] p-5 italic border border-[#111111]/5">
                           {BRAND_PACKAGES[selectedProduct.id].story}
                         </p>
                       </div>
@@ -501,7 +501,7 @@ export default function LandingPage() {
                         <ul className="space-y-2">
                           {BRAND_PACKAGES[selectedProduct.id].details.map((detail: string, i: number) => (
                             <li key={i} className="text-xs text-foreground/80 font-light flex items-start gap-2.5">
-                              <span className="text-[#C8452D] font-bold mt-0.5">✓</span>
+                              <span className="text-[#8C1D24] font-bold mt-0.5">✓</span>
                               <span>{detail}</span>
                             </li>
                           ))}
@@ -511,16 +511,16 @@ export default function LandingPage() {
                       {/* Social Media Content Options (상세페이지 대표 카피) */}
                       <div className="pt-2">
                         <div className="flex justify-between items-center mb-2">
-                          <p className="text-[9px] uppercase tracking-[0.25em] text-[#C8452D] font-semibold">AI Generated Representative Copy (대표 상세페이지 문구)</p>
+                          <p className="text-[9px] uppercase tracking-[0.25em] text-[#8C1D24] font-semibold">AI Generated Representative Copy (대표 상세페이지 문구)</p>
                           <button 
                             onClick={() => handleCopy(BRAND_PACKAGES[selectedProduct.id].marketingCopy, selectedProduct.id)}
-                            className="text-[10px] uppercase tracking-wider text-brand-green hover:text-[#C8452D] font-mono flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
+                            className="text-[10px] uppercase tracking-wider text-brand-green hover:text-[#8C1D24] font-mono flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
                           >
                             <Copy className="w-3.5 h-3.5" />
                             {copiedId === selectedProduct.id ? 'Copied!' : 'Copy Copywriting'}
                           </button>
                         </div>
-                        <div className="bg-[#1B4332] text-white/95 p-5 font-mono text-[10px] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto border border-black/5 rounded-none scrollbar-thin">
+                        <div className="bg-[#111111] text-white/95 p-5 font-mono text-[10px] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto border border-black/5 rounded-none scrollbar-thin">
                           {BRAND_PACKAGES[selectedProduct.id].marketingCopy}
                         </div>
                       </div>
@@ -533,7 +533,7 @@ export default function LandingPage() {
                           {selectedProduct.description}
                         </p>
                       </div>
-                      <div className="bg-[#F1ECE1]/80 p-5 text-center text-xs font-light text-foreground/60 border border-black/5">
+                      <div className="bg-[#FAF9F6]/80 p-5 text-center text-xs font-light text-foreground/60 border border-black/5">
                         귀하의 브랜드 철학과 스토리 패키지는 <span className="font-semibold text-brand-green">Seller Center &gt; AI Branding</span> 탭에서 생성할 수 있습니다.
                       </div>
                     </div>
@@ -541,7 +541,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Purchase Action Panel */}
-                <div className="mt-8 pt-6 border-t border-[#1B4332]/10 z-0">
+                <div className="mt-8 pt-6 border-t border-[#111111]/10 z-0">
                   {orderMode ? (
                     <motion.div 
                       initial={{ opacity: 0, scale: 0.98 }}
@@ -551,7 +551,7 @@ export default function LandingPage() {
                       <p className="text-xs text-brand-green font-semibold mb-1 flex items-center justify-center gap-1.5">
                         ✨ Order proposal dispatched to {selectedProduct.artisan}!
                       </p>
-                      <p className="text-[10px] font-light text-[#1B4332] opacity-80">
+                      <p className="text-[10px] font-light text-[#111111] opacity-80">
                         귀하의 주문 제안과 스토어 콜라보 초대가 장인에게 자동으로 전달되었습니다.
                       </p>
                     </motion.div>
@@ -582,19 +582,19 @@ export default function LandingPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="bg-[#FDFCF8] text-[#1B4332] max-w-4xl w-full border border-black/5 flex flex-col md:flex-row relative shadow-2xl overflow-hidden my-8"
+              className="bg-[#FDFCF8] text-[#111111] max-w-4xl w-full border border-black/5 flex flex-col md:flex-row relative shadow-2xl overflow-hidden my-8"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
               <button 
                 onClick={() => setSelectedMd(null)}
-                className="absolute top-6 right-6 z-10 p-2 hover:bg-black/5 rounded-full transition-all text-[#1B4332]"
+                className="absolute top-6 right-6 z-10 p-2 hover:bg-black/5 rounded-full transition-all text-[#111111]"
               >
                 <X className="w-6 h-6" />
               </button>
 
               {/* MD Portrait (Left) */}
-              <div className="w-full md:w-5/12 relative bg-[#F3F1E7] aspect-[4/5] md:aspect-auto md:min-h-[500px] overflow-hidden">
+              <div className="w-full md:w-5/12 relative bg-[#FAF9F6] aspect-[4/5] md:aspect-auto md:min-h-[500px] overflow-hidden">
                 <img 
                   src={selectedMd.image} 
                   alt={selectedMd.name} 
@@ -611,7 +611,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="absolute bottom-8 left-8 text-white right-8">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#C8452D] mb-1 font-semibold">CURATED EXPERT TEAM</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#8C1D24] mb-1 font-semibold">CURATED EXPERT TEAM</p>
                   <p className="text-2xl font-medium magazine-heading text-brand-ivory">{selectedMd.name}</p>
                   <p className="text-xs font-light opacity-75 mt-0.5 font-mono">{selectedMd.englishName}</p>
                 </div>
@@ -622,7 +622,7 @@ export default function LandingPage() {
                 <div className="space-y-6">
                   {/* Former Corporate Profile Header */}
                   <div>
-                    <span className="bg-[#C8452D]/10 text-[#C8452D] text-[9px] px-3 py-1 tracking-widest uppercase font-mono font-bold leading-none inline-block">
+                    <span className="bg-[#8C1D24]/10 text-[#8C1D24] text-[9px] px-3 py-1 tracking-widest uppercase font-mono font-bold leading-none inline-block">
                       {selectedMd.experience}
                     </span>
                     <h3 className="text-xl md:text-2xl font-bold text-brand-green leading-[1.3] mt-3">
@@ -631,11 +631,11 @@ export default function LandingPage() {
                     <p className="text-xs text-foreground/50 font-mono mt-1">{selectedMd.role}</p>
                   </div>
 
-                  <div className="w-full h-px bg-[#1B4332]/10"></div>
+                  <div className="w-full h-px bg-[#111111]/10"></div>
 
                   {/* Core Philosophy Quoted block */}
-                  <div className="bg-[#FAF7F0] border-l-2 border-[#C8452D] p-5">
-                    <p className="text-xs italic text-[#1B4332] leading-relaxed font-serif font-medium">
+                  <div className="bg-[#FAF9F6] border-l-2 border-[#8C1D24] p-5">
+                    <p className="text-xs italic text-[#111111] leading-relaxed font-serif font-medium">
                       {selectedMd.quote}
                     </p>
                   </div>
@@ -676,7 +676,7 @@ export default function LandingPage() {
                   )}
                 </div>
 
-                <div className="pt-6 border-t border-[#1B4332]/10">
+                <div className="pt-6 border-t border-[#111111]/10">
                   <button 
                     onClick={() => setSelectedMd(null)}
                     className="w-full bg-brand-green hover:bg-[#153427] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
