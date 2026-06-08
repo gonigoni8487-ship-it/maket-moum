@@ -22,7 +22,8 @@ import {
   TrendingUp,
   Briefcase,
   Layers,
-  MessageSquare
+  MessageSquare,
+  CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ import freshwaterEelImg from '../assets/images/freshwater_eel_1780579685433.png'
 import farmsGlowAbaloneImg from '../assets/images/farms_glow_abalone_1780536038721.png';
 import abaloneJerkyImg1 from '../assets/images/abalone_jerky_1_1780580185788.png';
 import abaloneJangImg1 from '../assets/images/abalone_jang_1_1780580202821.png';
+import CheckoutModal from './CheckoutModal';
 
 // Types for Curation Hub
 interface LocalProducer {
@@ -66,6 +68,7 @@ export default function LocalCurationHub() {
   const [hasJoined, setHasJoined] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [comparisonMetric, setComparisonMetric] = useState<number>(0);
+  const [checkoutProduct, setCheckoutProduct] = useState<any | null>(null);
 
   // Abalone Jerky (전복포) State
   const [selectedJerkyId, setSelectedJerkyId] = useState<string>('jerky-1');
@@ -226,7 +229,7 @@ export default function LocalCurationHub() {
       narrative: '기성의 고온 열풍 건조기에서 구워낸 멸치와는 빛깔 자체가 다른 은빛 투명함을 지녔습니다. 털어낸 후 옹기에 가벼운 연염을 쳐 가을 햇마루에서 72시간 볕을 쪼였습니다. 원조 할머니 레시피 북을 동봉해 드립니다.',
       votes: 188,
       goalVotes: 200,
-      image: 'https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?q=80&w=800&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?q=80&w=800&auto=format&fit=crop',
       highlightTag: '할머니 레시피'
     },
     {
@@ -705,36 +708,58 @@ export default function LocalCurationHub() {
             </div>
 
             {/* Interactive Actions */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-black/5 items-center">
-              <button
-                onClick={handleJoinProject}
-                className={`flex-1 py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-semibold transition-all flex items-center justify-center gap-2 rounded-none border cursor-pointer w-full sm:w-auto ${
-                  hasJoined 
-                    ? 'bg-[#8C1D24] border-[#8C1D24] text-white hover:bg-[#c05743]' 
-                    : 'bg-brand-green border-brand-green text-white hover:bg-brand-green/95 shadow-sm'
-                }`}
-              >
-                {hasJoined ? (
-                  <>
-                    <CheckCircle className="w-4 h-4" /> 나의 서포트 취소하고 정서 가치 하염하기
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-[#FAF9F6] animate-pulse" /> 이 프로젝트 전복장 공구 참여제안 하기
-                  </>
-                )}
-              </button>
+            <div className="space-y-3 pt-4 border-t border-black/5">
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <button
+                  type="button"
+                  onClick={handleJoinProject}
+                  className={`flex-1 py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-semibold transition-all flex items-center justify-center gap-2 rounded-none border cursor-pointer w-full sm:w-auto ${
+                    hasJoined 
+                      ? 'bg-[#8C1D24] border-[#8C1D24] text-white hover:bg-[#c05743]' 
+                      : 'bg-brand-green border-brand-green text-white hover:bg-brand-green/95 shadow-sm'
+                  }`}
+                >
+                  {hasJoined ? (
+                    <>
+                      <CheckCircle className="w-4 h-4" /> 나의 서포트 취소하고 정서 가치 하염하기
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-[#FAF9F6] animate-pulse" /> 이 프로젝트 전복장 공구 참여제안 하기
+                    </>
+                  )}
+                </button>
 
-              <button 
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setCopiedLink(true);
+                    navigator.clipboard.writeText("마켓모움 기장옹기 전복장 공동구매 가격하락 퍼널에 참여하세요! 많이 모일 수록 다 같이 ₩24,900원으로 싸집니다!");
+                    alert("카카오 바이럴용 스토리 스마트 초대 링크가 클립보드에 저온 복사되었습니다!");
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  }}
+                  className="py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-medium border border-black/10 bg-[#FAF9F6] text-brand-green hover:bg-black/5 transition-all text-center rounded-none w-full sm:w-auto cursor-pointer"
+                >
+                  {copiedLink ? "✓ 카카오 초대 링크 복사완료!" : "카카오 친구 초대하기 (₩1,000 하락)"}
+                </button>
+              </div>
+
+              <button
+                type="button"
                 onClick={() => {
-                  setCopiedLink(true);
-                  navigator.clipboard.writeText("마켓모움 기장옹기 전복장 공동구매 가격하락 퍼널에 참여하세요! 많이 모일 수록 다 같이 ₩24,900원으로 싸집니다!");
-                  alert("카카오 바이럴용 스토리 스마트 초대 링크가 클립보드에 저온 복사되었습니다!");
-                  setTimeout(() => setCopiedLink(false), 2000);
+                  setCheckoutProduct({
+                    id: 'group-buy-abalone-soy',
+                    name: '마켓모움 기장옹기 프리미엄 7첩 전복장 특제 세트 (공동구매 참여특가)',
+                    price: currentPrice,
+                    image: farmsGlowAbaloneImg,
+                    artisan: '기장옹기 가문 장인단',
+                    category: '공동구매',
+                    description: `현재 가격하락 공동구매에 참여하신 총 고객 ${participants}명 기준 특별가입니다. 공동구매가 최종 단계에 오를 시, 납부 차액금은 구매 완수 후 로컬 포인트 캐시백으로 배정됩니다.`
+                  });
                 }}
-                className="py-4.5 px-6 font-mono text-xs uppercase tracking-widest font-medium border border-black/10 bg-[#FAF9F6] text-brand-green hover:bg-black/5 transition-all text-center rounded-none w-full sm:w-auto cursor-pointer"
+                className="w-full bg-[#8C1D24] text-white hover:bg-[#a9323a] py-4 rounded-none text-xs uppercase tracking-widest font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm border border-[#8C1D24]"
               >
-                {copiedLink ? "✓ 카카오 초대 링크 복사완료!" : "카카오 친구 초대하기 (₩1,000 하락)"}
+                <CreditCard className="w-4 h-4 text-brand-ivory" /> 공동구매 즉시 선결제하기 (Buy Now)
               </button>
             </div>
           </div>
@@ -941,12 +966,36 @@ export default function LocalCurationHub() {
             </div>
 
             {/* Pledge Submit status trigger */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <button
+                type="button"
                 onClick={handleExecutePledgeSubmit}
-                className="w-full bg-[#8C1D24] hover:bg-[#c05743] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
+                className="w-full bg-brand-green hover:bg-[#153427] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
               >
                 🤝 소액 예약투자 약정 확인 서명하기 (Submit Pledge)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const pledgedAmt = userPledgedAmount[activeInvestmentId] || 0;
+                  if (pledgedAmt <= 0) {
+                    alert('선결제 참여를 위해 예약 투자금을 위에 있는 가이드 버튼(+10,000~)으로 먼저 선택해 주세요.');
+                    return;
+                  }
+                  setCheckoutProduct({
+                    id: activeProject.id,
+                    name: `[로컬 크라우드 선결제] ${activeProject.title}`,
+                    price: pledgedAmt,
+                    image: activeProject.image,
+                    artisan: activeProject.producer,
+                    category: '투자선주문',
+                    description: `리워드 수탁 플랜: ${activeProject.rewardPlan}`
+                  });
+                }}
+                className="w-full bg-[#8C1D24] text-white hover:bg-[#a9323a] py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer flex items-center justify-center gap-2 border border-[#8C1D24]"
+              >
+                <CreditCard className="w-4 h-4 text-brand-ivory" /> 💳 수확사료비 즉시 선결제하기
               </button>
 
               <AnimatePresence>
@@ -1287,13 +1336,33 @@ export default function LocalCurationHub() {
             {/* Submit Action */}
             <div className="space-y-3">
               <button
+                type="button"
                 onClick={() => {
                   setJerkyPreorderStatus(true);
                   setTimeout(() => setJerkyPreorderStatus(false), 6000);
                 }}
-                className="w-full bg-[#8C1D24] hover:bg-[#c05743] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
+                className="w-full bg-brand-green hover:bg-[#153427] text-white py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer"
               >
                 🤝 이 조합 그대로 베타 시식단 신청 및 알림받기
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCheckoutProduct({
+                    id: 'custom-jerky-box',
+                    name: `완도 명인 수작 전복포 ${selectedCustomPackSize}종 DIY 선물 세트`,
+                    price: customBoxPrice,
+                    image: abaloneJerkyImg1,
+                    artisan: '배철진 명인',
+                    category: 'DIY 푸드팩',
+                    description: `맞춤 묶음 구성: ${platedJerky.map(id => jerkyFlavors.find(f => f.id === id)?.name || id).join(', ')}`,
+                    customDetails: platedJerky.map((id, index) => `${index + 1}구: ${jerkyFlavors.find(f => f.id === id)?.name || id}`)
+                  });
+                }}
+                className="w-full bg-[#8C1D24] text-white hover:bg-[#a9323a] py-4 text-xs font-mono uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer flex items-center justify-center gap-2 border border-[#8C1D24]"
+              >
+                <CreditCard className="w-4 h-4 text-brand-ivory" /> 💳 이 조합 그대로 즉시 주문 결제하기
               </button>
 
               <AnimatePresence>
@@ -1547,6 +1616,13 @@ export default function LocalCurationHub() {
           이것이 마켓모움이 정의하는 차세대 로컬 상생 커머스 플랫폼의 소박하고도 원대한 사명입니다.
         </p>
       </div>
+
+      <CheckoutModal 
+        isOpen={!!checkoutProduct}
+        onClose={() => setCheckoutProduct(null)}
+        product={checkoutProduct}
+        membershipStatus="friends"
+      />
     </div>
   );
 }

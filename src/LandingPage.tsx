@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Clock, Star, Copy, X, ShoppingBag, Compass, Store, Award, CheckCircle, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Clock, Star, Copy, X, ShoppingBag, Compass, Store, Award, CheckCircle, ShieldCheck, CreditCard } from 'lucide-react';
 import { ScrollReveal } from './components/Animated';
 import { PRODUCTS, BRAND_PACKAGES } from './constants';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,7 @@ import MarketingCalendar from './components/MarketingCalendar';
 import SellerApplyForm from './components/SellerApplyForm';
 import chaeBuGonImg from './assets/images/chae_bu_gon_1780579137325.png';
 import wandoNatureScenicImg from './assets/images/wando_nature_scenic_1780581340577.png';
+import CheckoutModal from './components/CheckoutModal';
 
 const MDS_DATA = [
   {
@@ -180,6 +181,7 @@ export default function LandingPage({ theme = 'original' }: { theme?: 'original'
   const [orderMode, setOrderMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'community' | 'store'>('community');
   const [isApplyModalOpen, setIsApplyModalOpen] = useState<boolean>(false);
+  const [checkoutProduct, setCheckoutProduct] = useState<any | null>(null);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -224,7 +226,7 @@ export default function LandingPage({ theme = 'original' }: { theme?: 'original'
               생산자 + 스토리 + 팬덤 + 상생 펀딩 공동체
             </span>
             <h1 className="text-4xl md:text-6xl magazine-heading text-brand-green mb-8 leading-[1.1] font-medium transition-all duration-300">
-              최저가 전쟁을 넘어 <br /> 명인의 이야기를 소유하다
+              최저가 경쟁을 넘어 <br /> 명인의 이야기를 소유하다
             </h1>
             <p className="text-sm md:text-xl text-brand-green/80 mb-12 max-w-3xl mx-auto font-light leading-relaxed transition-all duration-300">
               단순히 저렴하게 구매하는 쇼핑몰이 아닙니다. <br />
@@ -359,6 +361,24 @@ export default function LandingPage({ theme = 'original' }: { theme?: 'original'
                       <span className="text-[10px] font-mono uppercase tracking-widest font-semibold">Ends in {product.timeLeft}</span>
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCheckoutProduct({
+                        id: product.id,
+                        name: product.name,
+                        price: product.price,
+                        image: product.image,
+                        artisan: product.artisan,
+                        category: product.category,
+                        description: product.description
+                      });
+                    }}
+                    className="w-full mt-4 bg-brand-green hover:bg-[#153427] text-white py-3 rounded-none text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer border border-brand-green shadow-sm hover:shadow"
+                  >
+                    <CreditCard className="w-4 h-4 text-brand-terracotta" /> 구매 클릭하기
+                  </button>
                 </div>
               </ScrollReveal>
             ))}
@@ -678,12 +698,34 @@ export default function LandingPage({ theme = 'original' }: { theme?: 'original'
                       </p>
                     </motion.div>
                   ) : (
-                    <button 
-                      onClick={() => setOrderMode(true)}
-                      className="w-full bg-brand-green text-white hover:bg-[#153427] py-4.5 rounded-none text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow"
-                    >
-                      <ShoppingBag className="w-4 h-4" /> Collaborate & Place Order (주문 제안 넣기)
-                    </button>
+                    <div className="space-y-3">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setCheckoutProduct({
+                            id: selectedProduct.id,
+                            name: selectedProduct.name,
+                            price: selectedProduct.price,
+                            image: selectedProduct.image,
+                            artisan: selectedProduct.artisan,
+                            category: selectedProduct.category,
+                            description: selectedProduct.description
+                          });
+                          setSelectedProduct(null);
+                        }}
+                        className="w-full bg-[#8C1D24] text-white hover:bg-[#a9323a] py-4.5 rounded-none text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow"
+                      >
+                        <CreditCard className="w-4 h-4" /> 즉시 안전 결제하기
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={() => setOrderMode(true)}
+                        className="w-full border border-brand-green text-brand-green hover:bg-brand-green hover:text-white py-3.5 rounded-none text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer bg-transparent"
+                      >
+                        <ShoppingBag className="w-4 h-4" /> Collaborate & Place Order (주문 제안 넣기)
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -838,6 +880,13 @@ export default function LandingPage({ theme = 'original' }: { theme?: 'original'
             </motion.div>
           </div>
         )}
+
+        <CheckoutModal 
+          isOpen={!!checkoutProduct}
+          onClose={() => setCheckoutProduct(null)}
+          product={checkoutProduct}
+          membershipStatus="friends"
+        />
       </AnimatePresence>
     </div>
   );

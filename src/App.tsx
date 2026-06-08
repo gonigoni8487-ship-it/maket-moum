@@ -92,9 +92,9 @@ export default function App() {
               <div className="space-y-4">
                 <p className="text-[10px] uppercase tracking-[0.3em] text-brand-terracotta">Navigation</p>
                 <div className="flex flex-col gap-2">
-                  <Link to="/markets" className="text-sm font-light hover:text-brand-terracotta">Markets</Link>
-                  <Link to="/artisans" className="text-sm font-light hover:text-brand-terracotta">Artisans</Link>
-                  <Link to="/about" className="text-sm font-light hover:text-brand-terracotta">About Us</Link>
+                  <Link to="/markets" className="text-sm font-light hover:text-brand-terracotta">마켓</Link>
+                  <Link to="/artisans" className="text-sm font-light hover:text-brand-terracotta">장인</Link>
+                  <Link to="/about" className="text-sm font-light hover:text-brand-terracotta">플랫폼 소개</Link>
                 </div>
               </div>
               <div className="space-y-4">

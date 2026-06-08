@@ -14,9 +14,9 @@ export default function Navbar({
   const location = useLocation();
 
   const navLinks = [
-    { name: 'Markets', path: '/markets' },
-    { name: 'Artisans', path: '/artisans' },
-    { name: 'About', path: '/about' },
+    { name: '마켓', path: '/markets' },
+    { name: '장인', path: '/artisans' },
+    { name: '플랫폼 소개', path: '/about' },
   ];
 
   return (
