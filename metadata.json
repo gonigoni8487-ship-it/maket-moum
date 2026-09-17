@@ -1,6 +1,6 @@
 {
-  "name": "Market Moum (마켓모움)",
-  "description": "Premium Local Brand Growth Platform - Empowering local artisans through AI branding and magazine-style commerce.",
+  "name": "더예로",
+  "description": "1인 미용실 원장님을 위한 고객 맞춤 관리 앱 - 고객 카드, 예약, 매출 통계, AI 스타일 추천까지 한 곳에서.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
