@@ -13,7 +13,7 @@ async function startServer() {
   app.use(express.json());
 
   // Initialize Gemini
-  const genAI = new GoogleGenAI({ 
+  const genAI = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY || "",
     httpOptions: {
       headers: {
@@ -22,183 +22,90 @@ async function startServer() {
     }
   });
 
-  // API Routes
-  app.post("/api/ai/brand-package", async (req, res) => {
+  function extractJson(text: string) {
+    let t = text.trim();
+    if (t.includes("```json")) {
+      t = t.split("```json")[1].split("```")[0];
+    } else if (t.includes("```")) {
+      t = t.split("```")[1].split("```")[0];
+    }
+    return JSON.parse(t.trim());
+  }
+
+  // AI-powered hairstyle & color recommendation for a specific customer
+  app.post("/api/ai/style-recommendation", async (req, res) => {
     try {
-      const { productName, productInfo, brandTone } = req.body;
-      
+      const { customerName, gender, tags, memo, recentServices } = req.body;
+
       const prompt = `
-        You are a premium local brand growth specialist. 
-        Create a branding package for a product called "${productName}" with the following info: "${productInfo}".
-        The brand tone should be "${brandTone}".
-        
-        Provide the following in JSON format:
-        1. tagline: A short, poetic tagline.
-        2. story: A 3-sentence brand story emphasizing artisan craftsmanship and local heritage.
-        3. details: A set of 3 key selling points.
-        4. marketingCopy: A short paragraph for an Instagram caption.
+        당신은 대한민국 1인 미용실을 운영하는 실력 있는 헤어 디자이너를 돕는 전문 스타일 컨설턴트입니다.
+        아래 고객 정보를 바탕으로, 원장님이 상담 시 바로 활용할 수 있는 맞춤 헤어 스타일/컬러 추천 3가지를 제안해주세요.
+
+        [고객 정보]
+        - 이름: ${customerName}
+        - 성별: ${gender}
+        - 고객 태그/특징: ${(tags || []).join(", ") || "없음"}
+        - 메모: ${memo || "없음"}
+        - 최근 받은 시술: ${recentServices || "정보 없음"}
+
+        실제 미용실에서 쓰는 전문 용어(펌 종류, 컬러 톤, 커트 라인 등)를 사용하되, 고객에게 설명하기 쉬운 친절한 존댓말로 작성해주세요.
+        각 추천은 왜 이 고객에게 잘 어울리는지 근거를 함께 제시해야 합니다.
+
+        아래 JSON 형식으로만 응답하세요:
+        {
+          "recommendations": [
+            { "title": "스타일/컬러 이름 (예: 애쉬 브라운 그러데이션 염색)", "description": "구체적인 시술 방법과 스타일 설명 2-3문장", "whyItFits": "이 고객에게 어울리는 이유 1-2문장" },
+            { "title": "...", "description": "...", "whyItFits": "..." },
+            { "title": "...", "description": "...", "whyItFits": "..." }
+          ]
+        }
       `;
 
       const response = await genAI.models.generateContent({
         model: "gemini-3.5-flash",
         contents: [{ parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json" }
+        config: { responseMimeType: "application/json", temperature: 0.9 }
       });
-      
-      let text = response.text;
-      
-      // Basic JSON extraction if model wraps it in markdown
-      if (text.includes("```json")) {
-        text = text.split("```json")[1].split("```")[0];
-      } else if (text.includes("```")) {
-        text = text.split("```")[1].split("```")[0];
-      }
 
-      res.json(JSON.parse(text));
+      res.json(extractJson(response.text ?? ""));
     } catch (error) {
-      console.error("AI Error:", error);
-      res.status(500).json({ error: "Failed to generate brand package" });
+      console.error("AI Style Recommendation Error:", error);
+      res.status(500).json({ error: "스타일 추천 생성에 실패했습니다." });
     }
   });
 
-  // Detailed Page copywriter endpoint
-  app.post("/api/ai/detail-page", async (req, res) => {
+  // AI-generated reminder / birthday / confirmation message for a customer
+  app.post("/api/ai/reminder-message", async (req, res) => {
     try {
-      const { productName, productType, persona, prompt } = req.body;
-      
-      const promptText = `
-        You are the absolute finest premium South Korean "Local Commerce Brand Designer & Copywriter".
-        Your client is a skilled local craftsman or hand-maker, and you are building a boutique, premium product detailed page (상세페이지) focused on design-conscious customers.
-        The layout must evoke local heritage, natural textures, and meticulous craft.
-        
-        [Target Authentic Product]:
-        - Product Name: ${productName}
-        - Category/Type: ${productType}
-        - Target Persona: ${persona}
-        - Aesthetic Mood Direction & Instructions: ${prompt || "Elegant and whisper-soft organic mood."}
-        
-        Create a detailed article-style page layout with exact Korean copy. The output MUST be in high-end, poetic, emotional South Korean marketing prose (matching the luxurious look of 29CM, Rawrow, or Market Kurly).
-        Your prose must be sophisticated, respectful (존댓말), and use refined vocabulary (e.g. '숨결', '빚어내다', '결', '온기').
-        
-        Return the copy as a single JSON object. The JSON structure MUST contain these exact key names:
-        {
-          "intro": {
-            "title": "Poetic main display headline, reflecting natural origins (e.g., '눈 덮인 고요 속에 피어난 매실 한 머금' or '대나무 마디마다 새겨진 연둣빛 바람')",
-            "subtitle": "Short, elegant, modern description (e.g., '숨쉬는 유기 백자 속에 담은 완도 전복의 부드러움')",
-            "summary": "1-paragraph deep ambient summary (3-4 poetic sentences) welcoming the reader into the aesthetic world of this product."
-          },
-          "legacy_story": {
-            "headline": "A headline explaining the craftsmanship process and the artisan's philosophy (e.g., '15가지 약초가 완성한 황금 조율, 그리고 세 번의 저온 숙성')",
-            "narrative": "A warm, deeply respectful 4-sentence narrative in Korean describing the artisan's environment, raw ingredient collection, and time-consuming handiwork."
-          },
-          "sensory_profile": {
-            "visual": "A brief poetic description of its natural visual color, grain, texture, or shape.",
-            "touch_text": "Sensory explanation of how it feels on the skin, smells, or tastes.",
-            "atmosphere": "The silent mood, space warmth, or physical peace it introduces when placed in a beautiful home."
-          },
-          "features": [
-            {
-              "number": "01",
-              "title": "A short poetic feature name (e.g., '바람과 일교차가 완성한 단단한 치밀함')",
-              "explain": "A block of 2-3 sentences explaining the first feature value with design focus."
-            },
-            {
-              "number": "02",
-              "title": "Another short poetic feature name (e.g., '시간이 갈수록 은은함을 더하는 자연 유래 옻칠')",
-              "explain": "A block of 2-3 sentences explaining the second feature value."
-            },
-            {
-              "number": "03",
-              "title": "A third short poetic feature name",
-              "explain": "A block of 2-3 sentences explaining the third feature value."
-            }
-          ],
-          "lifestyle_matching": {
-            "headline": "A matching scenario title tailored specifically for the persona (e.g., '오롯이 나다운 휴식을 수집하는 수집가를 위해')",
-            "matching_points": [
-              "Poetic lifestyle matching point 1 suited to the persona's daily routine",
-              "Poetic lifestyle matching point 2",
-              "Poetic lifestyle matching point 3"
-            ]
-          },
-          "guide": {
-            "usage": "Highly refined ritual guide on how to consume, wear, burn, or operate this product (e.g., '오후 4시의 미온수에 가볍게 한 스푼 개어내어')",
-            "storage": "Careful storage instructions to keep natural fibers, live organic matter, or raw clays intact (e.g., '생명이 숨쉬는 옹기 항아리째 냉장고 가장 깊은 곳에')"
-          }
-        }
+      const { customerName, occasion, shopName, ownerName, extra } = req.body;
+
+      const prompt = `
+        당신은 대한민국 1인 미용실 원장님을 대신해 단골 고객에게 보낼 문자(카카오톡) 메시지를 작성하는 전문 카피라이터입니다.
+
+        [상황]
+        - 메시지 목적: ${occasion}
+        - 고객 이름: ${customerName}
+        - 샵 이름: ${shopName}
+        - 원장님 이름: ${ownerName}
+        - 추가 요청/참고사항: ${extra || "없음"}
+
+        따뜻하고 친근하지만 과하지 않은 존댓말로, 이모지를 1-2개만 적절히 사용해서 실제 문자 메시지로 바로 보낼 수 있는 길이(3~5문장)로 작성해주세요.
+        고객 이름을 자연스럽게 포함하고, 샵 이름과 원장님 이름으로 마무리 인사를 해주세요.
+
+        아래 JSON 형식으로만 응답하세요:
+        { "message": "완성된 문자 메시지 전문" }
       `;
 
       const response = await genAI.models.generateContent({
         model: "gemini-3.5-flash",
-        contents: [{ parts: [{ text: promptText }] }],
-        config: { 
-          responseMimeType: "application/json",
-          temperature: 0.95
-        }
+        contents: [{ parts: [{ text: prompt }] }],
+        config: { responseMimeType: "application/json", temperature: 0.95 }
       });
-      
-      let text = response.text;
-      if (text.includes("```json")) {
-        text = text.split("```json")[1].split("```")[0];
-      } else if (text.includes("```")) {
-        text = text.split("```")[1].split("```")[0];
-      }
 
-      res.json(JSON.parse(text.trim()));
+      res.json(extractJson(response.text ?? ""));
     } catch (error) {
-      console.error("AI Detailed Page Error:", error);
-      res.status(500).json({ error: "Failed to generate detailed page copy" });
-    }
-  });
-
-  // AI Seasonal Marketing Strategy Developer
-  app.post("/api/ai/marketing-calendar", async (req, res) => {
-    try {
-      const { month, productName, productInfo, monthKeywords } = req.body;
-
-      const promptText = `
-        You are a highly acclaimed premium retail marketing director at "마켓모움" (Market Moum) - a boutique South Korean local food & craft platform.
-        You are generating a customized monthly marketing campaign and curation concept for an artisan's product.
-        
-        [Target Profile]:
-        - Target Month: ${month}월
-        - Selected Month's Micro-trends & Keywords: ${monthKeywords}
-        - Product Name: ${productName}
-        - Product Description/Core Craft: ${productInfo}
-
-        Reflect the specific vibe, seasonal shifts (e.g., Spring/Summer/Autumn/Winter, Chuseok/Solnal Seollal, or hot weather), and micro-trends of ${month}월 in South Korea.
-        The returned suggestions must be written in elegant, poetic, and highly persuasive Korean (prose matching high-end curator style like 29CM, Rawrow, or Market Kurly).
-        
-        Return the result as a single, valid JSON object. Do NOT wrap in markdown unless it is standard CJS JSON. The keys inside the JSON MUST be:
-        {
-          "campaignTitle": "A highly elegant, poetic, custom-tailored campaign title for this month (e.g., '5월의 햇살을 닮은, 온기를 전하는 종가 삼색 포세트')",
-          "seasonalHook": "1-2 elegant sentences connecting this product with the specific weather, mood, or traditional occasions of this month.",
-          "promotionIdea": "A customized product configuration, modern package upgrade, or specialized limited-edition promotion concept tailored to this month (e.g., custom leather card tags, traditional linen wrapper with handwritten letters).",
-          "curatorTip": "A professional MD's golden checklist tip on listing strategy, pricing, target hashtags, or display tips to maximize sales this month.",
-          "hashtags": ["#four", "#custom", "#hashtags", "#here"]
-        }
-      `;
-
-      const response = await genAI.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: [{ parts: [{ text: promptText }] }],
-        config: { 
-          responseMimeType: "application/json",
-          temperature: 0.95
-        }
-      });
-      
-      let text = response.text;
-      if (text.includes("```json")) {
-        text = text.split("```json")[1].split("```")[0];
-      } else if (text.includes("```")) {
-        text = text.split("```")[1].split("```")[0];
-      }
-
-      res.json(JSON.parse(text.trim()));
-    } catch (error) {
-      console.error("AI Marketing Calendar Plan Error:", error);
-      res.status(500).json({ error: "Failed to generate marketing campaign guide" });
+      console.error("AI Reminder Message Error:", error);
+      res.status(500).json({ error: "메시지 생성에 실패했습니다." });
     }
   });
 
