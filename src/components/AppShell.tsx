@@ -38,8 +38,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Scissors className="size-4.5" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="brand-heading text-lg font-semibold text-primary">단골</span>
-            <span className="text-[10px] tracking-widest text-muted-foreground uppercase">Dangol</span>
+            <span className="brand-heading text-lg font-semibold text-primary">더예로</span>
+            <span className="text-[10px] tracking-widest text-muted-foreground uppercase">Deoyero</span>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
@@ -76,7 +76,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Scissors className="size-4" />
             </div>
-            <span className="brand-heading text-base font-semibold text-primary">단골</span>
+            <span className="brand-heading text-base font-semibold text-primary">더예로</span>
           </div>
           <span className="text-xs text-muted-foreground">{shop.name}</span>
         </header>

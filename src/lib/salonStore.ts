@@ -8,7 +8,7 @@ import type {
   SalonDB,
 } from "../types";
 
-const STORAGE_KEY = "dangol-salon-db-v1";
+const STORAGE_KEY = "deoyero-salon-db-v1";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -44,7 +44,7 @@ const DEFAULT_MENU: ServiceMenuItem[] = [
 ];
 
 const DEFAULT_SHOP: ShopInfo = {
-  name: "단골 헤어샵",
+  name: "더예로 헤어샵",
   ownerName: "원장님",
   phone: "010-1234-5678",
   address: "서울시 마포구 어딘가로 12길 8",
