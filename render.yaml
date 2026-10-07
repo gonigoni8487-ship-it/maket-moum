@@ -1,0 +1,23 @@
+# Render 원클릭 배포 (Blueprint). README의 "Deploy to Render" 버튼 또는 Render 대시보드 → New → Blueprint
+services:
+  - type: web
+    name: marton
+    runtime: docker
+    plan: starter # 영구 디스크는 유료 플랜에서만 지원 (무료 플랜은 재시작 시 데이터 삭제)
+    region: singapore
+    healthCheckPath: /api/health
+    disk:
+      name: marton-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: MARTON_MANAGER_PIN # 점장/부점장 PIN (6자리 이상 권장)
+        sync: false
+      - key: MARTON_STORE_CODE # 매장 공용 접속 코드
+        sync: false
+      - key: MARTON_VAPID_SUBJECT # 예: mailto:담당자@회사
+        sync: false
+      - key: GEMINI_API_KEY # 선택: 사진 AI·AI 답변
+        sync: false
+      - key: MARTON_INTEGRATION_KEY # 센서·CCTV 웹훅 키 (자동 생성)
+        generateValue: true

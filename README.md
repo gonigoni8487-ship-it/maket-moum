@@ -25,6 +25,8 @@ View your app in AI Studio: https://ai.studio/apps/d6b10975-14b0-404f-bb66-12015
 
 `npm run dev` 후 휴대폰/PC에서 `http://<서버주소>:3000/marton/` 접속 → 홈 화면에 추가하면 앱(PWA)처럼 사용합니다.
 
+**운영 배포·앱 설치·플레이스토어 포장은 [docs/marton-deploy.md](docs/marton-deploy.md)** — Render 원클릭(`render.yaml`) 또는 `Dockerfile`로 서버를 올리고, 점장 화면의 직원 초대 QR로 설치합니다.
+
 | 기능 | 내용 |
 | --- | --- |
 | 직원 로그인 | 사번·이름·근무 부서·담당 업무. 점장/부점장은 관리자 PIN 필요 |

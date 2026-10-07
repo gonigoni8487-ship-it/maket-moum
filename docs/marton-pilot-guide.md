@@ -39,6 +39,7 @@ npm start          # http://0.0.0.0:3000 → 앞단 HTTPS 프록시 연결
 | `MARTON_DATA_FILE` | 선택 | 데이터 파일 경로 (기본 `data/marton-db.json`). 매일 백업 권장 |
 
 > 정적 호스팅(Cloudflare assets)만으로는 동작하지 않습니다. 실시간 알림·저장을 위해 Express 서버가 필요합니다.
+> 실제 배포 절차(Render 원클릭, Docker, 직원 설치, 플레이스토어)는 [marton-deploy.md](marton-deploy.md)를 따르세요.
 
 ## 4. 첫날 세팅 (30분)
 

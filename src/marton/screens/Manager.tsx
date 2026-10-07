@@ -4,6 +4,7 @@ import { api } from '../api';
 import { TaskCard } from './TaskBoard';
 import { NoticeCard } from './Notices';
 import { HandoverList } from './Handover';
+import InviteQR from './InviteQR';
 import { Chip, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -104,6 +105,8 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
       </Section>
 
       <HandoverList handovers={handovers} me={me} onError={onError} />
+
+      <InviteQR onToast={onToast} />
 
       <Section title="공지 보내기">
         <form onSubmit={post} className="space-y-3 rounded-2xl bg-white p-4">

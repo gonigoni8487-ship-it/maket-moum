@@ -31,9 +31,12 @@ function usePwaHead() {
       document.head.appendChild(el);
       added.push(el);
     };
-    add('link', { rel: 'manifest', href: '/marton/manifest.webmanifest' });
-    add('meta', { name: 'theme-color', content: '#1d4ed8' });
-    add('link', { rel: 'apple-touch-icon', href: '/marton/icon.svg' });
+    // 운영 서버는 HTML에 이미 넣어 보내므로 없을 때(개발 서버)만 추가
+    if (!document.querySelector('link[rel="manifest"]')) {
+      add('link', { rel: 'manifest', href: '/marton/manifest.webmanifest' });
+      add('meta', { name: 'theme-color', content: '#1d4ed8' });
+      add('link', { rel: 'apple-touch-icon', href: '/marton/apple-touch-icon.png' });
+    }
     const prevTitle = document.title;
     document.title = '마트ON';
     registerServiceWorker();
@@ -51,14 +54,19 @@ export default function MartOnApp() {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(Boolean(session.token));
   const [connected, setConnected] = useState(false);
-  const [tab, setTab] = useState<Tab>('tasks');
+  // 홈 화면 바로가기: /marton/?tab=security, /marton/?voice=1
+  const params = new URLSearchParams(window.location.search);
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = params.get('tab') as Tab | null;
+    return t && ['tasks', 'request', 'find', 'photo', 'notices', 'security', 'manager'].includes(t) ? t : 'tasks';
+  });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [urgent, setUrgent] = useState<Urgent | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefs>(loadPrefs);
   const [showSettings, setShowSettings] = useState(false);
   const [push, setPush] = useState<PushState>('off');
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(() => params.get('voice') === '1');
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [pending, setPending] = useState(() => pendingItems().length);
   const [netOnline, setNetOnline] = useState(() => navigator.onLine !== false);

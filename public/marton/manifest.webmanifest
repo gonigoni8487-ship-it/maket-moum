@@ -1,7 +1,8 @@
 {
+  "id": "/marton/",
   "name": "마트ON - 매장 직원 업무 플랫폼",
   "short_name": "마트ON",
-  "description": "말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI",
+  "description": "말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI. 부서 간 업무요청, 긴급 알림, 상품 찾기, 촬영 AI, 보안·손실방지, 인수인계.",
   "start_url": "/marton/",
   "scope": "/marton/",
   "display": "standalone",
@@ -9,7 +10,21 @@
   "background_color": "#f1f5f9",
   "theme_color": "#1d4ed8",
   "lang": "ko",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "/marton/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/marton/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/marton/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/marton/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/marton/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "screenshots": [
+    { "src": "/marton/screenshots/tasks.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow", "label": "받은 요청과 인수인계" },
+    { "src": "/marton/screenshots/voice.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow", "label": "말로 요청하기" },
+    { "src": "/marton/screenshots/urgent.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow", "label": "긴급 요청 사이렌" }
+  ],
+  "shortcuts": [
+    { "name": "말로 요청하기", "short_name": "말로 요청", "url": "/marton/?voice=1", "icons": [{ "src": "/marton/icon-192.png", "sizes": "192x192" }] },
+    { "name": "보안 신고", "short_name": "보안 신고", "url": "/marton/?tab=security", "icons": [{ "src": "/marton/icon-192.png", "sizes": "192x192" }] }
   ]
 }

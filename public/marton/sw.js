@@ -1,6 +1,6 @@
 // 마트ON 서비스워커: 화면 오프라인 캐시 + 웹 푸시 수신 + 알림 클릭 처리
-const CACHE = 'marton-v3';
-const SHELL = ['/marton/', '/marton/manifest.webmanifest', '/marton/icon.svg'];
+const CACHE = 'marton-v4';
+const SHELL = ['/marton/', '/marton/manifest.webmanifest', '/marton/icon.svg', '/marton/icon-192.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -41,8 +41,8 @@ self.addEventListener('push', event => {
       renotify: true,
       requireInteraction: urgent, // 긴급은 직접 닫을 때까지 유지
       vibrate: urgent ? [500, 200, 500, 200, 500, 200, 500] : [200, 100, 200],
-      icon: '/marton/icon.svg',
-      badge: '/marton/icon.svg',
+      icon: '/marton/icon-192.png',
+      badge: '/marton/badge-96.png',
       data: { url: data.url || '/marton/' },
     }),
   );

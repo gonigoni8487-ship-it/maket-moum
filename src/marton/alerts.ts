@@ -76,7 +76,7 @@ export async function requestNotificationPermission() {
 async function systemNotify(title: string, body: string, urgent: boolean, tag: string) {
   if (pushActive || !('Notification' in window) || Notification.permission !== 'granted') return;
   const options: NotificationOptions & { vibrate?: number[]; renotify?: boolean } = {
-    body, tag, icon: '/marton/icon.svg', badge: '/marton/icon.svg',
+    body, tag, icon: '/marton/icon-192.png', badge: '/marton/badge-96.png',
     requireInteraction: urgent, renotify: true, vibrate: urgent ? [400, 150, 400, 150, 400] : [200],
   };
   // 모바일에서는 서비스워커 알림만 동작한다.
