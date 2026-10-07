@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X } from 'lucide-react';
-import type { Bootstrap, Notice, Staff, StreamEvent, Task } from './shared';
+import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert } from 'lucide-react';
+import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
 import { alert, loadPrefs, registerServiceWorker, requestNotificationPermission, savePrefs, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
@@ -11,9 +11,10 @@ import ProductFinder from './screens/ProductFinder';
 import PhotoAI from './screens/PhotoAI';
 import Notices from './screens/Notices';
 import Manager from './screens/Manager';
+import Security from './screens/Security';
 
-type Tab = 'tasks' | 'request' | 'find' | 'photo' | 'notices' | 'manager';
-type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice };
+type Tab = 'tasks' | 'request' | 'find' | 'photo' | 'notices' | 'security' | 'manager';
+type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice } | { kind: 'incident'; incident: Incident };
 
 function usePwaHead() {
   useEffect(() => {
@@ -105,6 +106,29 @@ export default function MartOnApp() {
       return;
     }
 
+    if (e.type === 'incident') {
+      const i = e.incident;
+      setData(d => d && { ...d, incidents: upsert(d.incidents, i) });
+      if (e.action === 'created') {
+        if (i.reportedBy.id === me.id) return;
+        // 보안/관리자는 진행 중이면 사이렌, 구역 부서는 일반 알림(주변 고객 응대 요청)
+        const handler = canHandleIncident(me);
+        const body = `${i.zone}${i.productName ? ` · ${i.productName}` : ''}${handler ? '' : ' — 주변 고객 응대로 확인 부탁드립니다'}`;
+        alert({ title: `보안 ${i.type}`, body, urgent: handler && i.urgent, tag: `incident-${i.id}`, prefs: p });
+        if (handler && i.urgent) setUrgent({ kind: 'incident', incident: i });
+      } else {
+        const last = i.history[i.history.length - 1];
+        if (i.reportedBy.id === me.id && last.by.id !== me.id) {
+          alert({ title: `보안 신고 ${last.status}`, body: `${i.zone} — ${last.by.name}`, urgent: false, tag: `incident-${i.id}`, prefs: p });
+        }
+        setUrgent(u => {
+          if (u?.kind === 'incident' && u.incident.id === i.id && i.status !== '접수') { stopAlarm(); return null; }
+          return u;
+        });
+      }
+      return;
+    }
+
     const t = e.task;
     setData(d => d && { ...d, tasks: upsert(d.tasks, t) });
     if (e.action === 'created') {
@@ -143,6 +167,10 @@ export default function MartOnApp() {
     if (!u || !data) return;
     try {
       if (u.kind === 'notice') await api(`/notices/${u.notice.id}/read`, {});
+      else if (u.kind === 'incident') {
+        if (u.incident.status === '접수') await api(`/incidents/${u.incident.id}/status`, { status: '확인' });
+        setTab('security');
+      }
       else if (u.task.status === '접수' && (u.task.toDept === data.me.dept || data.me.role === 'manager')) await advance(u.task, '확인');
     } catch (e) {
       onError((e as Error).message);
@@ -152,7 +180,8 @@ export default function MartOnApp() {
   if (loading) return <div className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">마트ON 연결 중…</div>;
   if (!data) return <div className="min-h-screen bg-slate-100"><Login onLogin={() => { setLoading(true); void load(); }} /></div>;
 
-  const { me, tasks, notices, products, promotions, online, aiEnabled } = data;
+  const { me, tasks, notices, products, promotions, incidents, online, aiEnabled } = data;
+  const openIncidents = incidents.filter(i => i.status !== '종결' && (canHandleIncident(me) || i.reportedBy.id === me.id || i.dept === me.dept)).length;
   const openForMe = tasks.filter(t => t.toDept === me.dept && t.status !== '완료').length;
   const unreadNotices = notices.filter(n => (n.scope === 'all' || n.scope === me.dept) && !n.readBy.includes(me.id)).length;
 
@@ -162,6 +191,7 @@ export default function MartOnApp() {
     { id: 'find', label: '상품찾기', icon: Search },
     { id: 'photo', label: '촬영AI', icon: Camera },
     { id: 'notices', label: '공지', icon: Megaphone, badge: unreadNotices },
+    { id: 'security', label: '보안', icon: ShieldAlert, badge: openIncidents },
     ...(me.role === 'manager' ? [{ id: 'manager' as Tab, label: '관리', icon: LayoutDashboard }] : []),
   ];
 
@@ -204,6 +234,7 @@ export default function MartOnApp() {
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}
         {tab === 'photo' && <PhotoAI aiEnabled={aiEnabled} onRequest={openRequest} onError={onError} onToast={showToast} />}
         {tab === 'notices' && <Notices notices={notices} me={me} onError={onError} />}
+        {tab === 'security' && <Security me={me} incidents={incidents} products={products} onError={onError} onToast={showToast} />}
         {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} online={online} onError={onError} onToast={showToast} />}
       </main>
 
@@ -233,6 +264,14 @@ export default function MartOnApp() {
               <div className="mt-2 text-3xl font-black">{urgent.task.title}</div>
               <div className="mt-2 text-lg">{urgent.task.fromDept} {urgent.task.createdBy.name}{urgent.task.location ? ` · ${urgent.task.location}` : ''}</div>
               {urgent.task.detail && <p className="mt-3 text-base text-red-50">{urgent.task.detail}</p>}
+            </div>
+          ) : urgent.kind === 'incident' ? (
+            <div>
+              <div className="text-lg font-bold text-red-100">보안 {urgent.incident.source === 'sensor' ? `센서 ${urgent.incident.sensorId}` : '신고'} · 진행 중</div>
+              <div className="mt-2 text-3xl font-black">{urgent.incident.zone}</div>
+              <div className="mt-2 text-lg">{urgent.incident.type}{urgent.incident.productName ? ` · ${urgent.incident.productName}` : ''}</div>
+              {urgent.incident.note && <p className="mt-3 text-base text-red-50">{urgent.incident.note}</p>}
+              <p className="mt-4 text-sm text-red-100">직접 제지하지 말고 현장 확인 후 관리자에게 보고하세요.</p>
             </div>
           ) : (
             <div>

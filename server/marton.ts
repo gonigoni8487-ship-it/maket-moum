@@ -7,41 +7,47 @@ import path from 'path';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS,
   type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
-  type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult,
+  type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, canSeeIncident,
 } from '../src/marton/shared';
+import { registerSecurity } from './marton-security';
 
 const AI_MODEL = 'gemini-3.5-flash';
 const DATA_FILE = process.env.MARTON_DATA_FILE || path.join(process.cwd(), 'data', 'marton-db.json');
 const MANAGER_PIN = process.env.MARTON_MANAGER_PIN || (process.env.NODE_ENV === 'production' ? '' : '0000');
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
-interface Db {
+export interface Db {
   staff: Record<string, Staff>;
   sessions: Record<string, string>; // token -> staffId
   tasks: Task[];
   notices: Notice[];
   products: Product[];
   promotions: Promotion[];
+  incidents: Incident[];
 }
 
 function loadDb(): Db {
   try {
     const db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) as Db;
     db.promotions ??= [];
+    db.incidents ??= [];
     return db;
   } catch {
-    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [] };
+    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [] };
   }
 }
 
-const db = loadDb();
+export const db = loadDb();
 let saveTimer: NodeJS.Timeout | null = null;
-function save() {
+export function save() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
     const cutoff = Date.now() - TASK_RETENTION_MS;
     db.tasks = db.tasks.filter(t => t.status !== '완료' || t.updatedAt > cutoff);
+    const incidentCutoff = Date.now() - INCIDENT_RETENTION_MS;
+    db.incidents = db.incidents.filter(i => i.status !== '종결' || i.updatedAt > incidentCutoff);
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(db));
   }, 300);
@@ -61,20 +67,23 @@ function onlineCounts() {
   return counts;
 }
 
-function broadcast(event: StreamEvent) {
+/** who를 지정하면 해당 직원에게만 보낸다 (보안 신고 등 열람 제한 데이터). */
+export function broadcast(event: StreamEvent, who?: (s: Staff) => boolean) {
   const payload = `data: ${JSON.stringify(event)}\n\n`;
-  for (const res of clients.keys()) res.write(payload);
+  for (const [res, staff] of clients) {
+    if (!who || who(db.staff[staff.id] ?? staff)) res.write(payload);
+  }
 }
 
 // ---- 인증 ----
-type AuthedRequest = Request & { staff: Staff };
+export type AuthedRequest = Request & { staff: Staff };
 
 function staffFromToken(token: string | undefined) {
   const id = token ? db.sessions[token] : undefined;
   return id ? db.staff[id] : undefined;
 }
 
-function auth(req: Request, res: Response, next: NextFunction) {
+export function auth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : (req.query.token as string | undefined);
   const staff = staffFromToken(token);
@@ -83,14 +92,14 @@ function auth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-function managerOnly(req: Request, res: Response, next: NextFunction) {
+export function managerOnly(req: Request, res: Response, next: NextFunction) {
   if ((req as AuthedRequest).staff.role !== 'manager') return res.status(403).json({ error: '점장/부점장 전용 기능입니다.' });
   next();
 }
 
-const actorOf = (s: Staff): Actor => ({ id: s.id, name: s.name, dept: s.dept });
+export const actorOf = (s: Staff): Actor => ({ id: s.id, name: s.name, dept: s.dept });
 const isDept = (v: unknown): v is Department => DEPARTMENTS.includes(v as Department);
-const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+export const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 // ---- 상품 검색 ----
 function searchProducts(q: string, limit = 8): Product[] {
@@ -120,7 +129,7 @@ function promotionFor(p: Product) {
 
 const describe = (p: Product) => `${p.name}: ${p.floor} ${p.corner}, ${p.shelf} (${p.dept}, ${p.price.toLocaleString()}원)`;
 
-function parseJson<T>(raw: string | undefined): T {
+export function parseJson<T>(raw: string | undefined): T {
   let t = raw || '{}';
   if (t.includes('```')) t = t.split('```')[1].replace(/^json/, '');
   return JSON.parse(t.trim()) as T;
@@ -159,6 +168,8 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     res.json({ token, staff });
   });
 
+  registerSecurity(app, genAI, aiEnabled);
+
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
     if (token) delete db.sessions[token];
@@ -174,6 +185,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       notices: db.notices.filter(n => n.scope === 'all' || n.scope === me.dept || me.role === 'manager').slice(-50),
       products: db.products,
       promotions: db.promotions,
+      incidents: db.incidents.filter(i => canSeeIncident(me, i)),
       online: onlineCounts(),
       aiEnabled,
     });
