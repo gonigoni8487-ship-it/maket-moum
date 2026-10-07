@@ -4,6 +4,7 @@ import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Sta
 import { api, ApiError, bootstrap, connectStream, session } from './api';
 import { alert, loadPrefs, registerServiceWorker, savePrefs, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
+import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
 import Login from './screens/Login';
 import TaskBoard, { advance } from './screens/TaskBoard';
@@ -14,6 +15,9 @@ import Notices from './screens/Notices';
 import Manager from './screens/Manager';
 import Security from './screens/Security';
 import VoiceRequest from './screens/VoiceRequest';
+import { HandoverInbox, HandoverSheet } from './screens/Handover';
+
+const CACHE_KEY = 'marton-cache';
 
 type Tab = 'tasks' | 'request' | 'find' | 'photo' | 'notices' | 'security' | 'manager';
 type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice } | { kind: 'incident'; incident: Incident };
@@ -55,6 +59,10 @@ export default function MartOnApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [push, setPush] = useState<PushState>('off');
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [pending, setPending] = useState(() => pendingItems().length);
+  const [netOnline, setNetOnline] = useState(() => navigator.onLine !== false);
+  const [stale, setStale] = useState(false); // 오프라인이라 저장해 둔 화면을 보여주는 중
 
   const meRef = useRef<Staff | null>(null);
   const dataRef = useRef(data);
@@ -70,6 +78,11 @@ export default function MartOnApp() {
   const onError = useCallback((m: string) => showToast(m, true), [showToast]);
 
   const logout = useCallback(async () => {
+    if (pendingItems().length) await flush();
+    const left = pendingItems().length;
+    if (left && !window.confirm(`아직 보내지 못한 ${left}건이 있습니다. 로그아웃하면 이 기기에서 삭제됩니다. 계속할까요?`)) return;
+    clearOutbox();
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* 무시 */ }
     await detachPush();
     void api('/logout', {}).catch(() => {});
     session.set(null);
@@ -80,10 +93,20 @@ export default function MartOnApp() {
 
   const load = useCallback(async () => {
     try {
-      setData(await bootstrap());
+      const fresh = await bootstrap();
+      setData(fresh);
+      setStale(false);
+      // 오프라인 재실행용 화면 캐시 (보안 신고·순찰·리포트는 기기에 남기지 않음)
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ token: session.token, data: { ...fresh, incidents: [], patrols: [], reports: [] } })); } catch { /* 무시 */ }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) session.set(null);
-      else onError((e as Error).message);
+      else {
+        const cached = (() => { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { return null; } })();
+        if (cached?.token === session.token) {
+          setData(d => d ?? cached.data);
+          setStale(true);
+        } else onError((e as Error).message);
+      }
     } finally {
       setLoading(false);
     }
@@ -111,6 +134,15 @@ export default function MartOnApp() {
       return;
     }
 
+    if (e.type === 'handover') {
+      const h = e.handover;
+      const isNew = !dataRef.current?.handovers.some(x => x.id === h.id);
+      setData(d => d && { ...d, handovers: upsert(d.handovers, h) });
+      if (isNew && h.dept === me.dept && h.from.id !== me.id) {
+        alert({ title: `${h.dept} 인수인계 — ${h.from.name}`, body: h.note || `미처리 ${h.openTasks.length}건`, urgent: false, tag: `handover-${h.id}`, prefs: p });
+      }
+      return;
+    }
     if (e.type === 'patrol') return setData(d => d && { ...d, patrols: upsert(d.patrols, e.patrol) });
     if (e.type === 'report') {
       setData(d => d && { ...d, reports: upsert(d.reports, e.report) });
@@ -189,6 +221,40 @@ export default function MartOnApp() {
     }
   };
 
+  // ---- 오프라인 전송 대기함 ----
+  const flushOutbox = useCallback(async () => {
+    const r = await flush();
+    if (r.sent) showToast(`대기 중이던 ${r.sent}건을 보냈습니다.`);
+    if (r.dropped.length) onError(`보내지 못하고 삭제됨: ${r.dropped.join(', ')}`);
+  }, [showToast, onError]);
+
+  const pendingRef = useRef(pending);
+  useEffect(() => onOutboxChange(items => {
+    if (items.length > pendingRef.current) showToast(`연결이 불안정합니다. 연결되면 자동으로 보냅니다 (대기 ${items.length}건)`);
+    pendingRef.current = items.length;
+    setPending(items.length);
+  }), [showToast]);
+
+  useEffect(() => {
+    const up = () => { setNetOnline(true); void flushOutbox(); void load(); };
+    const down = () => setNetOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, [flushOutbox, load]);
+
+  useEffect(() => {
+    if (!loggedIn || !connected) return;
+    void flushOutbox();
+    if (stale) void load();
+  }, [loggedIn, connected, flushOutbox, stale, load]);
+
+  useEffect(() => {
+    if (!pending) return;
+    const t = window.setInterval(() => void flushOutbox(), 30000);
+    return () => clearInterval(t);
+  }, [pending, flushOutbox]);
+
   const updatePrefs = (p: AlertPrefs) => { setPrefs(p); savePrefs(p); };
 
   const openRequest = (d: Draft) => { setDraft({ ...d }); setTab('request'); };
@@ -199,9 +265,9 @@ export default function MartOnApp() {
     setUrgent(null);
     if (!u || !data) return;
     try {
-      if (u.kind === 'notice') await api(`/notices/${u.notice.id}/read`, {});
+      if (u.kind === 'notice') await send(`/notices/${u.notice.id}/read`, {}, '긴급 공지 확인');
       else if (u.kind === 'incident') {
-        if (u.incident.status === '접수') await api(`/incidents/${u.incident.id}/status`, { status: '확인' });
+        if (u.incident.status === '접수') await send(`/incidents/${u.incident.id}/status`, { status: '확인' }, '보안 경보 확인');
         setTab('security');
       }
       else if (u.task.status === '접수' && (u.task.toDept === data.me.dept || data.me.role === 'manager')) await advance(u.task, '확인');
@@ -213,7 +279,7 @@ export default function MartOnApp() {
   if (loading) return <div className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">마트ON 연결 중…</div>;
   if (!data) return <div className="min-h-screen bg-slate-100"><Login onLogin={() => { setLoading(true); void load(); }} /></div>;
 
-  const { me, tasks, notices, products, promotions, incidents, patrols, reports, online, aiEnabled } = data;
+  const { me, tasks, notices, products, promotions, incidents, patrols, reports, handovers, online, aiEnabled } = data;
   const openIncidents = incidents.filter(i => i.status !== '종결' && (canHandleIncident(me) || i.reportedBy.id === me.id || i.dept === me.dept)).length;
   const openForMe = tasks.filter(t => t.toDept === me.dept && t.status !== '완료').length;
   const unreadNotices = notices.filter(n => (n.scope === 'all' || n.scope === me.dept) && !n.readBy.includes(me.id)).length;
@@ -233,7 +299,7 @@ export default function MartOnApp() {
       <header className="sticky top-0 z-20 bg-blue-700 text-white">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <div className="text-xl font-black tracking-tight">마트<span className="text-yellow-300">ON</span></div>
-          <span className={cx('size-2 rounded-full', connected ? 'bg-emerald-400' : 'bg-red-400 animate-pulse')} title={connected ? '실시간 연결됨' : '연결 끊김'} />
+          <span className={cx('size-2 rounded-full', connected && netOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse')} title={connected && netOnline ? '실시간 연결됨' : '연결 끊김'} />
           <div className="ml-auto text-right text-xs leading-tight">
             <div className="font-bold">{me.name} {me.title ?? ''}</div>
             <div className="text-blue-200">{me.dept} · {me.duty}</div>
@@ -241,7 +307,16 @@ export default function MartOnApp() {
           <button onClick={() => { unlockAudio(); setVoiceOpen(true); }} aria-label="말로 요청하기" className="rounded-full bg-red-500 p-2 active:bg-red-600"><Mic className="size-5" /></button>
           <button onClick={() => setShowSettings(s => !s)} aria-label="설정" className="rounded-lg p-1.5 active:bg-blue-800"><Settings className="size-5" /></button>
         </div>
-        {!connected && <div className="bg-red-500 py-1 text-center text-xs font-semibold">실시간 연결이 끊겼습니다. 재연결 중…</div>}
+        {(!connected || pending > 0) && (
+          <div className={cx('flex items-center justify-center gap-2 py-1.5 text-xs font-semibold', netOnline ? 'bg-red-500' : 'bg-slate-700')}>
+            <span>
+              {!netOnline ? '오프라인' : !connected ? '실시간 연결 끊김 · 재연결 중' : '전송 대기'}
+              {pending > 0 && ` · 보내지 못한 ${pending}건 (연결되면 자동 전송)`}
+              {stale && ' · 저장된 화면 표시 중'}
+            </span>
+            {pending > 0 && netOnline && <button onClick={() => void flushOutbox()} className="rounded bg-white/20 px-2 py-0.5">다시 시도</button>}
+          </div>
+        )}
       </header>
 
       {showSettings && (
@@ -261,7 +336,7 @@ export default function MartOnApp() {
               <div className="font-semibold">푸시 알림 <span className={push === 'on' ? 'text-emerald-600' : 'text-slate-500'}>{PUSH_LABEL[push]}</span></div>
               {push === 'off' && <button className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 font-bold text-white" onClick={turnOnPush}>푸시 알림 켜기</button>}
             </div>
-            <button className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-bold text-white" onClick={logout}>퇴근 · 로그아웃</button>
+            <button className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-bold text-white" onClick={() => { setShowSettings(false); setHandoverOpen(true); }}>퇴근 · 로그아웃</button>
           </div>
         </div>
       )}
@@ -276,13 +351,14 @@ export default function MartOnApp() {
         {push === 'ios-install' && (
           <div className="mb-4 rounded-2xl bg-amber-50 p-3 text-[13px] text-amber-900">아이폰은 Safari 공유 버튼 → <b>홈 화면에 추가</b> 후, 홈 화면의 마트ON에서 열어야 푸시 알림을 받을 수 있습니다.</div>
         )}
+        {tab === 'tasks' && <HandoverInbox handovers={handovers} me={me} onError={onError} />}
         {tab === 'tasks' && <TaskBoard tasks={tasks} me={me} onError={onError} />}
-        {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onVoice={() => setVoiceOpen(true)} onSent={t => { showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
+        {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onVoice={() => setVoiceOpen(true)} onSent={t => { if (t) showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}
         {tab === 'photo' && <PhotoAI aiEnabled={aiEnabled} onRequest={openRequest} onError={onError} onToast={showToast} />}
         {tab === 'notices' && <Notices notices={notices} me={me} onError={onError} />}
         {tab === 'security' && <Security me={me} incidents={incidents} patrols={patrols} reports={reports} products={products} onError={onError} onToast={showToast} />}
-        {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} online={online} onError={onError} onToast={showToast} />}
+        {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} handovers={handovers} online={online} onError={onError} onToast={showToast} />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
@@ -302,6 +378,17 @@ export default function MartOnApp() {
         </div>
       )}
 
+      {handoverOpen && (
+        <HandoverSheet
+          me={me}
+          tasks={tasks}
+          incidents={incidents}
+          onCancel={() => setHandoverOpen(false)}
+          onError={onError}
+          onDone={() => { setHandoverOpen(false); void logout(); }}
+        />
+      )}
+
       {voiceOpen && (
         <VoiceRequest
           products={products}
@@ -309,7 +396,7 @@ export default function MartOnApp() {
           voice={prefs.voice}
           onClose={() => setVoiceOpen(false)}
           onError={onError}
-          onSent={t => { setVoiceOpen(false); showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }}
+          onSent={t => { setVoiceOpen(false); if (t) showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }}
           onEdit={d => { setVoiceOpen(false); openRequest(d); }}
         />
       )}

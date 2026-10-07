@@ -1,11 +1,11 @@
 import { Megaphone, Siren } from 'lucide-react';
 import type { Notice, Staff } from '../shared';
-import { api } from '../api';
+import { send } from '../outbox';
 import { clock, cx, Empty } from '../ui';
 
 export function NoticeCard({ n, me, onError }: { n: Notice; me: Staff; onError: (m: string) => void }) {
   const read = n.readBy.includes(me.id);
-  const markRead = () => api(`/notices/${n.id}/read`, {}).catch(e => onError(e.message));
+  const markRead = () => send(`/notices/${n.id}/read`, {}, `공지 확인: ${n.title}`).catch(e => onError(e.message));
   return (
     <article className={cx('rounded-2xl border bg-white p-4', n.urgent ? 'border-red-300' : 'border-slate-200', !read && 'ring-2 ring-blue-100')}>
       <div className="flex items-center gap-1.5 text-xs">

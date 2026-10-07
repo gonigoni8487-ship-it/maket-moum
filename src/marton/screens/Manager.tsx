@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { DEPARTMENTS, type Department, type Notice, type Staff, type Task } from '../shared';
+import { DEPARTMENTS, type Department, type Handover, type Notice, type Staff, type Task } from '../shared';
 import { api } from '../api';
 import { TaskCard } from './TaskBoard';
 import { NoticeCard } from './Notices';
+import { HandoverList } from './Handover';
 import { Chip, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -21,8 +22,8 @@ function deptStats(tasks: Task[], dept: Department) {
   };
 }
 
-export default function Manager({ me, tasks, notices, online, onError, onToast }: {
-  me: Staff; tasks: Task[]; notices: Notice[]; online: Record<string, number>; onError: (m: string) => void; onToast: (m: string) => void;
+export default function Manager({ me, tasks, notices, handovers, online, onError, onToast }: {
+  me: Staff; tasks: Task[]; notices: Notice[]; handovers: Handover[]; online: Record<string, number>; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   const [scope, setScope] = useState<'all' | Department>('all');
   const [title, setTitle] = useState('');
@@ -101,6 +102,8 @@ export default function Manager({ me, tasks, notices, online, onError, onToast }
           ? open.filter(t => !t.urgent).sort((a, b) => a.createdAt - b.createdAt).map(t => <TaskCard key={t.id} task={t} me={me} onError={onError} />)
           : <Empty>미처리 업무 없음</Empty>}
       </Section>
+
+      <HandoverList handovers={handovers} me={me} onError={onError} />
 
       <Section title="공지 보내기">
         <form onSubmit={post} className="space-y-3 rounded-2xl bg-white p-4">

@@ -7,7 +7,7 @@ import path from 'path';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, type TaskCategory,
   type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
-  type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, canSeeIncident, canHandleIncident,
+  type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { registerSecurity } from './marton-security';
 import { registerPush, pushFor, type PushSub } from './marton-push';
@@ -15,6 +15,7 @@ import { registerPush, pushFor, type PushSub } from './marton-push';
 const AI_MODEL = 'gemini-3.5-flash';
 const DATA_FILE = process.env.MARTON_DATA_FILE || path.join(process.cwd(), 'data', 'marton-db.json');
 const MANAGER_PIN = process.env.MARTON_MANAGER_PIN || (process.env.NODE_ENV === 'production' ? '' : '0000');
+const STORE_CODE = process.env.MARTON_STORE_CODE || ''; // 매장 공용 접속 코드 (설정 시 로그인에 필요)
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
@@ -29,6 +30,7 @@ export interface Db {
   patrols: PatrolLog[];
   reports: WeeklyReport[];
   pushSubs: PushSub[];
+  handovers: Handover[];
   vapid?: { publicKey: string; privateKey: string };
 }
 
@@ -40,9 +42,10 @@ function loadDb(): Db {
     db.patrols ??= [];
     db.reports ??= [];
     db.pushSubs ??= [];
+    db.handovers ??= [];
     return db;
   } catch {
-    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [] };
+    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [] };
   }
 }
 
@@ -58,6 +61,7 @@ export function save() {
     db.incidents = db.incidents.filter(i => i.status !== '종결' || i.updatedAt > incidentCutoff);
     db.patrols = db.patrols.filter(p => p.at > Date.now() - 90 * 24 * 60 * 60 * 1000);
     db.reports = db.reports.slice(-52);
+    db.handovers = db.handovers.filter(h => h.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000);
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(db));
   }, 300);
@@ -156,7 +160,21 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
   const aiEnabled = Boolean(process.env.GEMINI_API_KEY);
   const api = '/api/marton';
 
+  // 로그인 실패 제한: IP별 10분에 20회 — 관리자 PIN·매장 코드 대입 방지, 매장 Wi-Fi는 IP를 공유하므로 여유 있게
+  const failures = new Map<string, number[]>();
+  const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+  const tooMany = (ip: string) => (failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS).length >= 20;
+  const fail = (ip: string) => failures.set(ip, [...(failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS), Date.now()]);
+
+  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(STORE_CODE) }));
+
   app.post(`${api}/login`, (req, res) => {
+    const ip = req.ip || 'unknown';
+    if (tooMany(ip)) return res.status(429).json({ error: '로그인 실패가 많아 10분간 제한됩니다. 잠시 후 다시 시도해 주세요.' });
+    if (STORE_CODE && req.body.storeCode !== STORE_CODE) {
+      fail(ip);
+      return res.status(403).json({ error: '매장 접속 코드가 올바르지 않습니다.' });
+    }
     const id = text(req.body.staffId, 20);
     const name = text(req.body.name, 20);
     const { dept, wantManager } = req.body;
@@ -168,7 +186,10 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
 
     let role: Staff['role'] = 'staff';
     if (wantManager) {
-      if (!MANAGER_PIN || req.body.managerPin !== MANAGER_PIN) return res.status(403).json({ error: '관리자 PIN이 올바르지 않습니다.' });
+      if (!MANAGER_PIN || req.body.managerPin !== MANAGER_PIN) {
+        fail(ip);
+        return res.status(403).json({ error: '관리자 PIN이 올바르지 않습니다.' });
+      }
       role = 'manager';
     }
     const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined };
@@ -200,6 +221,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       incidents: db.incidents.filter(i => canSeeIncident(me, i)),
       patrols: canHandleIncident(me) ? db.patrols.filter(p => p.at > Date.now() - 14 * 24 * 60 * 60 * 1000) : [],
       reports: me.role === 'manager' ? db.reports.slice(-12) : [],
+      handovers: db.handovers.filter(h => h.createdAt > Date.now() - 3 * 24 * 60 * 60 * 1000 && (me.role === 'manager' || h.dept === me.dept)),
       online: onlineCounts(),
       aiEnabled,
     });
@@ -223,6 +245,10 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     const me = (req as AuthedRequest).staff;
     const { category, toDept, urgent } = req.body;
     if (!TASK_CATEGORIES.includes(category) || !isDept(toDept)) return res.status(400).json({ error: '요청 유형과 받는 부서를 선택해 주세요.' });
+    // 오프라인 재전송: 같은 clientId면 이미 만든 요청을 돌려준다
+    const clientId = text(req.body.clientId, 40) || undefined;
+    const dup = clientId && db.tasks.find(t => t.clientId === clientId && t.createdBy.id === me.id);
+    if (dup) return res.json(dup);
     const now = Date.now();
     const task: Task = {
       id: randomUUID().slice(0, 8),
@@ -238,6 +264,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       createdAt: now,
       updatedAt: now,
       history: [{ status: '접수', by: actorOf(me), at: now }],
+      clientId,
     };
     db.tasks.push(task);
     save();
@@ -250,6 +277,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     const task = db.tasks.find(t => t.id === req.params.id);
     if (!task) return res.status(404).json({ error: '업무를 찾을 수 없습니다.' });
     const status = req.body.status as TaskStatus;
+    if (status === task.status) return res.json(task); // 재전송된 같은 처리 → 성공으로 간주
     if (!TASK_STATUSES.includes(status) || TASK_STATUSES.indexOf(status) <= TASK_STATUSES.indexOf(task.status)) {
       return res.status(400).json({ error: '이미 처리된 단계입니다.' });
     }
@@ -260,6 +288,43 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     save();
     broadcast({ type: 'task', task, action: 'updated' });
     res.json(task);
+  });
+
+  // 근무 교대 인수인계: 우리 부서 미처리 업무·보안 이슈를 자동 요약 + 메모
+  app.post(`${api}/handovers`, auth, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const clientId = text(req.body.clientId, 40) || undefined;
+    const dup = clientId && db.handovers.find(h => h.clientId === clientId);
+    if (dup) return res.json(dup);
+    const handover: Handover = {
+      id: randomUUID().slice(0, 8),
+      dept: me.dept,
+      from: actorOf(me),
+      createdAt: Date.now(),
+      note: text(req.body.note, 1000),
+      openTasks: db.tasks.filter(t => t.toDept === me.dept && t.status !== '완료')
+        .map(t => ({ id: t.id, title: t.title, status: t.status, urgent: t.urgent, fromDept: t.fromDept })),
+      openIncidents: db.incidents.filter(i => i.dept === me.dept && i.status !== '종결' && !i.test)
+        .map(i => ({ id: i.id, zone: i.zone, type: i.type, status: i.status })),
+      ackBy: [],
+      clientId,
+    };
+    db.handovers.push(handover);
+    save();
+    broadcast({ type: 'handover', handover }, s => s.dept === handover.dept || s.role === 'manager');
+    res.json(handover);
+  });
+
+  app.post(`${api}/handovers/:id/ack`, auth, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const handover = db.handovers.find(h => h.id === req.params.id);
+    if (!handover) return res.status(404).json({ error: '인수인계를 찾을 수 없습니다.' });
+    if (!handover.ackBy.some(a => a.id === me.id)) {
+      handover.ackBy.push({ id: me.id, name: me.name, at: Date.now() });
+      save();
+      broadcast({ type: 'handover', handover }, s => s.dept === handover.dept || s.role === 'manager');
+    }
+    res.json(handover);
   });
 
   app.post(`${api}/notices`, auth, managerOnly, (req, res) => {

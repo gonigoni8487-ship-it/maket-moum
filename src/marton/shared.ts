@@ -57,6 +57,7 @@ export interface Task {
   createdAt: number;
   updatedAt: number;
   history: TaskEvent[];
+  clientId?: string; // 오프라인 재전송 중복 방지
 }
 
 export interface Notice {
@@ -102,6 +103,7 @@ export interface Bootstrap {
   incidents: Incident[];
   patrols: PatrolLog[];
   reports: WeeklyReport[];
+  handovers: Handover[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -113,6 +115,7 @@ export type StreamEvent =
   | { type: 'incident'; incident: Incident; action: 'created' | 'updated' }
   | { type: 'patrol'; patrol: PatrolLog }
   | { type: 'report'; report: WeeklyReport }
+  | { type: 'handover'; handover: Handover }
   | { type: 'presence'; online: Record<string, number> };
 
 export interface VisionFlyerResult {
@@ -222,6 +225,7 @@ export interface Incident {
   updatedAt: number;
   reportedBy: Actor;
   history: IncidentEvent[];
+  clientId?: string;
 }
 
 /** 보안 신고를 볼 수 있는 사람: 관리자, MS(보안), 신고자 본인, 해당 구역 부서(진행 중 알림용) */
@@ -487,3 +491,19 @@ export function parseRequestText(input: string, products: Product[] = []): Parse
   const title = [toDept, product?.name, category].filter(Boolean).join(' ') || text.slice(0, 40);
   return { toDept, category, location, urgent, product, title: title.slice(0, 60), detail: `🎤 "${text}"`, complete: Boolean(toDept && category) };
 }
+
+// ---- 근무 교대 인수인계 ----
+
+export interface Handover {
+  id: string;
+  dept: Department;
+  from: Actor;
+  createdAt: number;
+  note: string;
+  openTasks: { id: string; title: string; status: TaskStatus; urgent: boolean; fromDept: Department }[];
+  openIncidents: { id: string; zone: string; type: IncidentType; status: IncidentStatus }[];
+  ackBy: { id: string; name: string; at: number }[];
+  clientId?: string;
+}
+
+export const HANDOVER_CHIPS = ['특이사항 없음', '진열 보충 필요', '냉장·냉동 온도 확인', '행사 POP 교체 필요', '고객 클레임 진행 중', '발주 확인 필요'];

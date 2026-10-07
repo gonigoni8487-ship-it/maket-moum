@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight, Siren, MapPin, ChevronDown } from 'lucide-react';
 import { TASK_STATUSES, type Staff, type Task, type TaskStatus } from '../shared';
-import { api } from '../api';
+import { send } from '../outbox';
 import { cx, elapsed, clock, Empty, STATUS_STYLE } from '../ui';
 
 const NEXT_LABEL: Partial<Record<TaskStatus, string>> = { 확인: '확인했어요', 처리중: '처리 시작', 완료: '처리 완료' };
@@ -12,7 +12,7 @@ export function nextStatus(t: Task): TaskStatus | null {
 }
 
 export async function advance(task: Task, status: TaskStatus, note?: string) {
-  return api<Task>(`/tasks/${task.id}/status`, { status, note });
+  return send<Task>(`/tasks/${task.id}/status`, { status, note }, `${task.title} → ${status}`);
 }
 
 export function TaskCard({ task, me, onError }: { task: Task; me: Staff; onError: (m: string) => void }) {

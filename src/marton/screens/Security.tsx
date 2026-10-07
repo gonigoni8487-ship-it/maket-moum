@@ -5,6 +5,7 @@ import {
   type Incident, type IncidentOutcome, type IncidentStatus, type IncidentType, type LossInsight, type PatrolLog, type Product, type Staff, type WeeklyReport,
 } from '../shared';
 import { api } from '../api';
+import { send } from '../outbox';
 import { Chip, clock, cx, elapsed, Empty, inputCls, Section, won } from '../ui';
 import { PatrolPlan, Reports } from './Patrol';
 
@@ -17,7 +18,7 @@ const STATUS_STYLE: Record<IncidentStatus, string> = {
 const NEXT_LABEL: Partial<Record<IncidentStatus, string>> = { 확인: '확인했어요', 대응중: '현장 대응 시작', 종결: '종결 처리' };
 const AGO = [['지금', 0], ['10분 전', 10], ['30분 전', 30], ['1시간 전', 60]] as const;
 
-function ReportForm({ products, onDone, onError }: { products: Product[]; onDone: () => void; onError: (m: string) => void }) {
+function ReportForm({ products, onDone, onError }: { products: Product[]; onDone: (sent: boolean) => void; onError: (m: string) => void }) {
   const [type, setType] = useState<IncidentType | ''>('');
   const [urgent, setUrgent] = useState(false);
   const [zone, setZone] = useState('');
@@ -42,12 +43,12 @@ function ReportForm({ products, onDone, onError }: { products: Product[]; onDone
     e.preventDefault();
     setBusy(true);
     try {
-      await api<Incident>('/incidents', {
+      const sent = await send<Incident>('/incidents', {
         type, urgent, zone, productName, quantity: Number(quantity), unitPrice: Number(unitPrice), cctvRef, note,
         occurredAt: Date.now() - ago * 60 * 1000,
-      });
+      }, `보안 신고: ${type} · ${zone}`);
       setType(''); setUrgent(false); setProductName(''); setQuantity('1'); setUnitPrice(''); setCctvRef(''); setNote(''); setAgo(0);
-      onDone();
+      onDone(sent !== null);
     } catch (err) {
       onError((err as Error).message);
     } finally {
@@ -125,7 +126,7 @@ export function IncidentCard({ incident: i, me, onError }: { incident: Incident;
 
   const advance = async (status: IncidentStatus, extra: object = {}) => {
     setBusy(true);
-    try { await api(`/incidents/${i.id}/status`, { status, ...extra }); setClosing(false); }
+    try { await send(`/incidents/${i.id}/status`, { status, ...extra }, `보안 ${i.zone} → ${status}`); setClosing(false); }
     catch (e) { onError((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -348,7 +349,7 @@ export default function Security({ me, incidents, patrols, reports, products, on
         ))}
       </div>
 
-      {sub === 'report' && <ReportForm products={products} onError={onError} onDone={() => { onToast('보안 신고를 보냈습니다.'); setSub('list'); }} />}
+      {sub === 'report' && <ReportForm products={products} onError={onError} onDone={sent => { if (sent) onToast('보안 신고를 보냈습니다.'); setSub('list'); }} />}
 
       {sub === 'list' && (
         <div className="space-y-3">

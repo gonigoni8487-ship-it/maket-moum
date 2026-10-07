@@ -103,6 +103,11 @@ export function pushFor(event: StreamEvent) {
         void sendTo(s => s.id === i.reportedBy.id, { title: `보안 신고 ${last.status}`, body: `${i.zone} — ${last.by.name}`, urgent: false, tag: `incident-${i.id}` });
       }
     }
+  } else if (event.type === 'handover') {
+    const h = event.handover;
+    if (h.ackBy.length) return; // 확인 표시 갱신은 알리지 않음
+    const summary = [h.openTasks.length && `미처리 ${h.openTasks.length}건`, h.openIncidents.length && `보안 ${h.openIncidents.length}건`, h.note].filter(Boolean).join(' · ');
+    void sendTo(s => s.dept === h.dept && s.id !== h.from.id, { title: `${h.dept} 인수인계 — ${h.from.name}`, body: summary || '특이사항 없음', urgent: false, tag: `handover-${h.id}` });
   } else if (event.type === 'report' && event.report.auto) {
     void sendTo(s => s.role === 'manager', { title: '주간 손실방지 리포트', body: '지난주 리포트가 도착했습니다.', urgent: false, tag: `report-${event.report.id}` });
   }

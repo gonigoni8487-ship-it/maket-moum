@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, Footprints, Copy, Printer, FileText } from 'lucide-react';
 import { dayKey, patrolPlan, type Incident, type PatrolLog, type WeeklyReport } from '../shared';
 import { api } from '../api';
+import { send } from '../outbox';
 import { clock, cx, Empty, Section } from '../ui';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -16,7 +17,7 @@ export function PatrolPlan({ incidents, patrols, onError }: { incidents: Inciden
 
   const done = async (hour: number, zone: string) => {
     setBusy(`${hour}|${zone}`);
-    try { await api('/patrols', { hour, zone }); } catch (e) { onError((e as Error).message); } finally { setBusy(''); }
+    try { await send('/patrols', { hour, zone, at: Date.now() }, `순찰 완료: ${zone}`); } catch (e) { onError((e as Error).message); } finally { setBusy(''); }
   };
 
   return (

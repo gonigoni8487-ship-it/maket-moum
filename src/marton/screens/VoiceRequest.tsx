@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Mic, X, Send, RotateCcw, Pencil, Siren, Keyboard } from 'lucide-react';
 import { DEPARTMENTS, TASK_CATEGORIES, parseRequestText, type Department, type Product, type Task, type TaskCategory } from '../shared';
 import { api } from '../api';
+import { send as sendOrQueue } from '../outbox';
 import { speak } from '../alerts';
 import { Chip, cx, inputCls, type Draft } from '../ui';
 
@@ -26,7 +27,7 @@ function recognizer() {
  */
 export default function VoiceRequest({ products, aiEnabled, voice, onSent, onEdit, onClose, onError }: {
   products: Product[]; aiEnabled: boolean; voice: boolean;
-  onSent: (t: Task) => void; onEdit: (d: Draft) => void; onClose: () => void; onError: (m: string) => void;
+  onSent: (t: Task | null) => void; onEdit: (d: Draft) => void; onClose: () => void; onError: (m: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('listening');
   const [interim, setInterim] = useState('');
@@ -102,8 +103,8 @@ export default function VoiceRequest({ products, aiEnabled, voice, onSent, onEdi
     if (!toDept || !category) return;
     setBusy(true);
     try {
-      const task = await api<Task>('/tasks', { toDept, category, title, location, urgent, detail: `🎤 "${said}"` });
-      if (voice) speak(`${toDept}에 요청을 보냈습니다.`);
+      const task = await sendOrQueue<Task>('/tasks', { toDept, category, title, location, urgent, detail: `🎤 "${said}"` }, `요청: ${title}`);
+      if (voice) speak(task ? `${toDept}에 요청을 보냈습니다.` : '연결되면 자동으로 보내겠습니다.');
       onSent(task);
     } catch (e) {
       onError((e as Error).message);

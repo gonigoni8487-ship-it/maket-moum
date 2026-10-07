@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Siren, Send, Mic } from 'lucide-react';
 import { DEPARTMENTS, TASK_CATEGORIES, type Department, type Staff, type Task, type TaskCategory } from '../shared';
-import { api } from '../api';
+import { send } from '../outbox';
 import { Chip, cx, inputCls, primaryBtn, type Draft } from '../ui';
 
 // 고객센터에서 가장 많이 쓰는 요청을 원터치로
@@ -14,7 +14,7 @@ const QUICK: { label: string; draft: Draft }[] = [
   { label: '📦 재고/보충', draft: { category: '재고/보충', title: '상품 보충 요청' } },
 ];
 
-export default function RequestForm({ me, draft, onSent, onError, onVoice }: { me: Staff; draft: Draft | null; onSent: (t: Task) => void; onError: (m: string) => void; onVoice: () => void }) {
+export default function RequestForm({ me, draft, onSent, onError, onVoice }: { me: Staff; draft: Draft | null; onSent: (t: Task | null) => void; onError: (m: string) => void; onVoice: () => void }) {
   const [toDept, setToDept] = useState<Department | ''>('');
   const [category, setCategory] = useState<TaskCategory | ''>('');
   const [title, setTitle] = useState('');
@@ -37,7 +37,7 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
     e.preventDefault();
     setBusy(true);
     try {
-      const task = await api<Task>('/tasks', { toDept, category, title, detail, location, urgent });
+      const task = await send<Task>('/tasks', { toDept, category, title, detail, location, urgent }, `요청: ${title || `${toDept} ${category}`}`);
       setTitle(''); setDetail(''); setLocation(''); setUrgent(false);
       onSent(task);
     } catch (err) {

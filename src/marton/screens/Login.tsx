@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { DEPARTMENTS, DUTIES, type Department, type Staff } from '../shared';
-import { login, session } from '../api';
+import { api, login, session } from '../api';
 import { unlockAudio, requestNotificationPermission } from '../alerts';
 import { Chip, inputCls, primaryBtn } from '../ui';
 
@@ -18,6 +18,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [storeCode, setStoreCode] = useState<string>(last.storeCode || '');
+  const [needCode, setNeedCode] = useState(false);
+  useEffect(() => { api<{ storeCodeRequired: boolean }>('/config').then(c => setNeedCode(c.storeCodeRequired), () => {}); }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,9 +28,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
     setBusy(true);
     setError('');
     try {
-      const { token, staff } = await login({ staffId, name, dept, duty, wantManager, managerPin: pin, title });
+      const { token, staff } = await login({ storeCode, staffId, name, dept, duty, wantManager, managerPin: pin, title });
       session.set(token);
-      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty })); } catch { /* 무시 */ }
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty, storeCode })); } catch { /* 무시 */ }
       void requestNotificationPermission();
       onLogin(staff);
     } catch (err) {
@@ -43,6 +46,13 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
         <div className="text-3xl font-black tracking-tight text-slate-900">마트<span className="text-blue-600">ON</span></div>
         <p className="mt-1 text-sm text-slate-500">말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI</p>
       </div>
+
+      {needCode && (
+        <label className="block space-y-1.5">
+          <span className="text-sm font-semibold text-slate-700">매장 접속 코드</span>
+          <input className={inputCls} type="password" value={storeCode} onChange={e => setStoreCode(e.target.value)} placeholder="매장에서 안내받은 코드" required />
+        </label>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <label className="space-y-1.5">

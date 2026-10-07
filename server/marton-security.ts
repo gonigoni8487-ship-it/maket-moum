@@ -21,7 +21,7 @@ function publish(incident: Incident, action: 'created' | 'updated') {
 function createIncident(input: {
   type: IncidentType; source: Incident['source']; urgent: boolean; zone: string; reportedBy: Actor;
   productName?: string; quantity?: number; unitPrice?: number; cctvRef?: string; note: string;
-  sensorId?: string; test?: boolean; occurredAt?: number;
+  sensorId?: string; test?: boolean; occurredAt?: number; clientId?: string;
 }) {
   const now = Date.now();
   const quantity = input.quantity && input.quantity > 0 ? Math.min(input.quantity, 999) : undefined;
@@ -75,6 +75,9 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
     const me = (req as AuthedRequest).staff;
     const { type } = req.body;
     const zone = text(req.body.zone, 40);
+    const clientId = text(req.body.clientId, 40);
+    const dup = clientId && db.incidents.find(i => i.clientId === clientId && i.reportedBy.id === me.id);
+    if (dup) return res.json(dup);
     if (!INCIDENT_TYPES.includes(type) || type === '센서 경보' || !zone) return res.status(400).json({ error: '유형과 위치를 선택해 주세요.' });
     res.json(createIncident({
       type, source: 'staff', urgent: Boolean(req.body.urgent), zone, reportedBy: actorOf(me),
@@ -84,6 +87,7 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
       cctvRef: text(req.body.cctvRef, 60) || undefined,
       note: text(req.body.note, 500),
       occurredAt: Number(req.body.occurredAt) || undefined,
+      clientId: text(req.body.clientId, 40) || undefined,
     }));
   });
 
@@ -93,6 +97,7 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
     const incident = db.incidents.find(i => i.id === req.params.id);
     if (!incident) return res.status(404).json({ error: '신고를 찾을 수 없습니다.' });
     const status = req.body.status as IncidentStatus;
+    if (status === incident.status) return res.json(incident);
     if (!INCIDENT_STATUSES.includes(status) || INCIDENT_STATUSES.indexOf(status) <= INCIDENT_STATUSES.indexOf(incident.status)) {
       return res.status(400).json({ error: '이미 처리된 단계입니다.' });
     }
@@ -155,8 +160,13 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
     const hour = Number(req.body.hour);
     const zone = text(req.body.zone, 40);
     if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !zone) return res.status(400).json({ error: '순찰 시간대와 구역을 확인해 주세요.' });
-    const now = Date.now();
-    const patrol: PatrolLog = { id: randomUUID().slice(0, 8), date: dayKey(now), hour, zone, by: actorOf(me), at: now, note: text(req.body.note, 200) || undefined };
+    const clientId = text(req.body.clientId, 40);
+    const dup = clientId && db.patrols.find(p => p.id === clientId);
+    if (dup) return res.json(dup);
+    // 오프라인에서 기록한 순찰은 실제 순찰 시각(최근 12시간 이내)을 쓴다
+    const sentAt = Number(req.body.at);
+    const now = sentAt > Date.now() - 12 * 60 * 60 * 1000 && sentAt <= Date.now() ? sentAt : Date.now();
+    const patrol: PatrolLog = { id: clientId || randomUUID().slice(0, 8), date: dayKey(now), hour, zone, by: actorOf(me), at: now, note: text(req.body.note, 200) || undefined };
     db.patrols.push(patrol);
     save();
     broadcast({ type: 'patrol', patrol }, canHandleIncident);
