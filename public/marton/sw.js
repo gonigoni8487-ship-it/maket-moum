@@ -1,5 +1,5 @@
-// 마트ON 서비스워커: 화면 오프라인 캐시 + 알림 클릭 처리
-const CACHE = 'marton-v2';
+// 마트ON 서비스워커: 화면 오프라인 캐시 + 웹 푸시 수신 + 알림 클릭 처리
+const CACHE = 'marton-v3';
 const SHELL = ['/marton/', '/marton/manifest.webmanifest', '/marton/icon.svg'];
 
 self.addEventListener('install', event => {
@@ -26,6 +26,25 @@ self.addEventListener('fetch', event => {
         return res;
       })
       .catch(() => caches.match(event.request).then(r => r || caches.match('/marton/'))),
+  );
+});
+
+// 서버 푸시: 앱이 닫혀 있거나 화면이 꺼져 있어도 표시된다
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: '마트ON', body: event.data ? event.data.text() : '' }; }
+  const urgent = Boolean(data.urgent);
+  event.waitUntil(
+    self.registration.showNotification(data.title || '마트ON', {
+      body: data.body || '',
+      tag: data.tag || 'marton',
+      renotify: true,
+      requireInteraction: urgent, // 긴급은 직접 닫을 때까지 유지
+      vibrate: urgent ? [500, 200, 500, 200, 500, 200, 500] : [200, 100, 200],
+      icon: '/marton/icon.svg',
+      badge: '/marton/icon.svg',
+      data: { url: data.url || '/marton/' },
+    }),
   );
 });
 

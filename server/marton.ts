@@ -10,6 +10,7 @@ import {
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { registerSecurity } from './marton-security';
+import { registerPush, pushFor, type PushSub } from './marton-push';
 
 const AI_MODEL = 'gemini-3.5-flash';
 const DATA_FILE = process.env.MARTON_DATA_FILE || path.join(process.cwd(), 'data', 'marton-db.json');
@@ -27,6 +28,8 @@ export interface Db {
   incidents: Incident[];
   patrols: PatrolLog[];
   reports: WeeklyReport[];
+  pushSubs: PushSub[];
+  vapid?: { publicKey: string; privateKey: string };
 }
 
 function loadDb(): Db {
@@ -36,9 +39,10 @@ function loadDb(): Db {
     db.incidents ??= [];
     db.patrols ??= [];
     db.reports ??= [];
+    db.pushSubs ??= [];
     return db;
   } catch {
-    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [] };
+    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [] };
   }
 }
 
@@ -79,6 +83,7 @@ export function broadcast(event: StreamEvent, who?: (s: Staff) => boolean) {
   for (const [res, staff] of clients) {
     if (!who || who(db.staff[staff.id] ?? staff)) res.write(payload);
   }
+  pushFor(event);
 }
 
 // ---- 인증 ----
@@ -175,6 +180,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
   });
 
   registerSecurity(app, genAI, aiEnabled);
+  registerPush(app);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);

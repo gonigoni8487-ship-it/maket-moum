@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert } from 'lucide-react';
 import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { alert, loadPrefs, registerServiceWorker, requestNotificationPermission, savePrefs, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { alert, loadPrefs, registerServiceWorker, savePrefs, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
+import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
 import Login from './screens/Login';
 import TaskBoard, { advance } from './screens/TaskBoard';
 import RequestForm from './screens/RequestForm';
@@ -51,6 +52,7 @@ export default function MartOnApp() {
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefs>(loadPrefs);
   const [showSettings, setShowSettings] = useState(false);
+  const [push, setPush] = useState<PushState>('off');
 
   const meRef = useRef<Staff | null>(null);
   const dataRef = useRef(data);
@@ -65,7 +67,8 @@ export default function MartOnApp() {
   }, []);
   const onError = useCallback((m: string) => showToast(m, true), [showToast]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await detachPush();
     void api('/logout', {}).catch(() => {});
     session.set(null);
     stopAlarm();
@@ -162,6 +165,28 @@ export default function MartOnApp() {
     return connectStream(handleEvent, setConnected, load);
   }, [loggedIn, handleEvent, load]);
 
+  // 로그인하면 이 기기를 직원 계정에 푸시 등록 (권한이 이미 있으면 자동)
+  useEffect(() => {
+    if (!loggedIn) return;
+    void (async () => {
+      const state = await pushState();
+      if (state === 'off' && 'Notification' in window && Notification.permission === 'granted') setPush(await enablePush().catch(() => 'off' as const));
+      else setPush(state);
+    })();
+  }, [loggedIn]);
+
+  const turnOnPush = async () => {
+    try {
+      const state = await enablePush();
+      setPush(state);
+      showToast(state === 'on' ? '푸시 알림을 켰습니다.' : PUSH_LABEL[state], state !== 'on');
+    } catch (e) {
+      // 시크릿 모드, 브라우저 알림 차단, 푸시 서비스 접속 불가 등
+      onError('이 기기에서 푸시 등록이 거부되었습니다. 시크릿 모드가 아닌지, 브라우저 알림이 허용되어 있는지 확인해 주세요.');
+      console.error('push subscribe failed', e);
+    }
+  };
+
   const updatePrefs = (p: AlertPrefs) => { setPrefs(p); savePrefs(p); };
 
   const openRequest = (d: Draft) => { setDraft({ ...d }); setTab('request'); };
@@ -226,8 +251,12 @@ export default function MartOnApp() {
               </label>
             ))}
             <div className="grid grid-cols-2 gap-2 text-sm font-semibold">
-              <button className="rounded-xl bg-slate-100 py-2.5" onClick={async () => showToast(`알림 권한: ${await requestNotificationPermission()}`)}>알림 권한 요청</button>
-              <button className="rounded-xl bg-slate-100 py-2.5" onClick={() => alert({ title: '테스트 알림', body: '알림이 정상 동작합니다.', urgent: false, tag: 'test', prefs })}>테스트 알림</button>
+              <button className="rounded-xl bg-slate-100 py-2.5" onClick={() => alert({ title: '테스트 알림', body: '알림이 정상 동작합니다.', urgent: false, tag: 'test', prefs })}>소리·진동 테스트</button>
+              <button className="rounded-xl bg-slate-100 py-2.5 disabled:opacity-50" disabled={push !== 'on'} onClick={() => api<{ devices: number }>('/push/test', {}).then(r => showToast(`푸시를 보냈습니다 (기기 ${r.devices}대). 앱을 닫고 확인해 보세요.`), e => onError(e.message))}>푸시 테스트</button>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 text-sm">
+              <div className="font-semibold">푸시 알림 <span className={push === 'on' ? 'text-emerald-600' : 'text-slate-500'}>{PUSH_LABEL[push]}</span></div>
+              {push === 'off' && <button className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 font-bold text-white" onClick={turnOnPush}>푸시 알림 켜기</button>}
             </div>
             <button className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-bold text-white" onClick={logout}>퇴근 · 로그아웃</button>
           </div>
@@ -235,6 +264,15 @@ export default function MartOnApp() {
       )}
 
       <main className="mx-auto max-w-2xl px-4 pt-4">
+        {push === 'off' && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl bg-amber-50 p-3 text-[13px] text-amber-900">
+            <span className="flex-1">화면이 꺼져 있어도 요청·긴급 경보를 받으려면 푸시 알림을 켜 주세요.</span>
+            <button className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-bold text-white" onClick={turnOnPush}>켜기</button>
+          </div>
+        )}
+        {push === 'ios-install' && (
+          <div className="mb-4 rounded-2xl bg-amber-50 p-3 text-[13px] text-amber-900">아이폰은 Safari 공유 버튼 → <b>홈 화면에 추가</b> 후, 홈 화면의 마트ON에서 열어야 푸시 알림을 받을 수 있습니다.</div>
+        )}
         {tab === 'tasks' && <TaskBoard tasks={tasks} me={me} onError={onError} />}
         {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onSent={t => { showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}

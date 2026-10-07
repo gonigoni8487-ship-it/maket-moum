@@ -17,6 +17,12 @@ export function savePrefs(p: AlertPrefs) {
 }
 
 let ctx: AudioContext | null = null;
+let pushActive = false;
+
+/** 웹 푸시가 켜져 있으면 시스템 알림은 서버 푸시가 담당한다 (중복 방지) */
+export function setPushActive(v: boolean) {
+  pushActive = v;
+}
 let alarmTimer: number | null = null;
 
 /** 모바일 브라우저는 사용자 터치 이후에만 소리를 낼 수 있어서, 로그인 버튼 등에서 미리 호출한다. */
@@ -68,7 +74,7 @@ export async function requestNotificationPermission() {
 }
 
 async function systemNotify(title: string, body: string, urgent: boolean, tag: string) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (pushActive || !('Notification' in window) || Notification.permission !== 'granted') return;
   const options: NotificationOptions & { vibrate?: number[]; renotify?: boolean } = {
     body, tag, icon: '/marton/icon.svg', badge: '/marton/icon.svg',
     requireInteraction: urgent, renotify: true, vibrate: urgent ? [400, 150, 400, 150, 400] : [200],
