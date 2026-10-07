@@ -1,0 +1,15 @@
+{
+  "name": "마트ON - 매장 직원 업무 플랫폼",
+  "short_name": "마트ON",
+  "description": "말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI",
+  "start_url": "/marton/",
+  "scope": "/marton/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1f5f9",
+  "theme_color": "#1d4ed8",
+  "lang": "ko",
+  "icons": [
+    { "src": "/marton/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

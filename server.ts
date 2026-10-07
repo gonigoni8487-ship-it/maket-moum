@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { registerMartOn } from "./server/marton";
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "8mb" }));
 
   // Initialize Gemini
   const genAI = new GoogleGenAI({ 
@@ -201,6 +202,9 @@ async function startServer() {
       res.status(500).json({ error: "Failed to generate marketing campaign guide" });
     }
   });
+
+  // 마트ON v2 (직원용 업무 플랫폼)
+  registerMartOn(app, genAI);
 
   // Health check
   app.get("/api/health", (req, res) => {
