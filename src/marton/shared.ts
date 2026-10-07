@@ -100,6 +100,8 @@ export interface Bootstrap {
   products: Product[];
   promotions: Promotion[];
   incidents: Incident[];
+  patrols: PatrolLog[];
+  reports: WeeklyReport[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -109,6 +111,8 @@ export type StreamEvent =
   | { type: 'notice'; notice: Notice }
   | { type: 'promotion'; promotion: Promotion }
   | { type: 'incident'; incident: Incident; action: 'created' | 'updated' }
+  | { type: 'patrol'; patrol: PatrolLog }
+  | { type: 'report'; report: WeeklyReport }
   | { type: 'presence'; online: Record<string, number> };
 
 export interface VisionFlyerResult {
@@ -252,8 +256,8 @@ const countBy = (keys: string[]) => {
 };
 
 /** 손실방지 분석 집계 (테스트 경보 제외). 서버 AI 분석과 점장 화면이 같이 쓴다. */
-export function lossStats(incidents: Incident[], since: number): LossStats {
-  const list = incidents.filter(i => !i.test && i.occurredAt >= since);
+export function lossStats(incidents: Incident[], since: number, until = Infinity): LossStats {
+  const list = incidents.filter(i => !i.test && i.occurredAt >= since && i.occurredAt < until);
   const closed = list.filter(i => i.outcome);
   const lossList = list.filter(i => i.outcome && LOSS_OUTCOMES.includes(i.outcome));
   const acks = list.map(i => (i.history.find(h => h.status === '확인')?.at ?? 0) - i.createdAt).filter(x => x > 0);
@@ -275,4 +279,125 @@ export function lossStats(incidents: Incident[], since: number): LossStats {
     byProduct: [...productLoss].sort((a, b) => b[1] - a[1]),
     byType: countBy(list.map(i => i.type)),
   };
+}
+
+// ---- 순찰 추천 ----
+
+export interface PatrolLog {
+  id: string;
+  date: string; // YYYY-MM-DD (매장 현지)
+  hour: number;
+  zone: string;
+  by: Actor;
+  at: number;
+  note?: string;
+}
+
+export interface PatrolSlot {
+  hour: number;
+  label: string; // 피크 18시 → "17:30~18:30"
+  zones: { zone: string; count: number; reason: string }[];
+}
+
+export const dayKey = (t: number) => {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+/**
+ * 최근 4주 신고로 오늘 순찰 시간대와 구역을 추천한다.
+ * 같은 요일·실제 손실 건에 가중치를 주고, 피크 30분 전부터 순찰하도록 잡는다.
+ */
+export function patrolPlan(incidents: Incident[], now = Date.now(), maxSlots = 4): PatrolSlot[] {
+  const today = new Date(now).getDay();
+  const score = new Map<string, { hour: number; zone: string; score: number; count: number }>();
+  for (const i of incidents) {
+    if (i.test || i.occurredAt < now - 28 * DAY_MS || i.occurredAt > now) continue;
+    const d = new Date(i.occurredAt);
+    const key = `${d.getHours()}|${i.zone}`;
+    const w = 1 + (d.getDay() === today ? 1 : 0) + (i.outcome && LOSS_OUTCOMES.includes(i.outcome) ? 1 : 0) - (i.outcome === '오인/정상 구매' ? 0.5 : 0);
+    const cur = score.get(key) ?? { hour: d.getHours(), zone: i.zone, score: 0, count: 0 };
+    cur.score += w;
+    cur.count += 1;
+    score.set(key, cur);
+  }
+  const byHour = new Map<number, { zone: string; score: number; count: number }[]>();
+  for (const v of score.values()) byHour.set(v.hour, [...(byHour.get(v.hour) ?? []), v]);
+  const hourScore = (h: number) => (byHour.get(h) ?? []).reduce((a, z) => a + z.score, 0);
+  return [...byHour.keys()]
+    .sort((a, b) => hourScore(b) - hourScore(a))
+    .slice(0, maxSlots)
+    .sort((a, b) => a - b)
+    .map(hour => {
+      // 피크 시간대 30분 전 ~ 30분 후 (연속된 슬롯끼리 겹치지 않음)
+      const hhmm = (m: number) => `${String(Math.floor(((m + 1440) % 1440) / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
+      return {
+        hour,
+        label: `${hhmm(hour * 60 - 30)}~${hhmm(hour * 60 + 30)}`,
+        zones: (byHour.get(hour) ?? []).sort((a, b) => b.score - a.score).slice(0, 3)
+          .map(z => ({ zone: z.zone, count: z.count, reason: `최근 4주 ${hour}시대 ${z.count}건` })),
+      };
+    });
+}
+
+// ---- 주간 손실 리포트 ----
+
+export interface WeeklyReport {
+  id: string;
+  weekStart: number;
+  weekEnd: number;
+  createdAt: number;
+  auto: boolean;
+  text: string;
+}
+
+/** 해당 시각이 속한 주의 월요일 00:00 */
+export function weekStartOf(t: number) {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+
+const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
+const diff = (cur: number, prev: number, unit = '') => {
+  if (!prev) return cur ? '(지난주 0)' : '';
+  const d = cur - prev;
+  return d === 0 ? '(지난주와 동일)' : `(지난주 대비 ${d > 0 ? '+' : ''}${d.toLocaleString()}${unit}, ${d > 0 ? '+' : ''}${pct(d, prev)}%)`;
+};
+const mins = (ms: number | null) => (ms === null ? '-' : ms < 60000 ? `${Math.round(ms / 1000)}초` : `${Math.round(ms / 60000)}분`);
+const fmtDate = (t: number) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`; };
+
+/** 점장 보고·사내 메신저에 붙여 넣을 수 있는 텍스트 리포트 */
+export function buildWeeklyReport(incidents: Incident[], patrols: PatrolLog[], weekStart: number, weekEnd: number, actions: string[]): string {
+  const cur = lossStats(incidents, weekStart, weekEnd);
+  const prev = lossStats(incidents, weekStart - 7 * DAY_MS, weekStart);
+  const closed = cur.confirmed + cur.falseAlarm;
+  const weekPatrols = patrols.filter(p => p.at >= weekStart && p.at < weekEnd);
+  const topHours = cur.byHour.map((n, h) => [h, n] as const).filter(([, n]) => n).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const lines = [
+    `[마트ON 주간 손실방지 리포트] ${fmtDate(weekStart)} ~ ${fmtDate(weekEnd - 1)}`,
+    '',
+    '■ 요약',
+    `- 보안 신고 ${cur.total}건 ${diff(cur.total, prev.total, '건')}`,
+    `- 손실 확인 ${cur.confirmed}건 / 추정 손실액 ${cur.loss.toLocaleString()}원 ${diff(cur.loss, prev.loss, '원')}`,
+    `- 오인 비율 ${closed ? pct(cur.falseAlarm, closed) : 0}% · 평균 확인 시간 ${mins(cur.avgAckMs)} · 미종결 ${cur.open}건`,
+    `- 순찰 완료 기록 ${weekPatrols.length}회`,
+    '',
+    '■ 다발 구역',
+    ...(cur.byZone.length ? cur.byZone.slice(0, 3).map(([z, n], k) => `${k + 1}. ${z} ${n}건`) : ['- 없음']),
+    '',
+    '■ 다발 시간대',
+    ...(topHours.length ? topHours.map(([h, n]) => `- ${h}시대 ${n}건`) : ['- 없음']),
+    '',
+    '■ 손실 상품',
+    ...(cur.byProduct.length ? cur.byProduct.slice(0, 5).map(([p, w]) => `- ${p} ${w.toLocaleString()}원`) : ['- 없음']),
+    '',
+    '■ 다음 주 조치 제안',
+    ...(actions.length ? actions.map(a => `- ${a}`) : ['- 특이사항 없음']),
+  ];
+  return lines.join('\n');
 }

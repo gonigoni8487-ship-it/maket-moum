@@ -106,6 +106,12 @@ export default function MartOnApp() {
       return;
     }
 
+    if (e.type === 'patrol') return setData(d => d && { ...d, patrols: upsert(d.patrols, e.patrol) });
+    if (e.type === 'report') {
+      setData(d => d && { ...d, reports: upsert(d.reports, e.report) });
+      if (e.report.auto) alert({ title: '주간 손실방지 리포트', body: '지난주 리포트가 도착했습니다. 보안 > 분석에서 확인하세요.', urgent: false, tag: `report-${e.report.id}`, prefs: p });
+      return;
+    }
     if (e.type === 'incident') {
       const i = e.incident;
       setData(d => d && { ...d, incidents: upsert(d.incidents, i) });
@@ -180,7 +186,7 @@ export default function MartOnApp() {
   if (loading) return <div className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">마트ON 연결 중…</div>;
   if (!data) return <div className="min-h-screen bg-slate-100"><Login onLogin={() => { setLoading(true); void load(); }} /></div>;
 
-  const { me, tasks, notices, products, promotions, incidents, online, aiEnabled } = data;
+  const { me, tasks, notices, products, promotions, incidents, patrols, reports, online, aiEnabled } = data;
   const openIncidents = incidents.filter(i => i.status !== '종결' && (canHandleIncident(me) || i.reportedBy.id === me.id || i.dept === me.dept)).length;
   const openForMe = tasks.filter(t => t.toDept === me.dept && t.status !== '완료').length;
   const unreadNotices = notices.filter(n => (n.scope === 'all' || n.scope === me.dept) && !n.readBy.includes(me.id)).length;
@@ -234,7 +240,7 @@ export default function MartOnApp() {
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}
         {tab === 'photo' && <PhotoAI aiEnabled={aiEnabled} onRequest={openRequest} onError={onError} onToast={showToast} />}
         {tab === 'notices' && <Notices notices={notices} me={me} onError={onError} />}
-        {tab === 'security' && <Security me={me} incidents={incidents} products={products} onError={onError} onToast={showToast} />}
+        {tab === 'security' && <Security me={me} incidents={incidents} patrols={patrols} reports={reports} products={products} onError={onError} onToast={showToast} />}
         {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} online={online} onError={onError} onToast={showToast} />}
       </main>
 

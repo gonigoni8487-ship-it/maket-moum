@@ -2,10 +2,11 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { ShieldAlert, Siren, MapPin, Video, ChevronDown, Sparkles, Radio } from 'lucide-react';
 import {
   INCIDENT_TYPES, INCIDENT_STATUSES, INCIDENT_OUTCOMES, SECURITY_ZONES, canHandleIncident, lossStats,
-  type Incident, type IncidentOutcome, type IncidentStatus, type IncidentType, type LossInsight, type Product, type Staff,
+  type Incident, type IncidentOutcome, type IncidentStatus, type IncidentType, type LossInsight, type PatrolLog, type Product, type Staff, type WeeklyReport,
 } from '../shared';
 import { api } from '../api';
 import { Chip, clock, cx, elapsed, Empty, inputCls, Section, won } from '../ui';
+import { PatrolPlan, Reports } from './Patrol';
 
 const STATUS_STYLE: Record<IncidentStatus, string> = {
   접수: 'bg-amber-100 text-amber-800',
@@ -233,7 +234,7 @@ function ColumnBars({ values, labels, every = 1, unit = '' }: { values: number[]
   );
 }
 
-function Analytics({ incidents, onError, onToast }: { incidents: Incident[]; onError: (m: string) => void; onToast: (m: string) => void }) {
+function Analytics({ incidents, reports, onError, onToast }: { incidents: Incident[]; reports: WeeklyReport[]; onError: (m: string) => void; onToast: (m: string) => void }) {
   const [days, setDays] = useState(30);
   const [insight, setInsight] = useState<LossInsight | null>(null);
   const [busy, setBusy] = useState(false);
@@ -287,6 +288,8 @@ function Analytics({ incidents, onError, onToast }: { incidents: Incident[]; onE
         )}
       </div>
 
+      <Reports reports={reports} onError={onError} onToast={onToast} />
+
       <Section title="구역별 신고"><div className="rounded-2xl bg-white p-4"><HBars rows={s.byZone.slice(0, 8)} /></div></Section>
       <Section title="시간대별 발생">
         <div className="rounded-2xl bg-white p-4"><ColumnBars values={s.byHour} labels={s.byHour.map((_, h) => String(h))} unit="시" every={3} /></div>
@@ -316,10 +319,10 @@ const GUIDE = [
   ['위험하면 물러서기', '흉기·폭력 우려가 있으면 고객과 직원 안전이 우선입니다. 즉시 관리자와 112에 연락합니다.'],
 ];
 
-type Sub = 'report' | 'list' | 'analytics' | 'guide';
+type Sub = 'report' | 'list' | 'patrol' | 'analytics' | 'guide';
 
-export default function Security({ me, incidents, products, onError, onToast }: {
-  me: Staff; incidents: Incident[]; products: Product[]; onError: (m: string) => void; onToast: (m: string) => void;
+export default function Security({ me, incidents, patrols, reports, products, onError, onToast }: {
+  me: Staff; incidents: Incident[]; patrols: PatrolLog[]; reports: WeeklyReport[]; products: Product[]; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   const handler = canHandleIncident(me);
   const [sub, setSub] = useState<Sub>(handler ? 'list' : 'report');
@@ -329,7 +332,13 @@ export default function Security({ me, incidents, products, onError, onToast }: 
   const open = visible.filter(i => i.status !== '종결').sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.createdAt - a.createdAt);
   const closed = visible.filter(i => i.status === '종결').sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 30);
 
-  const tabs: [Sub, string][] = [['report', '신고'], ['list', `현황${open.length ? ` ${open.length}` : ''}`], ...(me.role === 'manager' ? [['analytics', '분석'] as [Sub, string]] : []), ['guide', '대응 수칙']];
+  const tabs: [Sub, string][] = [
+    ['report', '신고'],
+    ['list', `현황${open.length ? ` ${open.length}` : ''}`],
+    ...(handler ? [['patrol', '순찰'] as [Sub, string]] : []),
+    ...(me.role === 'manager' ? [['analytics', '분석'] as [Sub, string]] : []),
+    ['guide', '수칙'],
+  ];
 
   return (
     <div className="space-y-4">
@@ -353,7 +362,8 @@ export default function Security({ me, incidents, products, onError, onToast }: 
         </div>
       )}
 
-      {sub === 'analytics' && me.role === 'manager' && <Analytics incidents={incidents} onError={onError} onToast={onToast} />}
+      {sub === 'patrol' && handler && <PatrolPlan incidents={incidents} patrols={patrols} onError={onError} />}
+      {sub === 'analytics' && me.role === 'manager' && <Analytics incidents={incidents} reports={reports} onError={onError} onToast={onToast} />}
 
       {sub === 'guide' && (
         <div className="space-y-2">

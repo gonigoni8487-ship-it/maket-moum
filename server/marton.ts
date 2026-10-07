@@ -7,7 +7,7 @@ import path from 'path';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS,
   type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
-  type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, canSeeIncident,
+  type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { registerSecurity } from './marton-security';
 
@@ -25,6 +25,8 @@ export interface Db {
   products: Product[];
   promotions: Promotion[];
   incidents: Incident[];
+  patrols: PatrolLog[];
+  reports: WeeklyReport[];
 }
 
 function loadDb(): Db {
@@ -32,9 +34,11 @@ function loadDb(): Db {
     const db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) as Db;
     db.promotions ??= [];
     db.incidents ??= [];
+    db.patrols ??= [];
+    db.reports ??= [];
     return db;
   } catch {
-    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [] };
+    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [] };
   }
 }
 
@@ -48,6 +52,8 @@ export function save() {
     db.tasks = db.tasks.filter(t => t.status !== '완료' || t.updatedAt > cutoff);
     const incidentCutoff = Date.now() - INCIDENT_RETENTION_MS;
     db.incidents = db.incidents.filter(i => i.status !== '종결' || i.updatedAt > incidentCutoff);
+    db.patrols = db.patrols.filter(p => p.at > Date.now() - 90 * 24 * 60 * 60 * 1000);
+    db.reports = db.reports.slice(-52);
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(db));
   }, 300);
@@ -186,6 +192,8 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       products: db.products,
       promotions: db.promotions,
       incidents: db.incidents.filter(i => canSeeIncident(me, i)),
+      patrols: canHandleIncident(me) ? db.patrols.filter(p => p.at > Date.now() - 14 * 24 * 60 * 60 * 1000) : [],
+      reports: me.role === 'manager' ? db.reports.slice(-12) : [],
       online: onlineCounts(),
       aiEnabled,
     });

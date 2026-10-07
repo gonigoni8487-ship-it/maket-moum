@@ -4,7 +4,8 @@ import type { GoogleGenAI } from '@google/genai';
 import { randomUUID, timingSafeEqual } from 'crypto';
 import {
   INCIDENT_TYPES, INCIDENT_STATUSES, INCIDENT_OUTCOMES, canSeeIncident, canHandleIncident, lossStats, zoneDept,
-  type Actor, type Incident, type IncidentStatus, type IncidentType, type LossInsight, type LossStats,
+  buildWeeklyReport, weekStartOf, dayKey,
+  type Actor, type Incident, type IncidentStatus, type IncidentType, type LossInsight, type LossStats, type PatrolLog, type WeeklyReport,
 } from '../src/marton/shared';
 import { db, save, broadcast, auth, managerOnly, actorOf, text, parseJson, type AuthedRequest } from './marton';
 
@@ -144,24 +145,75 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
   // 관리자: 손실 패턴 분석과 예방 조치 제안
   app.post(`${api}/ai/loss-insight`, auth, managerOnly, async (req, res) => {
     const days = Math.min(Math.max(Number(req.body.days) || 30, 1), 180);
-    const stats = lossStats(db.incidents, Date.now() - days * DAY);
-    const fallback = ruleInsight(stats);
-    if (!aiEnabled || !stats.total) return res.json(fallback);
-    try {
-      const response = await genAI.models.generateContent({
-        model: AI_MODEL,
-        contents: [{ parts: [{ text: `당신은 대형마트 손실방지(LP) 컨설턴트입니다. 아래는 최근 ${days}일간 매장 도난·의심 신고 집계입니다(개인 정보 없음).
+    res.json(await insight(genAI, aiEnabled, Date.now() - days * DAY, Date.now(), `최근 ${days}일`));
+  });
+
+  // 순찰 완료 기록 (보안·관리자)
+  app.post(`${api}/patrols`, auth, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    if (!canHandleIncident(me)) return res.status(403).json({ error: '보안(MS) 담당 또는 관리자만 기록할 수 있습니다.' });
+    const hour = Number(req.body.hour);
+    const zone = text(req.body.zone, 40);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !zone) return res.status(400).json({ error: '순찰 시간대와 구역을 확인해 주세요.' });
+    const now = Date.now();
+    const patrol: PatrolLog = { id: randomUUID().slice(0, 8), date: dayKey(now), hour, zone, by: actorOf(me), at: now, note: text(req.body.note, 200) || undefined };
+    db.patrols.push(patrol);
+    save();
+    broadcast({ type: 'patrol', patrol }, canHandleIncident);
+    res.json(patrol);
+  });
+
+  // 주간 리포트 수동 생성 (이번 주 진행분 또는 지난주)
+  app.post(`${api}/reports`, auth, managerOnly, async (req, res) => {
+    const thisWeek = weekStartOf(Date.now());
+    const start = req.body.week === 'last' ? weekStartOf(thisWeek - DAY) : thisWeek;
+    const end = req.body.week === 'last' ? thisWeek : Date.now();
+    res.json(await createReport(genAI, aiEnabled, start, end, false));
+  });
+
+  // 매주 월요일 08시 이후 지난주 리포트 자동 생성
+  const tick = () => {
+    const now = new Date();
+    const thisWeek = weekStartOf(now.getTime());
+    const lastWeek = weekStartOf(thisWeek - DAY);
+    if (now.getTime() < thisWeek + 8 * 60 * 60 * 1000) return;
+    if (db.reports.some(r => r.auto && r.weekStart === lastWeek)) return;
+    void createReport(genAI, aiEnabled, lastWeek, thisWeek, true).catch(e => console.error('MartON weekly report error:', e));
+  };
+  setInterval(tick, 10 * 60 * 1000).unref();
+  setTimeout(tick, 5000).unref();
+}
+
+async function insight(genAI: GoogleGenAI, aiEnabled: boolean, since: number, until: number, label: string): Promise<LossInsight> {
+  const stats = lossStats(db.incidents, since, until);
+  const fallback = ruleInsight(stats);
+  if (!aiEnabled || !stats.total) return fallback;
+  try {
+    const response = await genAI.models.generateContent({
+      model: AI_MODEL,
+      contents: [{ parts: [{ text: `당신은 대형마트 손실방지(LP) 컨설턴트입니다. 아래는 ${label} 매장 도난·의심 신고 집계입니다(개인 정보 없음).
 특정 고객층을 의심하거나 개인을 식별하는 조치는 제안하지 말고, 진열·동선·인력배치·응대·시스템 개선 중심으로 제안하세요.
 JSON으로만 답하세요: {"summary":"핵심 패턴 2~3문장","actions":["실행 가능한 조치 3~5개, 구역·시간·상품을 구체적으로"]}
 
 ${JSON.stringify(stats)}` }] }],
-        config: { responseMimeType: 'application/json' },
-      });
-      const raw = parseJson<{ summary?: string; actions?: string[] }>(response.text);
-      res.json({ summary: raw.summary || fallback.summary, actions: Array.isArray(raw.actions) ? raw.actions.slice(0, 6) : fallback.actions, source: 'ai' } satisfies LossInsight);
-    } catch (error) {
-      console.error('MartON loss insight error:', error);
-      res.json(fallback);
-    }
-  });
+      config: { responseMimeType: 'application/json' },
+    });
+    const raw = parseJson<{ summary?: string; actions?: string[] }>(response.text);
+    return { summary: raw.summary || fallback.summary, actions: Array.isArray(raw.actions) ? raw.actions.slice(0, 6) : fallback.actions, source: 'ai' };
+  } catch (error) {
+    console.error('MartON loss insight error:', error);
+    return fallback;
+  }
+}
+
+async function createReport(genAI: GoogleGenAI, aiEnabled: boolean, weekStart: number, weekEnd: number, auto: boolean) {
+  const { actions } = await insight(genAI, aiEnabled, weekStart, weekEnd, auto ? '지난 한 주' : '이번 주(진행 중)');
+  const report: WeeklyReport = {
+    id: randomUUID().slice(0, 8), weekStart, weekEnd, createdAt: Date.now(), auto,
+    text: buildWeeklyReport(db.incidents, db.patrols, weekStart, weekEnd, actions),
+  };
+  db.reports.push(report);
+  save();
+  broadcast({ type: 'report', report }, s => s.role === 'manager');
+  return report;
 }
