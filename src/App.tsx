@@ -6,8 +6,15 @@ import SellerCenter from './SellerCenter';
 import ApplyPage from './ApplyPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
+import MartOnApp from './marton/MartOnApp';
 
 const queryClient = new QueryClient();
+
+// 마트ON(직원용 앱)은 마켓모움 내비게이션/푸터 없이 단독 화면으로 렌더링
+function MartOnSwitch({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  return pathname === '/marton' || pathname.startsWith('/marton/') ? <MartOnApp /> : <>{children}</>;
+}
 
 function LocationProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
@@ -66,6 +73,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
+        <MartOnSwitch>
         <div className={`min-h-screen bg-background text-foreground font-sans selection:bg-brand-terracotta selection:text-white theme-${theme} transition-colors duration-500`}>
           <Navbar theme={theme} toggleTheme={toggleTheme} />
           <LocationProvider>
@@ -127,6 +135,7 @@ export default function App() {
             </div>
           </footer>
         </div>
+        </MartOnSwitch>
       </Router>
     </QueryClientProvider>
   );
