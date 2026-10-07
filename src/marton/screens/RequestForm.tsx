@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Siren, Send } from 'lucide-react';
+import { Siren, Send, Mic } from 'lucide-react';
 import { DEPARTMENTS, TASK_CATEGORIES, type Department, type Staff, type Task, type TaskCategory } from '../shared';
 import { api } from '../api';
 import { Chip, cx, inputCls, primaryBtn, type Draft } from '../ui';
@@ -14,7 +14,7 @@ const QUICK: { label: string; draft: Draft }[] = [
   { label: '📦 재고/보충', draft: { category: '재고/보충', title: '상품 보충 요청' } },
 ];
 
-export default function RequestForm({ me, draft, onSent, onError }: { me: Staff; draft: Draft | null; onSent: (t: Task) => void; onError: (m: string) => void }) {
+export default function RequestForm({ me, draft, onSent, onError, onVoice }: { me: Staff; draft: Draft | null; onSent: (t: Task) => void; onError: (m: string) => void; onVoice: () => void }) {
   const [toDept, setToDept] = useState<Department | ''>('');
   const [category, setCategory] = useState<TaskCategory | ''>('');
   const [title, setTitle] = useState('');
@@ -49,6 +49,10 @@ export default function RequestForm({ me, draft, onSent, onError }: { me: Staff;
 
   return (
     <form onSubmit={submit} className="space-y-5">
+      <button type="button" onClick={onVoice} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 py-4 text-[16px] font-black text-white active:bg-red-700">
+        <Mic className="size-5" />말로 요청하기
+      </button>
+
       <div className="grid grid-cols-2 gap-2">
         {QUICK.map(q => (
           <button key={q.label} type="button" onClick={() => apply(q.draft)} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-800 active:bg-slate-100">

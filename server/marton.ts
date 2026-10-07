@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import {
-  DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS,
+  DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, type TaskCategory,
   type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
@@ -337,6 +337,33 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     } catch (error) {
       console.error('MartON ask error:', error);
       res.json(fallback());
+    }
+  });
+
+  // 음성 요청 해석 보완: 기기 규칙으로 부서/유형을 못 찾은 문장만 AI로 해석
+  app.post(`${api}/ai/parse-request`, auth, async (req, res) => {
+    const said = text(req.body.text, 300);
+    if (!said) return res.status(400).json({ error: '문장이 비어 있습니다.' });
+    if (!aiEnabled) return res.json({});
+    try {
+      const response = await genAI.models.generateContent({
+        model: AI_MODEL,
+        contents: [{ parts: [{ text: `대형마트 직원이 말로 한 업무요청을 해석하세요. 받는 부서는 ${DEPARTMENTS.join(', ')} 중 하나, 유형은 ${TASK_CATEGORIES.join(', ')} 중 하나입니다. 모르면 null.
+JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 내 위치"|null,"urgent":true|false}
+
+문장: ${said}` }] }],
+        config: { responseMimeType: 'application/json' },
+      });
+      const raw = parseJson<{ toDept?: string; category?: string; location?: string; urgent?: boolean }>(response.text);
+      res.json({
+        toDept: isDept(raw.toDept) ? raw.toDept : undefined,
+        category: TASK_CATEGORIES.includes(raw.category as TaskCategory) ? raw.category : undefined,
+        location: text(raw.location, 60) || undefined,
+        urgent: raw.urgent === true,
+      });
+    } catch (error) {
+      console.error('MartON parse-request error:', error);
+      res.json({});
     }
   });
 

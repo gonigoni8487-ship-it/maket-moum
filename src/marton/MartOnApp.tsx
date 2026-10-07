@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert } from 'lucide-react';
+import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic } from 'lucide-react';
 import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
 import { alert, loadPrefs, registerServiceWorker, savePrefs, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
@@ -13,6 +13,7 @@ import PhotoAI from './screens/PhotoAI';
 import Notices from './screens/Notices';
 import Manager from './screens/Manager';
 import Security from './screens/Security';
+import VoiceRequest from './screens/VoiceRequest';
 
 type Tab = 'tasks' | 'request' | 'find' | 'photo' | 'notices' | 'security' | 'manager';
 type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice } | { kind: 'incident'; incident: Incident };
@@ -53,6 +54,7 @@ export default function MartOnApp() {
   const [prefs, setPrefs] = useState<AlertPrefs>(loadPrefs);
   const [showSettings, setShowSettings] = useState(false);
   const [push, setPush] = useState<PushState>('off');
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   const meRef = useRef<Staff | null>(null);
   const dataRef = useRef(data);
@@ -236,6 +238,7 @@ export default function MartOnApp() {
             <div className="font-bold">{me.name} {me.title ?? ''}</div>
             <div className="text-blue-200">{me.dept} · {me.duty}</div>
           </div>
+          <button onClick={() => { unlockAudio(); setVoiceOpen(true); }} aria-label="말로 요청하기" className="rounded-full bg-red-500 p-2 active:bg-red-600"><Mic className="size-5" /></button>
           <button onClick={() => setShowSettings(s => !s)} aria-label="설정" className="rounded-lg p-1.5 active:bg-blue-800"><Settings className="size-5" /></button>
         </div>
         {!connected && <div className="bg-red-500 py-1 text-center text-xs font-semibold">실시간 연결이 끊겼습니다. 재연결 중…</div>}
@@ -274,7 +277,7 @@ export default function MartOnApp() {
           <div className="mb-4 rounded-2xl bg-amber-50 p-3 text-[13px] text-amber-900">아이폰은 Safari 공유 버튼 → <b>홈 화면에 추가</b> 후, 홈 화면의 마트ON에서 열어야 푸시 알림을 받을 수 있습니다.</div>
         )}
         {tab === 'tasks' && <TaskBoard tasks={tasks} me={me} onError={onError} />}
-        {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onSent={t => { showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
+        {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onVoice={() => setVoiceOpen(true)} onSent={t => { showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}
         {tab === 'photo' && <PhotoAI aiEnabled={aiEnabled} onRequest={openRequest} onError={onError} onToast={showToast} />}
         {tab === 'notices' && <Notices notices={notices} me={me} onError={onError} />}
@@ -297,6 +300,18 @@ export default function MartOnApp() {
         <div className={cx('fixed inset-x-4 bottom-20 z-30 mx-auto max-w-md rounded-xl px-4 py-3 text-center text-sm font-semibold text-white shadow-lg', toast.error ? 'bg-red-600' : 'bg-slate-900')}>
           {toast.msg}
         </div>
+      )}
+
+      {voiceOpen && (
+        <VoiceRequest
+          products={products}
+          aiEnabled={aiEnabled}
+          voice={prefs.voice}
+          onClose={() => setVoiceOpen(false)}
+          onError={onError}
+          onSent={t => { setVoiceOpen(false); showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }}
+          onEdit={d => { setVoiceOpen(false); openRequest(d); }}
+        />
       )}
 
       {urgent && (

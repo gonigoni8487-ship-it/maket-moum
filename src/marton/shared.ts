@@ -401,3 +401,89 @@ export function buildWeeklyReport(incidents: Incident[], patrols: PatrolLog[], w
   ];
   return lines.join('\n');
 }
+
+// ---- 음성 요청 ("수산에 고객응대 요청해줘, 고객센터 앞, 급해") ----
+
+export interface ParsedRequest {
+  toDept?: Department;
+  category?: TaskCategory;
+  location?: string;
+  urgent: boolean;
+  product?: Product;
+  title: string;
+  detail: string;
+  complete: boolean; // 부서와 유형을 모두 알아냈는지
+}
+
+const DEPT_WORDS: [Department, string[]][] = [
+  ['수산', ['수산', '생선', '회코너', '횟감', '활어', '수산코너']],
+  ['축산', ['축산', '정육', '고기', '한우', '돼지고기', '정육코너']],
+  ['농산', ['농산', '과일', '채소', '야채', '청과']],
+  ['가공', ['가공', '공산', '가공식품', '음료', '주류', '라면']],
+  ['생활문화', ['생활문화', '생활용품', '생활', '주방용품', '가전', '문구', '완구']],
+  ['MS', ['MS', '엠에스', '보안', '시설', '매장관리', '주차']],
+  ['고객센터', ['고객센터', '안내데스크', '안내 데스크', '고객만족센터']],
+];
+
+const CATEGORY_WORDS: [TaskCategory, string[]][] = [
+  ['가격 오류', ['가격 오류', '가격오류', '가격표', '가격이 틀', '가격 틀', '가격이 달', '금액이 틀', '금액이 달', '가격 확인']],
+  ['행사상품 확인', ['행사', '1+1', '원플러스원', '할인', '증정', '세일']],
+  ['재고/보충', ['재고', '보충', '품절', '비었', '비어', '채워', '진열 부족', '물건 없']],
+  ['상품 위치 확인', ['어디', '위치', '찾아', '못 찾', '못찾']],
+  ['고객응대 요청', ['응대', '손님', '고객님', '고객 문의', '문의', '와 주', '와주', '불러', '와줘', '와달', '도와']],
+];
+
+const URGENT_WORDS = ['긴급', '급해', '급한', '급히', '빨리', '당장', '지금 바로', '바로 와', '시급'];
+const LOCATION_RE = new RegExp([
+  '\\d+\\s*번\\s*(?:계산대|통로|매대|코너|게이트|출입구)',
+  '(?:셀프\\s*)?계산대\\s*\\d+\\s*번',
+  // 부서 이름이기도 한 장소는 "앞/옆/쪽/근처"가 붙을 때만 위치로 본다
+  '(?:고객센터|안내데스크)\\s*(?:앞|옆|쪽|근처)',
+  '(?:입구|출입구|정문|후문|엘리베이터|에스컬레이터|무빙워크|주차장|카트\\s*보관소|[가-힣]+코너)\\s*(?:앞|옆|쪽|근처)?',
+].map(p => `(?:${p})`).join('|'));
+
+const squash = (s: string) => s.replace(/\s+/g, '');
+
+/** 말한 문장을 업무요청으로 해석한다 (규칙 기반, 기기 안에서 즉시 동작) */
+export function parseRequestText(input: string, products: Product[] = []): ParsedRequest {
+  const text = input.trim();
+  let rest = text;
+
+  // 위치를 먼저 떼어낸다 ("고객센터 앞"의 고객센터를 받는 부서로 오인하지 않도록)
+  const loc = LOCATION_RE.exec(rest);
+  const location = loc ? loc[0].replace(/\s+/g, ' ').trim() : undefined;
+  if (loc) rest = rest.replace(loc[0], ' ');
+
+  // "수산에", "정육으로", "축산팀" 처럼 조사가 붙은 부서를 우선
+  let toDept: Department | undefined;
+  let firstAt = Infinity;
+  for (const [dept, words] of DEPT_WORDS) {
+    for (const w of words) {
+      const m = new RegExp(`${w}\\s*(에게|에|으로|로|팀|파트|쪽)`).exec(rest);
+      if (m && m.index < firstAt) { firstAt = m.index; toDept = dept; }
+    }
+  }
+  if (!toDept) {
+    for (const [dept, words] of DEPT_WORDS) {
+      for (const w of words) {
+        const i = rest.indexOf(w);
+        if (i >= 0 && i < firstAt) { firstAt = i; toDept = dept; }
+      }
+    }
+  }
+
+  let category: TaskCategory | undefined;
+  for (const [c, words] of CATEGORY_WORDS) {
+    if (words.some(w => squash(rest).includes(squash(w)))) { category = c; break; }
+  }
+
+  // 상품명이 나오면 해당 부서를 추정
+  const flat = squash(text).toLowerCase();
+  const product = products.find(p => [p.name, ...p.aliases].some(n => n.length >= 2 && flat.includes(squash(n).toLowerCase())));
+  if (!toDept && product) toDept = product.dept;
+  if (!category && toDept) category = product ? '상품 위치 확인' : '고객응대 요청';
+
+  const urgent = URGENT_WORDS.some(w => squash(text).includes(squash(w)));
+  const title = [toDept, product?.name, category].filter(Boolean).join(' ') || text.slice(0, 40);
+  return { toDept, category, location, urgent, product, title: title.slice(0, 60), detail: `🎤 "${text}"`, complete: Boolean(toDept && category) };
+}
