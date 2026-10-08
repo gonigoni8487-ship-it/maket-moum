@@ -1,16 +1,16 @@
 // 마트ON 보안/손실방지: 직원 신고, 센서·CCTV 연동 경보, 대응 기록, 손실 분석
-import type { Express, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import type { GoogleGenAI } from '@google/genai';
-import { randomUUID, timingSafeEqual } from 'crypto';
 import {
   INCIDENT_TYPES, INCIDENT_STATUSES, INCIDENT_OUTCOMES, canSeeIncident, canHandleIncident, lossStats, zoneDept,
   buildWeeklyReport, weekStartOf, dayKey,
   type Actor, type Incident, type IncidentStatus, type IncidentType, type LossInsight, type LossStats, type PatrolLog, type WeeklyReport,
 } from '../src/marton/shared';
-import { db, save, broadcast, auth, managerOnly, actorOf, text, parseJson, type AuthedRequest } from './marton';
+import { db, save, broadcast, auth, managerOnly, actorOf, text, parseJson, newId, type AuthedRequest, type RouteApp } from './marton';
+import { platform, onJob } from './platform';
 
 const AI_MODEL = 'gemini-3.5-flash';
-const INTEGRATION_KEY = process.env.MARTON_INTEGRATION_KEY || '';
+const integrationKey = () => platform().env('MARTON_INTEGRATION_KEY') || '';
 const DAY = 24 * 60 * 60 * 1000;
 
 function publish(incident: Incident, action: 'created' | 'updated') {
@@ -27,7 +27,7 @@ function createIncident(input: {
   const quantity = input.quantity && input.quantity > 0 ? Math.min(input.quantity, 999) : undefined;
   const unitPrice = input.unitPrice && input.unitPrice > 0 ? input.unitPrice : undefined;
   const incident: Incident = {
-    id: randomUUID().slice(0, 8),
+    id: newId().slice(0, 8),
     ...input,
     quantity,
     unitPrice,
@@ -45,11 +45,13 @@ function createIncident(input: {
   return incident;
 }
 
+/** 연동 키 비교 (길이가 같으면 끝까지 비교해 시간 차이로 키를 추측하지 못하게) */
 function keyMatches(given: string | undefined) {
-  if (!INTEGRATION_KEY || !given) return false;
-  const a = Buffer.from(given);
-  const b = Buffer.from(INTEGRATION_KEY);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const key = integrationKey();
+  if (!key || !given || given.length !== key.length) return false;
+  let diff = 0;
+  for (let i = 0; i < key.length; i++) diff |= key.charCodeAt(i) ^ given.charCodeAt(i);
+  return diff === 0;
 }
 
 function ruleInsight(s: LossStats): LossInsight {
@@ -67,7 +69,7 @@ function ruleInsight(s: LossStats): LossInsight {
   };
 }
 
-export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: boolean) {
+export function registerSecurity(app: RouteApp, genAI: GoogleGenAI, aiEnabled: boolean) {
   const api = '/api/marton';
 
   // 직원 현장 신고
@@ -122,7 +124,7 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
   // POST /api/marton/integrations/alerts  헤더 X-MartON-Key: <MARTON_INTEGRATION_KEY>
   // { "sensorId": "EAS-1", "zone": "출입구/EAS 게이트", "message": "EAS 태그 감지", "productName"?: "...", "urgent"?: true }
   app.post(`${api}/integrations/alerts`, (req: Request, res: Response) => {
-    if (!INTEGRATION_KEY) return res.status(503).json({ error: 'MARTON_INTEGRATION_KEY가 설정되지 않아 연동이 비활성화되어 있습니다.' });
+    if (!integrationKey()) return res.status(503).json({ error: 'MARTON_INTEGRATION_KEY가 설정되지 않아 연동이 비활성화되어 있습니다.' });
     if (!keyMatches(req.header('x-marton-key'))) return res.status(401).json({ error: 'invalid key' });
     const sensorId = text(req.body.sensorId, 40);
     const zone = text(req.body.zone, 40);
@@ -166,7 +168,7 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
     // 오프라인에서 기록한 순찰은 실제 순찰 시각(최근 12시간 이내)을 쓴다
     const sentAt = Number(req.body.at);
     const now = sentAt > Date.now() - 12 * 60 * 60 * 1000 && sentAt <= Date.now() ? sentAt : Date.now();
-    const patrol: PatrolLog = { id: clientId || randomUUID().slice(0, 8), date: dayKey(now), hour, zone, by: actorOf(me), at: now, note: text(req.body.note, 200) || undefined };
+    const patrol: PatrolLog = { id: clientId || newId().slice(0, 8), date: dayKey(now), hour, zone, by: actorOf(me), at: now, note: text(req.body.note, 200) || undefined };
     db.patrols.push(patrol);
     save();
     broadcast({ type: 'patrol', patrol }, canHandleIncident);
@@ -190,8 +192,12 @@ export function registerSecurity(app: Express, genAI: GoogleGenAI, aiEnabled: bo
     if (db.reports.some(r => r.auto && r.weekStart === lastWeek)) return;
     void createReport(genAI, aiEnabled, lastWeek, thisWeek, true).catch(e => console.error('MartON weekly report error:', e));
   };
-  setInterval(tick, 10 * 60 * 1000).unref();
-  setTimeout(tick, 5000).unref();
+  // 서버가 잠들어도(Cloudflare) 돌도록 예약 작업으로 10분마다 확인. key가 같으면 기존 예약을 바꾼다
+  onJob('weekly-tick', async () => {
+    tick();
+    await platform().schedule({ at: Date.now() + 10 * 60 * 1000, type: 'weekly-tick', key: 'weekly-tick' });
+  });
+  void platform().schedule({ at: Date.now() + 5000, type: 'weekly-tick', key: 'weekly-tick' });
 }
 
 async function insight(genAI: GoogleGenAI, aiEnabled: boolean, since: number, until: number, label: string): Promise<LossInsight> {
@@ -219,7 +225,7 @@ ${JSON.stringify(stats)}` }] }],
 async function createReport(genAI: GoogleGenAI, aiEnabled: boolean, weekStart: number, weekEnd: number, auto: boolean) {
   const { actions } = await insight(genAI, aiEnabled, weekStart, weekEnd, auto ? '지난 한 주' : '이번 주(진행 중)');
   const report: WeeklyReport = {
-    id: randomUUID().slice(0, 8), weekStart, weekEnd, createdAt: Date.now(), auto,
+    id: newId().slice(0, 8), weekStart, weekEnd, createdAt: Date.now(), auto,
     text: buildWeeklyReport(db.incidents, db.patrols, weekStart, weekEnd, actions),
   };
   db.reports.push(report);

@@ -1,8 +1,8 @@
 // 마트ON 웹 푸시: 앱이 닫혀 있거나 화면이 꺼져 있어도 업무요청·공지·보안 경보를 받는다.
-import type { Express } from 'express';
-import webpush from 'web-push';
 import { canHandleIncident, type Staff, type StreamEvent } from '../src/marton/shared';
-import { db, save, auth, text, type AuthedRequest } from './marton';
+import { db, save, auth, text, type AuthedRequest, type RouteApp } from './marton';
+import { platform, onJob } from './platform';
+import { generateVapidKeys, sendWebPush, type VapidKeys } from './webpush';
 
 export interface PushSub {
   endpoint: string;
@@ -21,53 +21,80 @@ interface PushMessage {
 const REPEAT_MS = 60 * 1000; // 긴급 미확인 시 재알림 간격
 const REPEAT_TIMES = 3;
 
-let ready = false;
+let vapidPromise: Promise<VapidKeys> | null = null;
 
-/** VAPID 키: 환경변수 우선, 없으면 최초 실행 시 생성해 데이터 파일에 보관 */
-function initVapid() {
-  let publicKey = process.env.MARTON_VAPID_PUBLIC_KEY;
-  let privateKey = process.env.MARTON_VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) {
-    db.vapid ??= webpush.generateVAPIDKeys();
-    save();
-    ({ publicKey, privateKey } = db.vapid);
-  }
-  webpush.setVapidDetails(process.env.MARTON_VAPID_SUBJECT || 'mailto:marton@example.com', publicKey, privateKey);
-  ready = true;
-  return publicKey;
+/** VAPID 키: 환경변수 우선, 없으면 처음 쓸 때 생성해 데이터에 보관 */
+function vapidKeys(): Promise<VapidKeys> {
+  vapidPromise ??= (async () => {
+    const publicKey = platform().env('MARTON_VAPID_PUBLIC_KEY');
+    const privateKey = platform().env('MARTON_VAPID_PRIVATE_KEY');
+    if (publicKey && privateKey) return { publicKey, privateKey };
+    if (!db.vapid) {
+      db.vapid = await generateVapidKeys();
+      save();
+    }
+    return db.vapid;
+  })();
+  return vapidPromise;
 }
 
 async function sendTo(who: (s: Staff) => boolean, msg: PushMessage) {
-  if (!ready) return;
   const targets = db.pushSubs.filter(sub => {
     const staff = db.staff[sub.staffId];
     return staff && who(staff);
   });
+  if (!targets.length) return;
+  const vapid = { ...(await vapidKeys()), subject: platform().env('MARTON_VAPID_SUBJECT') || 'mailto:marton@example.com' };
   const payload = JSON.stringify({ ...msg, url: '/marton/' });
+  const opts = { ttl: msg.urgent ? 600 : 3600, urgency: msg.urgent ? 'high' : 'normal', topic: msg.tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) } as const;
   await Promise.all(targets.map(async sub => {
     try {
-      await webpush.sendNotification(sub, payload, { TTL: msg.urgent ? 600 : 3600, urgency: msg.urgent ? 'high' : 'normal', topic: msg.tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) });
-    } catch (e) {
-      const status = (e as { statusCode?: number }).statusCode;
+      const status = await sendWebPush(sub, payload, opts, vapid);
       if (status === 404 || status === 410) {
         db.pushSubs = db.pushSubs.filter(s => s.endpoint !== sub.endpoint); // 만료된 구독 정리
         save();
-      } else {
-        console.error('MartON push error:', status ?? e);
+      } else if (status >= 400) {
+        console.error('MartON push rejected:', status, new URL(sub.endpoint).host);
       }
+    } catch (e) {
+      console.error('MartON push error:', e);
     }
   }));
 }
 
-/** 아무도 확인하지 않으면 긴급 알림을 1분 간격으로 다시 보낸다 */
-function repeatUntilAcknowledged(isPending: () => boolean, who: (s: Staff) => boolean, msg: PushMessage, round = 1) {
-  if (round > REPEAT_TIMES) return;
-  setTimeout(() => {
-    if (!isPending()) return;
-    void sendTo(who, { ...msg, title: `[재알림 ${round}] ${msg.title}` });
-    repeatUntilAcknowledged(isPending, who, msg, round + 1);
-  }, REPEAT_MS).unref();
+// ---- 긴급 재알림: 아무도 확인하지 않으면 1분 간격으로 다시 보낸다 ----
+// 서버가 잠들거나 재시작해도 실행되도록 예약 작업으로 처리하고, 실행 시점의 상태로 대상과 문구를 다시 만든다.
+type RepeatJob = { kind: 'task' | 'incident'; id: string; round: number };
+
+function urgentTaskPush(id: string) {
+  const t = db.tasks.find(x => x.id === id);
+  if (!t || t.status !== '접수') return null;
+  return {
+    who: (s: Staff) => s.id !== t.createdBy.id && s.dept === t.toDept,
+    msg: { title: `🚨 긴급 ${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: true, tag: `task-${t.id}` },
+  };
 }
+
+function urgentIncidentPush(id: string) {
+  const i = db.incidents.find(x => x.id === id);
+  if (!i || i.status !== '접수') return null;
+  return {
+    who: (s: Staff) => canHandleIncident(s) && s.id !== i.reportedBy.id,
+    msg: { title: `🚨 보안 ${i.type}`, body: `${i.zone}${i.productName ? ` · ${i.productName}` : ''}`, urgent: true, tag: `incident-${i.id}` },
+  };
+}
+
+function scheduleRepeat(job: RepeatJob) {
+  if (job.round > REPEAT_TIMES) return;
+  void platform().schedule({ at: Date.now() + REPEAT_MS, type: 'push-repeat', data: job });
+}
+
+onJob('push-repeat', async (job: RepeatJob) => {
+  const target = job.kind === 'task' ? urgentTaskPush(job.id) : urgentIncidentPush(job.id);
+  if (!target) return; // 이미 확인됨
+  await sendTo(target.who, { ...target.msg, title: `[재알림 ${job.round}] ${target.msg.title}` });
+  scheduleRepeat({ ...job, round: job.round + 1 });
+});
 
 /** 실시간 이벤트 → 푸시 대상과 문구 (화면 알림 규칙과 동일) */
 export function pushFor(event: StreamEvent) {
@@ -77,7 +104,7 @@ export function pushFor(event: StreamEvent) {
       const who = (s: Staff) => s.id !== t.createdBy.id && (s.dept === t.toDept || (t.urgent && s.role === 'manager'));
       const msg = { title: `${t.urgent ? '🚨 긴급 ' : ''}${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}` };
       void sendTo(who, msg);
-      if (t.urgent) repeatUntilAcknowledged(() => db.tasks.find(x => x.id === t.id)?.status === '접수', s => who(s) && s.dept === t.toDept, msg);
+      if (t.urgent) scheduleRepeat({ kind: 'task', id: t.id, round: 1 });
     } else {
       const last = t.history[t.history.length - 1];
       if (last.by.id !== t.createdBy.id) {
@@ -96,7 +123,7 @@ export function pushFor(event: StreamEvent) {
       const msg = { title: `${i.urgent ? '🚨 ' : ''}보안 ${i.type}`, body: where, urgent: i.urgent, tag: `incident-${i.id}` };
       void sendTo(handlers, msg);
       void sendTo(s => !canHandleIncident(s) && s.dept === i.dept && s.id !== i.reportedBy.id, { title: `보안 ${i.type}`, body: `${where} — 주변 고객 응대로 확인 부탁드립니다`, urgent: false, tag: `incident-${i.id}` });
-      if (i.urgent) repeatUntilAcknowledged(() => db.incidents.find(x => x.id === i.id)?.status === '접수', handlers, msg);
+      if (i.urgent) scheduleRepeat({ kind: 'incident', id: i.id, round: 1 });
     } else {
       const last = i.history[i.history.length - 1];
       if (last.by.id !== i.reportedBy.id) {
@@ -113,11 +140,10 @@ export function pushFor(event: StreamEvent) {
   }
 }
 
-export function registerPush(app: Express) {
+export function registerPush(app: RouteApp) {
   const api = '/api/marton/push';
-  const publicKey = initVapid();
 
-  app.get(`${api}/key`, (_req, res) => res.json({ publicKey }));
+  app.get(`${api}/key`, async (_req, res) => res.json({ publicKey: (await vapidKeys()).publicKey }));
 
   app.post(`${api}/subscribe`, auth, (req, res) => {
     const me = (req as AuthedRequest).staff;

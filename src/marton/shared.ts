@@ -243,6 +243,19 @@ export interface LossInsight {
   source: 'ai' | 'rules';
 }
 
+// ---- 매장 시간대 ----
+// 서버가 UTC(클라우드)에서 돌아도 날짜·요일·시간대 계산은 매장 기준(한국 UTC+9, 서머타임 없음)으로 한다.
+let storeOffsetMin = 540;
+export function setStoreUtcOffset(minutes: number) {
+  if (Number.isFinite(minutes)) storeOffsetMin = minutes;
+}
+
+/** 매장 기준 연·월·일·요일·시 */
+export function storeTime(t: number) {
+  const d = new Date(t + storeOffsetMin * 60000);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, date: d.getUTCDate(), day: d.getUTCDay(), hour: d.getUTCHours() };
+}
+
 export interface LossStats {
   total: number;
   confirmed: number;
@@ -271,7 +284,7 @@ export function lossStats(incidents: Incident[], since: number, until = Infinity
   const acks = list.map(i => (i.history.find(h => h.status === '확인')?.at ?? 0) - i.createdAt).filter(x => x > 0);
   const byHour = Array(24).fill(0);
   const byWeekday = Array(7).fill(0);
-  list.forEach(i => { const d = new Date(i.occurredAt); byHour[d.getHours()]++; byWeekday[d.getDay()]++; });
+  list.forEach(i => { const d = storeTime(i.occurredAt); byHour[d.hour]++; byWeekday[d.day]++; });
   const productLoss = new Map<string, number>();
   lossList.forEach(i => i.productName && productLoss.set(i.productName, (productLoss.get(i.productName) || 0) + i.estimatedLoss));
   return {
@@ -308,8 +321,8 @@ export interface PatrolSlot {
 }
 
 export const dayKey = (t: number) => {
-  const d = new Date(t);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const d = storeTime(t);
+  return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.date).padStart(2, '0')}`;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -320,14 +333,14 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
  * 같은 요일·실제 손실 건에 가중치를 주고, 피크 30분 전부터 순찰하도록 잡는다.
  */
 export function patrolPlan(incidents: Incident[], now = Date.now(), maxSlots = 4): PatrolSlot[] {
-  const today = new Date(now).getDay();
+  const today = storeTime(now).day;
   const score = new Map<string, { hour: number; zone: string; score: number; count: number }>();
   for (const i of incidents) {
     if (i.test || i.occurredAt < now - 28 * DAY_MS || i.occurredAt > now) continue;
-    const d = new Date(i.occurredAt);
-    const key = `${d.getHours()}|${i.zone}`;
-    const w = 1 + (d.getDay() === today ? 1 : 0) + (i.outcome && LOSS_OUTCOMES.includes(i.outcome) ? 1 : 0) - (i.outcome === '오인/정상 구매' ? 0.5 : 0);
-    const cur = score.get(key) ?? { hour: d.getHours(), zone: i.zone, score: 0, count: 0 };
+    const d = storeTime(i.occurredAt);
+    const key = `${d.hour}|${i.zone}`;
+    const w = 1 + (d.day === today ? 1 : 0) + (i.outcome && LOSS_OUTCOMES.includes(i.outcome) ? 1 : 0) - (i.outcome === '오인/정상 구매' ? 0.5 : 0);
+    const cur = score.get(key) ?? { hour: d.hour, zone: i.zone, score: 0, count: 0 };
     cur.score += w;
     cur.count += 1;
     score.set(key, cur);
@@ -364,10 +377,9 @@ export interface WeeklyReport {
 
 /** 해당 시각이 속한 주의 월요일 00:00 */
 export function weekStartOf(t: number) {
-  const d = new Date(t);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.getTime();
+  const d = storeTime(t);
+  const midnight = Date.UTC(d.year, d.month - 1, d.date) - storeOffsetMin * 60000;
+  return midnight - ((d.day + 6) % 7) * DAY_MS;
 }
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -377,7 +389,7 @@ const diff = (cur: number, prev: number, unit = '') => {
   return d === 0 ? '(지난주와 동일)' : `(지난주 대비 ${d > 0 ? '+' : ''}${d.toLocaleString()}${unit}, ${d > 0 ? '+' : ''}${pct(d, prev)}%)`;
 };
 const mins = (ms: number | null) => (ms === null ? '-' : ms < 60000 ? `${Math.round(ms / 1000)}초` : `${Math.round(ms / 60000)}분`);
-const fmtDate = (t: number) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`; };
+const fmtDate = (t: number) => { const d = storeTime(t); return `${d.month}/${d.date}(${WEEKDAYS[d.day]})`; };
 
 /** 점장 보고·사내 메신저에 붙여 넣을 수 있는 텍스트 리포트 */
 export function buildWeeklyReport(incidents: Incident[], patrols: PatrolLog[], weekStart: number, weekEnd: number, actions: string[]): string {

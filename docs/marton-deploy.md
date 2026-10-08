@@ -6,13 +6,37 @@
 ① 서버 배포 (HTTPS 주소 생성)  →  ② 직원 휴대폰 설치 (QR)  →  ③ (선택) 플레이스토어·앱스토어 포장
 ```
 
-> Cloudflare Workers 설정(`wrangler.toml`)은 화면 파일만 올리는 방식이라 마트ON의 로그인·실시간 알림·저장이 동작하지 않습니다. 아래 방법으로 서버째 배포하세요.
-
 ---
 
 ## ① 서버 배포
 
-### 방법 A. Render 원클릭 (추천, 약 10분)
+### 방법 0. Cloudflare (지금 연결된 방식, 자동 배포)
+
+이 저장소는 Cloudflare Workers에 연결되어 있어 **`main`에 합치면 자동으로 배포**됩니다. 마트ON 서버는 Cloudflare **Durable Object** 하나에서 돌아갑니다 (데이터·사진은 Cloudflare 저장소, 실시간 알림, 긴급 재알림·주간 리포트는 Cloudflare 알람).
+
+처음 한 번만, Cloudflare 계정 주인이 비밀값을 넣어 주세요.
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** → 마트ON으로 쓸 Worker(예: `maket-moum`) 선택
+2. **Settings → Variables and Secrets → Add** 에서 종류를 **Secret**으로 하고 아래 값을 추가
+
+   | 이름 | 필수 | 예시 / 설명 |
+   | --- | --- | --- |
+   | `MARTON_MANAGER_PIN` | 필수 | 6자리 이상. 없으면 점장 로그인이 막힙니다 |
+   | `MARTON_STORE_CODE` | 권장 | 매장 공용 접속 코드 (외부인 차단) |
+   | `MARTON_VAPID_SUBJECT` | 권장 | `mailto:담당자@회사메일` (푸시 발신자) |
+   | `GEMINI_API_KEY` | 선택 | 사진 AI·AI 답변 |
+   | `MARTON_INTEGRATION_KEY` | 선택 | 센서·CCTV 경보 웹훅 키 |
+   | `MARTON_HOME_REDIRECT` | 선택 | `1`이면 주소 첫 화면에서 바로 마트ON으로 이동 |
+
+   (터미널을 쓴다면 `npx wrangler secret put MARTON_MANAGER_PIN` 도 같습니다)
+3. 저장하면 다시 배포됩니다. `https://<worker 주소>/marton/` 로 접속해 점장 로그인 → **직원 초대 QR**.
+
+- 이 저장소에 연결된 Worker가 여러 개면(`maket-moum`, `maket-moum1`, `maket-moum3` 등) **각각 별도 매장 데이터**를 가집니다. 마트ON용으로 하나를 정해 그 Worker에만 비밀값을 넣고 직원에게 그 주소만 안내하세요.
+- 무료 플랜으로 시작할 수 있습니다(Durable Object SQLite 저장소 지원). 사용량은 Worker의 **Metrics**에서 보고, 한도에 가까우면 Workers 유료 플랜(월 $5~)으로 올립니다.
+- PR 미리보기 주소(Branch Preview)는 Durable Object를 쓰는 서버 기능이 제한될 수 있습니다. 실제 확인은 `main` 배포 주소에서 하세요.
+- 데이터와 첨부 사진은 그 Worker의 Durable Object 저장소에 보관됩니다. 아직 전체 데이터 내보내기 기능은 없습니다.
+
+### 방법 A. Render 원클릭 (약 10분)
 
 1. 이 브랜치를 `main`에 병합합니다.
 2. [render.com](https://render.com) 가입 → GitHub 연결 → **New → Blueprint** → 이 저장소 선택

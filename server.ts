@@ -4,7 +4,11 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { registerMartOn } from "./server/marton";
+import { registerMartOn, initStore } from "./server/marton";
+import { setPlatform } from "./server/platform";
+import { nodePlatform } from "./server/platform-node";
+import { martonHtml, assetLinks } from "./server/web";
+import { setStoreUtcOffset } from "./src/marton/shared";
 
 dotenv.config();
 
@@ -208,7 +212,10 @@ async function startServer() {
     }
   });
 
-  // 마트ON v2 (직원용 업무 플랫폼)
+  // 마트ON v2 (직원용 업무 플랫폼): 데이터 파일을 불러온 뒤 라우트 등록
+  setPlatform(nodePlatform());
+  setStoreUtcOffset(Number(process.env.MARTON_UTC_OFFSET_MIN ?? 540));
+  await initStore();
   registerMartOn(app, genAI);
 
   // Health check
@@ -223,13 +230,9 @@ async function startServer() {
 
   // 안드로이드 앱(TWA) 패키지와 웹 주소 연결 — 주소창 없는 전체화면 앱으로 실행
   app.get("/.well-known/assetlinks.json", (_req, res) => {
-    const pkg = process.env.MARTON_ANDROID_PACKAGE;
-    const fingerprints = (process.env.MARTON_ANDROID_SHA256 || "").split(",").map(s => s.trim()).filter(Boolean);
-    if (!pkg || !fingerprints.length) return res.status(404).json([]);
-    res.json([{
-      relation: ["delegate_permission/common.handle_all_urls"],
-      target: { namespace: "android_app", package_name: pkg, sha256_cert_fingerprints: fingerprints },
-    }]);
+    const links = assetLinks(process.env.MARTON_ANDROID_PACKAGE, process.env.MARTON_ANDROID_SHA256);
+    if (!links) return res.status(404).json([]);
+    res.json(links);
   });
 
   // Vite middleware for development
@@ -248,26 +251,11 @@ async function startServer() {
         else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       },
     }));
-    // 마트ON 화면은 설치 앱 정보(매니페스트·아이콘)를 HTML에 직접 넣어 보낸다 — 설치 버튼, 스토어 패키징 도구가 JS 없이도 인식
-    const indexHtml = fs.readFileSync(path.join(distPath, 'index.html'), 'utf8');
-    const martonHtml = indexHtml
-      .replace(/<title>[^<]*<\/title>/, '<title>마트ON</title>')
-      .replace('</head>', [
-        '<link rel="manifest" href="/marton/manifest.webmanifest" />',
-        '<meta name="theme-color" content="#1d4ed8" />',
-        '<meta name="description" content="말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI" />',
-        '<link rel="icon" type="image/png" href="/marton/favicon-48.png" />',
-        '<link rel="apple-touch-icon" href="/marton/apple-touch-icon.png" />',
-        '<meta name="apple-mobile-web-app-capable" content="yes" />',
-        '<meta name="mobile-web-app-capable" content="yes" />',
-        '<meta name="apple-mobile-web-app-title" content="마트ON" />',
-        '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
-        '</head>',
-      ].join('\n'));
+    const marton = martonHtml(fs.readFileSync(path.join(distPath, 'index.html'), 'utf8'));
     app.get('*', (req, res) => {
       if (req.path === '/marton' || req.path.startsWith('/marton/')) {
         res.setHeader('Cache-Control', 'no-cache');
-        return res.type('html').send(martonHtml);
+        return res.type('html').send(marton);
       }
       res.sendFile(path.join(distPath, 'index.html'));
     });

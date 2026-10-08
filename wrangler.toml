@@ -1,9 +1,30 @@
+# Cloudflare Workers: 마켓모움 화면 + 마트ON 서버(Durable Object)
+# main 브랜치에 합치면 연결된 Workers Builds가 자동 배포한다.
+# 비밀값(PIN, 매장 코드 등)은 Cloudflare 대시보드 → Workers → 설정 → 변수 및 비밀에서 입력 (docs/marton-deploy.md)
 name = "market-moum"
-compatibility_date = "2024-04-03"
+main = "worker/index.ts"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
 
 [build]
 command = "npm run build"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/", "/api/*", "/.well-known/*", "/marton", "/marton/"]
 
+[vars]
+NODE_ENV = "production"
+
+[[durable_objects.bindings]]
+name = "MARTON"
+class_name = "MartOnStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MartOnStore"]
+
+[observability]
+enabled = true
