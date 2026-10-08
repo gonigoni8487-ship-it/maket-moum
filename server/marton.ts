@@ -1,35 +1,45 @@
 // 마트ON v2 API: 직원 로그인, 업무요청, 실시간 알림(SSE), 공지, 상품찾기, 사진 AI
-import type { Express, Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
-import { randomUUID } from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
   type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
+import { platform } from './platform';
 import { registerSecurity } from './marton-security';
 import { registerPush, pushFor, type PushSub } from './marton-push';
 
-const AI_MODEL = 'gemini-3.5-flash';
-const DATA_FILE = process.env.MARTON_DATA_FILE || path.join(process.cwd(), 'data', 'marton-db.json');
-const PHOTO_DIR = path.join(path.dirname(DATA_FILE), 'photos'); // 업무요청 첨부 사진 (데이터 파일과 같은 디스크)
-const PHOTO_ID = /^[a-f0-9-]{36}\.(jpg|png|webp)$/;
-const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+/** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
+export interface RouteApp {
+  get(path: string, ...handlers: any[]): unknown;
+  post(path: string, ...handlers: any[]): unknown;
+}
 
-/** data URL 사진을 파일로 저장하고 id 목록을 돌려준다 (최대 3장, 장당 2MB) */
-function savePhotos(input: unknown): string[] {
+const AI_MODEL = 'gemini-3.5-flash';
+const PHOTO_ID = /^[a-f0-9-]{36}\.(jpg|png|webp)$/;
+const MAX_PHOTO_BYTES = 1.8 * 1024 * 1024; // Durable Object 저장 한도(행당 2MB) 안쪽
+
+export const newId = () => crypto.randomUUID();
+
+function base64ToBytes(b64: string) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/** data URL 사진을 저장하고 id 목록을 돌려준다 (최대 3장, 장당 1.8MB) */
+async function savePhotos(input: unknown): Promise<string[]> {
   if (!Array.isArray(input)) return [];
   const ids: string[] = [];
   for (const item of input.slice(0, MAX_TASK_PHOTOS)) {
     const m = typeof item === 'string' ? /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(item) : null;
     if (!m) continue;
-    const bytes = Buffer.from(m[2], 'base64');
+    const bytes = base64ToBytes(m[2]);
     if (!bytes.length || bytes.length > MAX_PHOTO_BYTES) continue;
-    const id = `${randomUUID()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
-    fs.mkdirSync(PHOTO_DIR, { recursive: true });
-    fs.writeFileSync(path.join(PHOTO_DIR, id), bytes);
+    const id = `${newId()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
+    await platform().photos.put(id, bytes);
     ids.push(id);
   }
   return ids;
@@ -37,11 +47,13 @@ function savePhotos(input: unknown): string[] {
 
 function deletePhotos(ids: string[] = []) {
   for (const id of ids) {
-    if (PHOTO_ID.test(id)) fs.rm(path.join(PHOTO_DIR, id), { force: true }, () => {});
+    if (PHOTO_ID.test(id)) void platform().photos.remove(id).catch(() => {});
   }
 }
-const MANAGER_PIN = process.env.MARTON_MANAGER_PIN || (process.env.NODE_ENV === 'production' ? '' : '0000');
-const STORE_CODE = process.env.MARTON_STORE_CODE || ''; // 매장 공용 접속 코드 (설정 시 로그인에 필요)
+
+/** 운영 모드에서는 PIN이 없으면 관리자 로그인을 막는다 */
+const managerPin = () => platform().env('MARTON_MANAGER_PIN') || (platform().production ? '' : '0000');
+const storeCode = () => platform().env('MARTON_STORE_CODE') || ''; // 매장 공용 접속 코드 (설정 시 로그인에 필요)
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
@@ -60,9 +72,9 @@ export interface Db {
   vapid?: { publicKey: string; privateKey: string };
 }
 
-function loadDb(): Db {
+function parseDb(raw: string | null): Db {
   try {
-    const db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) as Db;
+    const db = JSON.parse(raw ?? '') as Db;
     db.promotions ??= [];
     db.incidents ??= [];
     db.patrols ??= [];
@@ -75,8 +87,14 @@ function loadDb(): Db {
   }
 }
 
-export const db = loadDb();
-let saveTimer: NodeJS.Timeout | null = null;
+export let db: Db = parseDb(null);
+
+/** 저장된 데이터를 불러온다 (서버 시작 시 한 번) */
+export async function initStore() {
+  db = parseDb(await platform().loadDb());
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 export function save() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
@@ -90,13 +108,13 @@ export function save() {
     db.patrols = db.patrols.filter(p => p.at > Date.now() - 90 * 24 * 60 * 60 * 1000);
     db.reports = db.reports.slice(-52);
     db.handovers = db.handovers.filter(h => h.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000);
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(db));
-  }, 300);
+    void platform().saveDb(JSON.stringify(db)).catch(e => console.error('MartON save failed:', e));
+  }, platform().saveDelayMs);
 }
 
 // ---- 실시간 스트림 (Server-Sent Events) ----
-const clients = new Map<Response, Staff>();
+interface Client { write(chunk: string): unknown }
+const clients = new Map<Client, Staff>();
 
 function onlineCounts() {
   const counts: Record<string, number> = {};
@@ -112,8 +130,8 @@ function onlineCounts() {
 /** who를 지정하면 해당 직원에게만 보낸다 (보안 신고 등 열람 제한 데이터). */
 export function broadcast(event: StreamEvent, who?: (s: Staff) => boolean) {
   const payload = `data: ${JSON.stringify(event)}\n\n`;
-  for (const [res, staff] of clients) {
-    if (!who || who(db.staff[staff.id] ?? staff)) res.write(payload);
+  for (const [client, staff] of clients) {
+    if (!who || who(db.staff[staff.id] ?? staff)) client.write(payload);
   }
   pushFor(event);
 }
@@ -184,8 +202,8 @@ function parseImage(dataUrl: unknown) {
   return m ? { mimeType: m[1], data: m[2] } : null;
 }
 
-export function registerMartOn(app: Express, genAI: GoogleGenAI) {
-  const aiEnabled = Boolean(process.env.GEMINI_API_KEY);
+export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
+  const aiEnabled = Boolean(platform().env('GEMINI_API_KEY'));
   const api = '/api/marton';
 
   // 로그인 실패 제한: IP별 10분에 20회 — 관리자 PIN·매장 코드 대입 방지, 매장 Wi-Fi는 IP를 공유하므로 여유 있게
@@ -194,12 +212,12 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
   const tooMany = (ip: string) => (failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS).length >= 20;
   const fail = (ip: string) => failures.set(ip, [...(failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS), Date.now()]);
 
-  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(STORE_CODE) }));
+  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()) }));
 
   app.post(`${api}/login`, (req, res) => {
     const ip = req.ip || 'unknown';
     if (tooMany(ip)) return res.status(429).json({ error: '로그인 실패가 많아 10분간 제한됩니다. 잠시 후 다시 시도해 주세요.' });
-    if (STORE_CODE && req.body.storeCode !== STORE_CODE) {
+    if (storeCode() && req.body.storeCode !== storeCode()) {
       fail(ip);
       return res.status(403).json({ error: '매장 접속 코드가 올바르지 않습니다.' });
     }
@@ -214,7 +232,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
 
     let role: Staff['role'] = 'staff';
     if (wantManager) {
-      if (!MANAGER_PIN || req.body.managerPin !== MANAGER_PIN) {
+      if (!managerPin() || req.body.managerPin !== managerPin()) {
         fail(ip);
         return res.status(403).json({ error: '관리자 PIN이 올바르지 않습니다.' });
       }
@@ -222,7 +240,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     }
     const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined };
     db.staff[id] = staff;
-    const token = randomUUID();
+    const token = newId();
     db.sessions[token] = id;
     save();
     res.json({ token, staff });
@@ -269,7 +287,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     });
   });
 
-  app.post(`${api}/tasks`, auth, (req, res) => {
+  app.post(`${api}/tasks`, auth, async (req, res) => {
     const me = (req as AuthedRequest).staff;
     const { category, toDept, urgent } = req.body;
     if (!TASK_CATEGORIES.includes(category) || !isDept(toDept)) return res.status(400).json({ error: '요청 유형과 받는 부서를 선택해 주세요.' });
@@ -279,7 +297,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     if (dup) return res.json(dup);
     const now = Date.now();
     const task: Task = {
-      id: randomUUID().slice(0, 8),
+      id: newId().slice(0, 8),
       category,
       title: text(req.body.title, 60) || `${toDept} ${category}`,
       detail: text(req.body.detail, 500),
@@ -294,7 +312,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       history: [{ status: '접수', by: actorOf(me), at: now }],
       clientId,
     };
-    const photos = savePhotos(req.body.photos);
+    const photos = await savePhotos(req.body.photos);
     if (photos.length) task.photos = photos;
     db.tasks.push(task);
     save();
@@ -303,11 +321,13 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
   });
 
   // 첨부 사진: 로그인한 직원만 (img 태그는 헤더를 못 보내므로 ?token= 사용)
-  app.get(`${api}/photos/:id`, auth, (req, res) => {
+  app.get(`${api}/photos/:id`, auth, async (req, res) => {
     const id = req.params.id;
     if (!PHOTO_ID.test(id) || !db.tasks.some(t => t.photos?.includes(id))) return res.status(404).end();
+    const bytes = await platform().photos.get(id);
+    if (!bytes) return res.status(404).end();
     res.setHeader('Cache-Control', 'private, max-age=86400');
-    res.sendFile(path.join(PHOTO_DIR, id), err => { if (err && !res.headersSent) res.status(404).end(); });
+    res.type(id.split('.').pop()!).send(bytes);
   });
 
   app.post(`${api}/tasks/:id/status`, auth, (req, res) => {
@@ -335,7 +355,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     const dup = clientId && db.handovers.find(h => h.clientId === clientId);
     if (dup) return res.json(dup);
     const handover: Handover = {
-      id: randomUUID().slice(0, 8),
+      id: newId().slice(0, 8),
       dept: me.dept,
       from: actorOf(me),
       createdAt: Date.now(),
@@ -371,7 +391,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
     const title = text(req.body.title, 80);
     if (!title || (scope !== 'all' && !isDept(scope))) return res.status(400).json({ error: '제목과 공지 대상을 확인해 주세요.' });
     const notice: Notice = {
-      id: randomUUID().slice(0, 8), scope, title, body: text(req.body.body, 1000), urgent: Boolean(req.body.urgent),
+      id: newId().slice(0, 8), scope, title, body: text(req.body.body, 1000), urgent: Boolean(req.body.urgent),
       by: actorOf(me), createdAt: Date.now(), readBy: [me.id],
     };
     db.notices.push(notice);
@@ -400,7 +420,7 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       const name = text(it?.name, 60);
       if (!name) continue;
       const promotion: Promotion = {
-        id: randomUUID().slice(0, 8), name,
+        id: newId().slice(0, 8), name,
         price: Number(it.price) || undefined, originalPrice: Number(it.originalPrice) || undefined,
         period: text(it.period, 40) || undefined, condition: text(it.condition, 60) || undefined,
         createdAt: Date.now(), by: actorOf(me),
