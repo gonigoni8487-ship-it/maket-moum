@@ -13,7 +13,10 @@ export const DUTIES: Record<Department, string[]> = {
   MS: ['매장관리', '시설', '보안', '주차'],
 };
 
-export const TASK_CATEGORIES = ['고객응대 요청', '상품 위치 확인', '가격 오류', '행사상품 확인', '재고/보충', '기타'] as const;
+export const TASK_CATEGORIES = ['고객응대 요청', '상품 위치 확인', '가격 오류', '바코드 훼손/미인식', '행사상품 확인', '재고/보충', '기타'] as const;
+
+/** 업무요청에 붙일 수 있는 사진 수 (상품·가격표·바코드 사진) */
+export const MAX_TASK_PHOTOS = 3;
 export type TaskCategory = (typeof TASK_CATEGORIES)[number];
 
 export const TASK_STATUSES = ['접수', '확인', '처리중', '완료'] as const;
@@ -58,6 +61,7 @@ export interface Task {
   updatedAt: number;
   history: TaskEvent[];
   clientId?: string; // 오프라인 재전송 중복 방지
+  photos?: string[]; // 첨부 사진 id (/api/marton/photos/:id)
 }
 
 export interface Notice {
@@ -433,6 +437,7 @@ const CATEGORY_WORDS: [TaskCategory, string[]][] = [
   ['가격 오류', ['가격 오류', '가격오류', '가격표', '가격이 틀', '가격 틀', '가격이 달', '금액이 틀', '금액이 달', '가격 확인']],
   ['행사상품 확인', ['행사', '1+1', '원플러스원', '할인', '증정', '세일']],
   ['재고/보충', ['재고', '보충', '품절', '비었', '비어', '채워', '진열 부족', '물건 없']],
+  ['바코드 훼손/미인식', ['바코드', '안 찍', '안찍', '인식 안', '인식이 안', '스캔 안', '스캔이 안']],
   ['상품 위치 확인', ['어디', '위치', '찾아', '못 찾', '못찾']],
   ['고객응대 요청', ['응대', '손님', '고객님', '고객 문의', '문의', '와 주', '와주', '불러', '와줘', '와달', '도와']],
 ];

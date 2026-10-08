@@ -49,26 +49,3 @@ export function connectStream(onEvent: (e: StreamEvent) => void, onStatus: (conn
   };
   return () => es.close();
 }
-
-/** 사진을 긴 변 1280px JPEG로 줄여서 업로드 용량을 줄인다. */
-export async function fileToDataUrl(file: File, maxSide = 1280): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
-
-/** 브라우저 내장 바코드 인식(지원 기기만). 실패하면 null → 서버 AI로 판독. */
-export async function detectBarcode(file: File): Promise<string | null> {
-  const Detector = (window as any).BarcodeDetector;
-  if (!Detector) return null;
-  try {
-    const codes = await new Detector().detect(await createImageBitmap(file));
-    return codes[0]?.rawValue ?? null;
-  } catch {
-    return null;
-  }
-}

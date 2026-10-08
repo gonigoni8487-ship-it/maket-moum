@@ -61,6 +61,7 @@ export interface Draft {
   detail?: string;
   location?: string;
   urgent?: boolean;
+  photos?: string[]; // 첨부할 사진 (data URL)
 }
 
 export const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';

@@ -16,9 +16,11 @@ let flushing = false;
 function read(): Pending[] {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
 }
-function write(items: Pending[]) {
-  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { /* 저장 불가 */ }
-  listeners.forEach(l => l(items));
+function write(items: Pending[]): boolean {
+  let ok = true;
+  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { ok = false; /* 저장 공간 부족 등 */ }
+  listeners.forEach(l => l(ok ? items : read()));
+  return ok;
 }
 
 export const pendingItems = read;
@@ -53,7 +55,10 @@ export async function send<T>(path: string, body: Record<string, unknown>, label
 }
 
 function enqueue(path: string, body: Record<string, unknown>, label: string) {
-  write([...read(), { id: uid(), path, body, label, at: Date.now() }]);
+  if (!write([...read(), { id: uid(), path, body, label, at: Date.now() }])) {
+    // 사진이 많아 기기에 보관하지 못한 경우: 조용히 잃어버리지 않도록 알린다
+    throw new Error('연결이 없고 기기 저장 공간이 부족해 보관하지 못했습니다. 사진을 줄이거나 연결된 곳에서 다시 보내 주세요.');
+  }
 }
 
 /** 보관된 항목을 순서대로 보낸다. 반환: 보낸 건수, 서버가 거절해 버린 항목 */
