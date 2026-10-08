@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Siren, Send, Mic } from 'lucide-react';
-import { DEPARTMENTS, TASK_CATEGORIES, type Department, type Staff, type Task, type TaskCategory } from '../shared';
+import { Siren, Send, Mic, Camera, X } from 'lucide-react';
+import { DEPARTMENTS, MAX_TASK_PHOTOS, TASK_CATEGORIES, type Department, type Staff, type Task, type TaskCategory } from '../shared';
 import { send } from '../outbox';
 import { Chip, cx, inputCls, primaryBtn, type Draft } from '../ui';
+import CameraView from './CameraView';
 
 // 고객센터에서 가장 많이 쓰는 요청을 원터치로
 const QUICK: { label: string; draft: Draft }[] = [
@@ -10,6 +11,7 @@ const QUICK: { label: string; draft: Draft }[] = [
   { label: '🥩 축산 고객응대', draft: { toDept: '축산', category: '고객응대 요청', title: '축산 고객응대 요청' } },
   { label: '📍 상품 위치 확인', draft: { category: '상품 위치 확인', title: '상품 위치 확인 요청' } },
   { label: '🏷️ 가격 오류', draft: { category: '가격 오류', title: '가격표 오류 확인' } },
+  { label: '🔖 바코드 훼손', draft: { category: '바코드 훼손/미인식', title: '바코드 훼손/미인식 신고' } },
   { label: '🎉 행사상품 확인', draft: { category: '행사상품 확인', title: '행사상품 확인 요청' } },
   { label: '📦 재고/보충', draft: { category: '재고/보충', title: '상품 보충 요청' } },
 ];
@@ -22,6 +24,8 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
   const [location, setLocation] = useState('');
   const [urgent, setUrgent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [camera, setCamera] = useState(false);
 
   const apply = (d: Draft) => {
     if (d.toDept) setToDept(d.toDept);
@@ -30,6 +34,7 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
     if (d.detail !== undefined) setDetail(d.detail);
     if (d.location !== undefined) setLocation(d.location);
     if (d.urgent !== undefined) setUrgent(d.urgent);
+    if (d.photos) setPhotos(d.photos.slice(0, MAX_TASK_PHOTOS));
   };
   useEffect(() => { if (draft) apply(draft); }, [draft]);
 
@@ -37,8 +42,8 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
     e.preventDefault();
     setBusy(true);
     try {
-      const task = await send<Task>('/tasks', { toDept, category, title, detail, location, urgent }, `요청: ${title || `${toDept} ${category}`}`);
-      setTitle(''); setDetail(''); setLocation(''); setUrgent(false);
+      const task = await send<Task>('/tasks', { toDept, category, title, detail, location, urgent, photos }, `요청: ${title || `${toDept} ${category}`}`);
+      setTitle(''); setDetail(''); setLocation(''); setUrgent(false); setPhotos([]);
       onSent(task);
     } catch (err) {
       onError((err as Error).message);
@@ -79,6 +84,23 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
       <input className={inputCls} value={location} onChange={e => setLocation(e.target.value)} placeholder="위치 (예: 고객센터 앞, 3번 계산대)" maxLength={60} />
       <textarea className={cx(inputCls, 'min-h-24')} value={detail} onChange={e => setDetail(e.target.value)} placeholder="내용 (예: 고객님이 회 손질 문의하십니다)" maxLength={500} />
 
+      <div className="space-y-2">
+        <span className="text-sm font-semibold text-slate-700">사진 첨부 <span className="font-normal text-slate-400">(가격표·바코드·상품, 최대 {MAX_TASK_PHOTOS}장)</span></span>
+        <div className="flex flex-wrap gap-2">
+          {photos.map((src, i) => (
+            <div key={i} className="relative size-20 overflow-hidden rounded-xl bg-slate-200">
+              <img src={src} alt={`첨부 사진 ${i + 1}`} className="size-full object-cover" />
+              <button type="button" onClick={() => setPhotos(p => p.filter((_, k) => k !== i))} aria-label="사진 빼기" className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white"><X className="size-3.5" /></button>
+            </div>
+          ))}
+          {photos.length < MAX_TASK_PHOTOS && (
+            <button type="button" onClick={() => setCamera(true)} className="flex size-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-500">
+              <Camera className="size-5" />사진 추가
+            </button>
+          )}
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={() => setUrgent(u => !u)}
@@ -91,6 +113,9 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
       <button className={cx(primaryBtn, 'flex items-center justify-center gap-2')} disabled={busy || !toDept || !category}>
         <Send className="size-4" />{busy ? '보내는 중…' : `${toDept || '부서'}에 요청 보내기`}
       </button>
+      {camera && (
+        <CameraView mode="photo" onClose={() => setCamera(false)} onCapture={photo => { setCamera(false); setPhotos(p => [...p, photo].slice(0, MAX_TASK_PHOTOS)); }} />
+      )}
     </form>
   );
 }

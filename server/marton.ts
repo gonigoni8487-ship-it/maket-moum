@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import {
-  DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, type TaskCategory,
+  DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
   type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
@@ -14,6 +14,32 @@ import { registerPush, pushFor, type PushSub } from './marton-push';
 
 const AI_MODEL = 'gemini-3.5-flash';
 const DATA_FILE = process.env.MARTON_DATA_FILE || path.join(process.cwd(), 'data', 'marton-db.json');
+const PHOTO_DIR = path.join(path.dirname(DATA_FILE), 'photos'); // 업무요청 첨부 사진 (데이터 파일과 같은 디스크)
+const PHOTO_ID = /^[a-f0-9-]{36}\.(jpg|png|webp)$/;
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+
+/** data URL 사진을 파일로 저장하고 id 목록을 돌려준다 (최대 3장, 장당 2MB) */
+function savePhotos(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const ids: string[] = [];
+  for (const item of input.slice(0, MAX_TASK_PHOTOS)) {
+    const m = typeof item === 'string' ? /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(item) : null;
+    if (!m) continue;
+    const bytes = Buffer.from(m[2], 'base64');
+    if (!bytes.length || bytes.length > MAX_PHOTO_BYTES) continue;
+    const id = `${randomUUID()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
+    fs.mkdirSync(PHOTO_DIR, { recursive: true });
+    fs.writeFileSync(path.join(PHOTO_DIR, id), bytes);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function deletePhotos(ids: string[] = []) {
+  for (const id of ids) {
+    if (PHOTO_ID.test(id)) fs.rm(path.join(PHOTO_DIR, id), { force: true }, () => {});
+  }
+}
 const MANAGER_PIN = process.env.MARTON_MANAGER_PIN || (process.env.NODE_ENV === 'production' ? '' : '0000');
 const STORE_CODE = process.env.MARTON_STORE_CODE || ''; // 매장 공용 접속 코드 (설정 시 로그인에 필요)
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -56,6 +82,8 @@ export function save() {
   saveTimer = setTimeout(() => {
     saveTimer = null;
     const cutoff = Date.now() - TASK_RETENTION_MS;
+    const expired = db.tasks.filter(t => t.status === '완료' && t.updatedAt <= cutoff);
+    expired.forEach(t => deletePhotos(t.photos));
     db.tasks = db.tasks.filter(t => t.status !== '완료' || t.updatedAt > cutoff);
     const incidentCutoff = Date.now() - INCIDENT_RETENTION_MS;
     db.incidents = db.incidents.filter(i => i.status !== '종결' || i.updatedAt > incidentCutoff);
@@ -266,10 +294,20 @@ export function registerMartOn(app: Express, genAI: GoogleGenAI) {
       history: [{ status: '접수', by: actorOf(me), at: now }],
       clientId,
     };
+    const photos = savePhotos(req.body.photos);
+    if (photos.length) task.photos = photos;
     db.tasks.push(task);
     save();
     broadcast({ type: 'task', task, action: 'created' });
     res.json(task);
+  });
+
+  // 첨부 사진: 로그인한 직원만 (img 태그는 헤더를 못 보내므로 ?token= 사용)
+  app.get(`${api}/photos/:id`, auth, (req, res) => {
+    const id = req.params.id;
+    if (!PHOTO_ID.test(id) || !db.tasks.some(t => t.photos?.includes(id))) return res.status(404).end();
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.sendFile(path.join(PHOTO_DIR, id), err => { if (err && !res.headersSent) res.status(404).end(); });
   });
 
   app.post(`${api}/tasks/:id/status`, auth, (req, res) => {

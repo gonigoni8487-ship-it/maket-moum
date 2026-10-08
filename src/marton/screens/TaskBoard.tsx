@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ArrowRight, Siren, MapPin, ChevronDown } from 'lucide-react';
+import { ArrowRight, Siren, MapPin, ChevronDown, ImageIcon, X } from 'lucide-react';
 import { TASK_STATUSES, type Staff, type Task, type TaskStatus } from '../shared';
 import { send } from '../outbox';
+import { session } from '../api';
 import { cx, elapsed, clock, Empty, STATUS_STYLE } from '../ui';
 
 const NEXT_LABEL: Partial<Record<TaskStatus, string>> = { 확인: '확인했어요', 처리중: '처리 시작', 완료: '처리 완료' };
@@ -13,6 +14,30 @@ export function nextStatus(t: Task): TaskStatus | null {
 
 export async function advance(task: Task, status: TaskStatus, note?: string) {
   return send<Task>(`/tasks/${task.id}/status`, { status, note }, `${task.title} → ${status}`);
+}
+
+const photoUrl = (id: string) => `/api/marton/photos/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
+
+/** 요청에 첨부된 사진 (눌러서 크게 보기) */
+function TaskPhotos({ ids }: { ids: string[] }) {
+  const [big, setBig] = useState<string | null>(null);
+  return (
+    <>
+      <div className="flex gap-2">
+        {ids.map(id => (
+          <button key={id} type="button" onClick={() => setBig(id)} className="size-20 overflow-hidden rounded-xl bg-slate-200">
+            <img src={photoUrl(id)} alt="첨부 사진" loading="lazy" className="size-full object-cover" />
+          </button>
+        ))}
+      </div>
+      {big && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3" onClick={() => setBig(null)}>
+          <img src={photoUrl(big)} alt="첨부 사진 크게 보기" className="max-h-full max-w-full rounded-lg object-contain" />
+          <button type="button" aria-label="닫기" className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] rounded-full bg-white/20 p-2 text-white"><X className="size-5" /></button>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function TaskCard({ task, me, onError }: { task: Task; me: Staff; onError: (m: string) => void }) {
@@ -41,6 +66,7 @@ export function TaskCard({ task, me, onError }: { task: Task; me: Staff; onError
         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[13px] text-slate-500">
           <span>{task.fromDept} {task.createdBy.name}</span><ArrowRight className="size-3.5" /><span className="font-semibold text-slate-700">{task.toDept}</span>
           {task.location && <span className="inline-flex items-center gap-0.5"><MapPin className="size-3.5" />{task.location}</span>}
+          {task.photos?.length ? <span className="inline-flex items-center gap-0.5 font-semibold text-blue-700"><ImageIcon className="size-3.5" />사진 {task.photos.length}</span> : null}
           <ChevronDown className={cx('ml-auto size-4 transition-transform', open && 'rotate-180')} />
         </div>
       </button>
@@ -48,6 +74,7 @@ export function TaskCard({ task, me, onError }: { task: Task; me: Staff; onError
       {open && (
         <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
           {task.detail && <p className="whitespace-pre-wrap text-sm text-slate-700">{task.detail}</p>}
+          {task.photos?.length ? <TaskPhotos ids={task.photos} /> : null}
           <ol className="space-y-1.5">
             {task.history.map((h, i) => (
               <li key={i} className="flex items-center gap-2 text-[13px]">
