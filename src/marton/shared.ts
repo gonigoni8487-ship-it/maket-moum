@@ -159,6 +159,71 @@ export const COUPON_COUNTS = [1, 5, 10] as const;
 export const COUPON_VALID_DAYS = 90;
 export const COUPON_ARRIVED = '소통 커피쿠폰이 도착했습니다';
 
+// ---- 비상 알림 (화재·사고·재난): 이때만 전 직원 휴대폰에 사이렌이 울린다 ----
+export const EMERGENCY_TYPES = ['화재 발생', '사고 발생', '재난 발생'] as const;
+export type EmergencyType = (typeof EMERGENCY_TYPES)[number];
+export const EMERGENCY_INFO: Record<EmergencyType, { icon: string; hint: string; say: string; guide: string[] }> = {
+  '화재 발생': {
+    icon: '🔥', hint: '불·연기·타는 냄새', say: '고객을 가까운 비상구로 대피 유도해 주세요',
+    guide: ['고객을 가까운 비상구로 대피 유도', '119 신고 · 소화기·소화전으로 초기 진화', '엘리베이터 사용 금지, 계단으로 이동', '대피 후 부서별 인원 확인'],
+  },
+  '사고 발생': {
+    icon: '🚑', hint: '고객·직원 부상, 넘어짐, 낙하', say: '현장 안전을 확보하고 관리자에게 보고해 주세요',
+    guide: ['주변을 통제해 2차 사고 막기', '부상자 상태 확인 · 필요하면 119 신고', '함부로 옮기지 말고 응급조치', '관리자 보고 · 현장 사진·경위 기록'],
+  },
+  '재난 발생': {
+    icon: '🌪️', hint: '지진·정전·침수·가스 누출', say: '고객 안전을 안내하고 방송 지시에 따라 행동해 주세요',
+    guide: ['고객에게 침착하게 안전 안내', '매장 방송·관리자 지시에 따라 행동', '지진은 진열대에서 떨어져 머리 보호', '가스 누출은 전기 스위치 만지지 않기'],
+  },
+};
+
+export interface Emergency {
+  id: string;
+  type: EmergencyType;
+  /** 발생 위치 (예: 지하 1층 수산 코너) */
+  location?: string;
+  note?: string;
+  by: Actor;
+  createdAt: number;
+  clearedAt?: number;
+  clearedBy?: Actor;
+}
+
+/** 비상 알림 음성: "화재 발생. 화재 발생. 위치 지하 1층 수산 코너. 고객을 …" */
+export const emergencySpeech = (e: Pick<Emergency, 'type' | 'location'>) =>
+  `${e.type}. ${e.type}. ${e.location ? `위치 ${e.location}. ` : ''}${EMERGENCY_INFO[e.type].say}.`;
+/** 비상 상황을 해제할 수 있는 사람: 점장·부점장, 보안(MS), 알린 사람 */
+export const canClearEmergency = (s: Staff, e: Emergency) => s.role === 'manager' || s.dept === 'MS' || s.id === e.by.id;
+
+// ---- 도와드리겠습니다: 고객 컴플레인 접수건 공유 ----
+export const COMPLAINT_STATUSES = ['접수', '처리중', '처리완료'] as const;
+export type ComplaintStatus = (typeof COMPLAINT_STATUSES)[number];
+export const MAX_COMPLAINT_PHOTOS = 5;
+export interface Complaint {
+  id: string;
+  /** 해당 내용 (고객이 불편했던 점) */
+  content: string;
+  /** 처리 내용 */
+  action?: string;
+  /** 보상 내용 (예: 상품 교환, 상품권 1만원) */
+  compensation?: string;
+  /** 담당자 이름 */
+  assignee?: string;
+  /** 전달 부서 */
+  depts: Department[];
+  photos?: string[];
+  status: ComplaintStatus;
+  by: Actor;
+  createdAt: number;
+  updatedAt: number;
+  updatedBy?: Actor;
+  readBy: string[];
+  clientId?: string;
+}
+/** 전달 부서 호출 음성 */
+export const complaintCallPhrase = (dept: string) => `${dept} 담당님, 도와드리겠습니다 컴플레인 접수건이 전달되었습니다`;
+export const canEditComplaint = (s: Staff, c: Complaint) => s.role === 'manager' || s.id === c.by.id || c.depts.includes(s.dept);
+
 export interface Actor {
   id: string;
   name: string;
@@ -318,6 +383,10 @@ export interface Bootstrap {
   expiryChecks: ExpiryCheck[];
   /** 매장에서 바꾼 소리 */
   sounds: StoreSound[];
+  /** 비상 알림 (진행 중 + 지난 7일) */
+  emergencies: Emergency[];
+  /** 도와드리겠습니다 컴플레인 공유 (최근 90일) */
+  complaints: Complaint[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -335,7 +404,9 @@ export type StreamEvent =
   | { type: 'schedule'; schedule: WorkSchedule }
   | { type: 'expiry'; checks: ExpiryCheck[]; action: 'saved' | 'deleted' | 'call' }
   | { type: 'birthday'; staffId: string; name: string }
-  | { type: 'sounds'; sounds: StoreSound[] };
+  | { type: 'sounds'; sounds: StoreSound[] }
+  | { type: 'emergency'; emergency: Emergency; action: 'created' | 'cleared' }
+  | { type: 'complaint'; complaint: Complaint; action: 'created' | 'updated' };
 
 /** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
 export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {

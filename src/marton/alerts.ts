@@ -54,7 +54,7 @@ function wavUrl(seconds: number, sample: (t: number) => number) {
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 
-// 긴급 경보음 (확인할 때까지 반복). 기본은 매장 경보음 음원, 업무용 알람 소리 3가지 중에서도 고를 수 있다.
+// 비상 사이렌 (화재·사고·재난 때만, 확인할 때까지 반복). 기본은 매장 경보음 음원, 업무용 알람 소리 3가지 중에서도 고를 수 있다.
 export type AlarmTone = 'song' | 'digital' | 'bell' | 'chime';
 export const ALARM_TONES: { id: AlarmTone; label: string; hint: string }[] = [
   { id: 'song', label: '매장 경보음', hint: '마트ON 전용 경보음' },
@@ -305,9 +305,10 @@ export function primeSpeech() {
   speechSynthesis.speak(u);
 }
 
-export function speak(message: string) {
-  if (!('speechSynthesis' in window)) return;
+export function speak(message: string, onEnd?: () => void) {
+  if (!('speechSynthesis' in window)) return onEnd?.();
   const u = new SpeechSynthesisUtterance(speech(message));
+  if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
   u.lang = 'ko-KR';
   if (koVoice) u.voice = koVoice;
   u.rate = 1.05;
@@ -336,34 +337,54 @@ async function systemNotify(title: string, body: string, urgent: boolean, tag: s
 }
 
 /**
- * 새 업무/공지 알림. 긴급이면 확인(stopAlarm)할 때까지 사이렌(반복)과 진동이 계속된다.
- * 돌려주는 값: 소리가 실제로 났는지 (막혔으면 화면에 "눌러서 사이렌 켜기"를 보여준다)
+ * 새 업무/공지 알림.
+ * - siren: 비상 알림(화재·사고·재난)만 — 확인(stopAlarm)할 때까지 사이렌과 진동이 계속된다.
+ * - urgent: 긴급 요청 — 사이렌 대신 호출음을 15초마다 다시 울리고 진동이 계속된다.
+ * 돌려주는 값: 소리가 실제로 났는지 (막혔으면 화면에 "눌러서 소리 켜기"를 보여준다)
  */
 export async function alert(opts: {
   title: string; body: string; urgent: boolean; tag: string; prefs: AlertPrefs;
-  /** call: 받은 요청 호출음 (긴급이면 무시하고 사이렌) */
+  /** call: 받은 요청 호출음 (긴급이면 호출음 반복) */
   tone?: 'chime' | 'call' | 'coupon';
+  /** 비상 사이렌 (화재·사고·재난) */
+  siren?: boolean;
   /** 호출 음성 (예: "수산 담당님 호출입니다") */
   announce?: string;
 }): Promise<boolean> {
-  const { title, body, urgent, tag, prefs, tone, announce } = opts;
+  const { title, body, urgent, tag, prefs, tone, announce, siren: useSiren } = opts;
   void systemNotify(title, body, urgent, tag);
   const spoken = announce && prefs.call ? announce : prefs.voice ? `${urgent ? '긴급 요청. ' : ''}${title}. ${body}` : null;
-  // 호출음이 끝난 뒤 말한다 (사이렌은 계속 울리므로 바로)
-  const after = !prefs.sound || urgent ? 0 : tone === 'call' ? lengthOf(call, CALL_SECONDS, 6) : tone === 'coupon' ? lengthOf(coupon, COUPON_SECONDS, 6) : 0;
-  if (spoken) window.setTimeout(() => speak(spoken), after * 1000);
+  // 호출음이 끝난 뒤 말한다 (사이렌은 계속 울리므로 2초 뒤 사이렌을 줄이고 말한다)
+  const after = !prefs.sound ? 0 : useSiren ? 2 : tone === 'call' || urgent ? lengthOf(call, CALL_SECONDS, 6) : tone === 'coupon' ? lengthOf(coupon, COUPON_SECONDS, 6) : 0;
+  if (spoken) window.setTimeout(() => (useSiren ? speakOverSiren(spoken) : speak(spoken)), after * 1000);
 
-  const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'call' ? [250, 100, 250, 100, 250, 100, 600] : tone === 'coupon' ? [80, 60, 80, 60, 300] : [200, 100, 200];
+  const pattern = useSiren ? [800, 200, 800, 200, 800] : urgent ? [500, 200, 500, 200, 500] : tone === 'call' ? [250, 100, 250, 100, 250, 100, 600] : tone === 'coupon' ? [80, 60, 80, 60, 300] : [200, 100, 200];
   const vibrate = () => { if (prefs.vibrate) navigator.vibrate?.(pattern); };
   vibrate();
-  if (urgent) {
+  if (urgent || useSiren) {
     stopAlarm();
     vibrateTimer = window.setInterval(vibrate, 4000);
   }
   if (!prefs.sound) return true;
-  if (urgent) return startSiren();
+  if (useSiren) return startSiren();
+  if (urgent) return startUrgentCall();
   await playChime(tone);
   return unlocked;
+}
+
+let urgentTimer: number | null = null;
+/** 긴급 요청: 호출음을 지금 울리고, 확인할 때까지 15초마다 다시 울린다 */
+export async function startUrgentCall(): Promise<boolean> {
+  if (urgentTimer !== null) clearInterval(urgentTimer);
+  urgentTimer = window.setInterval(() => void playChime('call'), 15000);
+  await playChime('call');
+  return unlocked;
+}
+
+/** 사이렌을 잠시 줄이고 음성 안내 (위치가 들리도록) */
+function speakOverSiren(message: string) {
+  if (siren) siren.volume = 0.25;
+  speak(message, () => { if (siren) siren.volume = 1; });
 }
 
 /** 받은 요청의 호출 음성 */
@@ -374,8 +395,10 @@ export function stopAlarm() {
   alarmOn = false;
   if (vibrateTimer !== null) clearInterval(vibrateTimer);
   vibrateTimer = null;
+  if (urgentTimer !== null) clearInterval(urgentTimer);
+  urgentTimer = null;
   navigator.vibrate?.(0);
-  if (siren) { siren.pause(); siren.currentTime = 0; }
+  if (siren) { siren.pause(); siren.currentTime = 0; siren.volume = 1; }
 }
 
 export function registerServiceWorker() {

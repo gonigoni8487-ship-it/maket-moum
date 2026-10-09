@@ -28,7 +28,7 @@ function deptStats(tasks: Task[], dept: Department) {
 }
 
 /** 말로 입력 버튼: 누르고 말하면 내용 칸에 글자로 들어간다 */
-function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
+export function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
   return (
     <div className="space-y-1.5">
       <button type="button" onClick={d.listening ? d.stop : d.start}
@@ -153,7 +153,7 @@ export default function Manager({ me, tasks, notices, handovers, online, sounds,
               <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목 (선택 · 비우면 내용 앞부분)" maxLength={80} />
               <p className="text-xs text-slate-500">받는 파트 직원 휴대폰에서 호출음 뒤에 "{me.title || '점장'}님 지시사항입니다. (내용)"을 음성으로 읽어 줍니다.</p>
               <label className="flex items-center gap-2 text-sm font-semibold text-red-600">
-                <input type="checkbox" className="size-5 accent-red-600" checked={urgent} onChange={e => setUrgent(e.target.checked)} />긴급 (확인할 때까지 경보음)
+                <input type="checkbox" className="size-5 accent-red-600" checked={urgent} onChange={e => setUrgent(e.target.checked)} />긴급 (확인할 때까지 호출음 반복)
               </label>
             </>
           )}

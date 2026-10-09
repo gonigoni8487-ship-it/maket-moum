@@ -1,5 +1,5 @@
 // 마트ON 웹 푸시: 앱이 닫혀 있거나 화면이 꺼져 있어도 업무요청·공지·보안 경보를 받는다.
-import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, noticeFor, type Staff, type StreamEvent } from '../src/marton/shared';
+import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, EMERGENCY_INFO, noticeFor, type Staff, type StreamEvent } from '../src/marton/shared';
 import { db, save, auth, text, type AuthedRequest, type RouteApp } from './marton';
 import { platform, onJob } from './platform';
 import { generateVapidKeys, sendWebPush, type VapidKeys } from './webpush';
@@ -150,6 +150,16 @@ export function pushFor(event: StreamEvent) {
     if (h.ackBy.length) return; // 확인 표시 갱신은 알리지 않음
     const summary = [h.openTasks.length && `미처리 ${h.openTasks.length}건`, h.openIncidents.length && `보안 ${h.openIncidents.length}건`, h.note].filter(Boolean).join(' · ');
     void sendTo(s => s.dept === h.dept && s.id !== h.from.id, { title: `${h.dept} 인수인계 — ${h.from.name}`, body: summary || '특이사항 없음', urgent: false, tag: `handover-${h.id}` });
+  } else if (event.type === 'emergency') {
+    const e = event.emergency;
+    if (event.action === 'created') {
+      void sendTo(s => s.id !== e.by.id, { title: `${EMERGENCY_INFO[e.type].icon} ${e.type}`, body: `${e.location ? `${e.location} — ` : ''}${EMERGENCY_INFO[e.type].say}`, urgent: true, tag: `emergency-${e.id}` });
+    } else {
+      void sendTo(() => true, { title: `✅ ${e.type} 상황 해제`, body: `${e.clearedBy?.name ?? ''}님이 상황 해제를 알렸습니다.`, urgent: false, tag: `emergency-${e.id}` });
+    }
+  } else if (event.type === 'complaint' && event.action === 'created') {
+    const c = event.complaint;
+    void sendTo(s => s.id !== (c.updatedBy ?? c.by).id && c.depts.includes(s.dept), { title: `🙋 ${c.depts.join('·')} 도와드리겠습니다 컴플레인 접수`, body: c.content.slice(0, 120), urgent: false, tag: `complaint-${c.id}` });
   } else if (event.type === 'report' && event.report.auto) {
     void sendTo(s => s.role === 'manager', { title: '주간 손실방지 리포트', body: '지난주 리포트가 도착했습니다.', urgent: false, tag: `report-${event.report.id}` });
   }
