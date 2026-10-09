@@ -112,7 +112,7 @@ export default function PhotoUpload({ me, onSent, onError }: { me: Staff; onSent
 
       <button type="button" onClick={() => setUrgent(u => !u)}
         className={cx('flex w-full items-center justify-center gap-2 rounded-xl border-2 py-3 text-[15px] font-bold', urgent ? 'border-red-600 bg-red-600 text-white' : 'border-red-200 bg-white text-red-600')}>
-        <Siren className="size-5" />{urgent ? '긴급 (사이렌 + 진동 반복)' : '긴급으로 보내기'}
+        <Siren className="size-5" />{urgent ? '긴급 (호출음 반복 + 진동)' : '긴급으로 보내기'}
       </button>
 
       <button className={cx(primaryBtn, 'flex items-center justify-center gap-2')} disabled={busy || !photos.length || !kind || !toDept}>

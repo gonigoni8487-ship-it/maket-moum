@@ -109,7 +109,7 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
         className={cx('flex w-full items-center justify-center gap-2 rounded-xl border-2 py-3 text-[15px] font-bold',
           urgent ? 'border-red-600 bg-red-600 text-white' : 'border-red-200 bg-white text-red-600')}
       >
-        <Siren className="size-5" />{urgent ? '긴급 요청 (사이렌 + 진동 반복)' : '긴급으로 보내기'}
+        <Siren className="size-5" />{urgent ? '긴급 요청 (호출음 반복 + 진동)' : '긴급으로 보내기'}
       </button>
 
       <button className={cx(primaryBtn, 'flex items-center justify-center gap-2')} disabled={busy || !toDept || !category}>

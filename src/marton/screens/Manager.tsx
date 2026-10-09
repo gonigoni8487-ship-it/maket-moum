@@ -1,13 +1,14 @@
 import { Mic, MicOff } from 'lucide-react';
 import { useDictation } from '../dictation';
 import { useState, type FormEvent } from 'react';
-import { BROADCAST_TITLE, DEPARTMENTS, meetingTitle, type Department, type Handover, type Notice, type Staff, type Task } from '../shared';
+import { BROADCAST_TITLE, DEPARTMENTS, meetingTitle, type Department, type Handover, type Notice, type Staff, type StoreSound, type Task } from '../shared';
 import { api } from '../api';
 import { TaskCard } from './TaskBoard';
 import { NoticeCard } from './Notices';
 import { HandoverList } from './Handover';
 import InviteQR from './InviteQR';
 import CouponSend from './CouponSend';
+import SoundSettings from './SoundSettings';
 import { Chip, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -27,7 +28,7 @@ function deptStats(tasks: Task[], dept: Department) {
 }
 
 /** 말로 입력 버튼: 누르고 말하면 내용 칸에 글자로 들어간다 */
-function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
+export function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
   return (
     <div className="space-y-1.5">
       <button type="button" onClick={d.listening ? d.stop : d.start}
@@ -40,8 +41,8 @@ function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
   );
 }
 
-export default function Manager({ me, tasks, notices, handovers, online, onError, onToast }: {
-  me: Staff; tasks: Task[]; notices: Notice[]; handovers: Handover[]; online: Record<string, number>; onError: (m: string) => void; onToast: (m: string) => void;
+export default function Manager({ me, tasks, notices, handovers, online, sounds, onError, onToast }: {
+  me: Staff; tasks: Task[]; notices: Notice[]; handovers: Handover[]; online: Record<string, number>; sounds: StoreSound[]; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   // 받는 파트 (비어 있으면 전체)
   const [targets, setTargets] = useState<Department[]>([]);
@@ -152,7 +153,7 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
               <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목 (선택 · 비우면 내용 앞부분)" maxLength={80} />
               <p className="text-xs text-slate-500">받는 파트 직원 휴대폰에서 호출음 뒤에 "{me.title || '점장'}님 지시사항입니다. (내용)"을 음성으로 읽어 줍니다.</p>
               <label className="flex items-center gap-2 text-sm font-semibold text-red-600">
-                <input type="checkbox" className="size-5 accent-red-600" checked={urgent} onChange={e => setUrgent(e.target.checked)} />긴급 (확인할 때까지 경보음)
+                <input type="checkbox" className="size-5 accent-red-600" checked={urgent} onChange={e => setUrgent(e.target.checked)} />긴급 (확인할 때까지 호출음 반복)
               </label>
             </>
           )}
@@ -165,6 +166,8 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
       </Section>
 
       <CouponSend onError={onError} onToast={onToast} />
+
+      <SoundSettings sounds={sounds} myName={me.name} myDept={me.dept} onError={onError} onToast={onToast} />
 
       <div className="grid grid-cols-2 gap-2">
         {kpis.map(([label, value, alarm]) => (

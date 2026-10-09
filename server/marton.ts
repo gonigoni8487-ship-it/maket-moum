@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type CustomerBell, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform, onJob } from './platform';
@@ -11,6 +11,7 @@ import { registerSecurity } from './marton-security';
 import { registerPush, pushFor, type PushSub } from './marton-push';
 import { registerCoupons, pruneCoupons } from './marton-coupons';
 import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
+import { registerCare, pruneCare } from './marton-care';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
 export interface RouteApp {
@@ -32,7 +33,7 @@ function base64ToBytes(b64: string) {
 }
 
 /** data URL 사진을 저장하고 id 목록을 돌려준다 (기본 최대 3장, 장당 1.8MB) */
-async function savePhotos(input: unknown, max = MAX_TASK_PHOTOS): Promise<string[]> {
+export async function savePhotos(input: unknown, max = MAX_TASK_PHOTOS): Promise<string[]> {
   if (!Array.isArray(input)) return [];
   const ids: string[] = [];
   for (const item of input.slice(0, max)) {
@@ -47,7 +48,7 @@ async function savePhotos(input: unknown, max = MAX_TASK_PHOTOS): Promise<string
   return ids;
 }
 
-function deletePhotos(ids: string[] = []) {
+export function deletePhotos(ids: string[] = []) {
   for (const id of ids) {
     if (PHOTO_ID.test(id)) void platform().photos.remove(id).catch(() => {});
   }
@@ -75,6 +76,10 @@ export interface Db {
   couponBatch?: number;
   schedules: WorkSchedule[];
   expiryChecks: ExpiryCheck[];
+  sounds?: StoreSound[];
+  emergencies?: Emergency[];
+  complaints?: Complaint[];
+  bells?: CustomerBell[];
   /** 생일 축하를 보낸 해 (직원별) */
   birthdayDone?: Record<string, number>;
   vapid?: { publicKey: string; privateKey: string };
@@ -126,6 +131,7 @@ export function save() {
     db.reports = db.reports.slice(-52);
     pruneCoupons();
     pruneBoard();
+    pruneCare();
     db.handovers = db.handovers.filter(h => h.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000);
     void platform().saveDb(JSON.stringify(db)).catch(e => console.error('MartON save failed:', e));
   }, platform().saveDelayMs);
@@ -288,6 +294,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   registerPush(app);
   registerCoupons(app);
   registerBoard(app, genAI, aiEnabled);
+  registerCare(app);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
@@ -310,6 +317,10 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       handovers: db.handovers.filter(h => h.createdAt > Date.now() - 3 * 24 * 60 * 60 * 1000 && (me.role === 'manager' || h.dept === me.dept)),
       coupons: db.coupons.filter(c => c.to.id === me.id),
       schedules: db.schedules.slice(-3),
+      sounds: db.sounds ?? [],
+      emergencies: (db.emergencies ?? []).filter(e => !e.clearedAt || e.createdAt > Date.now() - 7 * 24 * 60 * 60 * 1000),
+      complaints: (db.complaints ?? []).slice(-100),
+      bells: (db.bells ?? []).filter(b => !b.answeredAt || b.answeredAt > Date.now() - 12 * 60 * 60 * 1000),
       expiryChecks: db.expiryChecks.filter(c => (me.role === 'manager' || c.dept === me.dept) && c.at > Date.now() - 7 * 24 * 60 * 60 * 1000),
       online: onlineCounts(),
       aiEnabled,
@@ -366,7 +377,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   // 첨부 사진: 로그인한 직원만 (img 태그는 헤더를 못 보내므로 ?token= 사용)
   app.get(`${api}/photos/:id`, auth, async (req, res) => {
     const id = req.params.id;
-    if (!PHOTO_ID.test(id) || !(db.tasks.some(t => t.photos?.includes(id)) || db.notices.some(n => n.photos?.includes(id)))) return res.status(404).end();
+    if (!PHOTO_ID.test(id) || !(db.tasks.some(t => t.photos?.includes(id)) || db.notices.some(n => n.photos?.includes(id)) || Boolean(db.complaints?.some(c => c.photos?.includes(id))))) return res.status(404).end();
     const bytes = await platform().photos.get(id);
     if (!bytes) return res.status(404).end();
     res.setHeader('Cache-Control', 'private, max-age=86400');

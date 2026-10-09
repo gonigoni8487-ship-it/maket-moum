@@ -1,8 +1,8 @@
 // 마트ON 게시판: 실적 공유 첨부 파일·사진 요약, 월 근무계획, 소비기한 점검 호출, 생일 축하
 import type { GoogleGenAI } from '@google/genai';
 import {
-  DEPARTMENTS, MAX_FILE_BYTES, SHIFTS, birthdayMessage, isBirthdayToday, normalizeShift, storeDayStart, storeTime,
-  type Attachment, type Department, type ExpiryCheck, type ShiftEntry, type Staff, type WorkSchedule,
+  DEPARTMENTS, MAX_FILE_BYTES, MAX_SOUND_BYTES, SHIFTS, SOUND_KINDS, birthdayMessage, isBirthdayToday, normalizeShift, storeDayStart, storeTime,
+  type Attachment, type Department, type ExpiryCheck, type ShiftEntry, type Staff, type StoreSound, type StoreSoundKind, type WorkSchedule,
 } from '../src/marton/shared';
 import { db, save, broadcast, auth, managerOnly, actorOf, text, newId, parseJson, type AuthedRequest, type RouteApp } from './marton';
 import { platform, onJob } from './platform';
@@ -79,6 +79,45 @@ export function registerBoard(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bool
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`);
     res.setHeader('Cache-Control', 'private, max-age=86400');
     res.type(file.mime).send(bytes);
+  });
+
+  // ---- 매장 소리 바꾸기 (생일 축하·쿠폰 도착·호출음) ----
+  const SOUND_TYPES: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg' };
+  app.post(`${api}/sounds`, auth, managerOnly, async (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const kind = req.body.kind as StoreSoundKind;
+    const name = text(req.body.name, 80);
+    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+    const m = typeof req.body.data === 'string' ? /^data:[^;,]*(?:;[^,]*)?;base64,([A-Za-z0-9+/=]+)$/.exec(req.body.data) : null;
+    if (!SOUND_KINDS.includes(kind)) return res.status(400).json({ error: '바꿀 소리를 골라 주세요.' });
+    if (!SOUND_TYPES[ext] || !m) return res.status(400).json({ error: 'MP3·M4A·WAV·OGG 소리 파일을 올려 주세요.' });
+    const bytes = bytesOf(m[1]);
+    if (!bytes.length || bytes.length > MAX_SOUND_BYTES) return res.status(400).json({ error: '소리 파일은 1.5MB까지 올릴 수 있습니다. 짧게 자르거나 낮은 음질로 저장해 주세요.' });
+    const id = `${newId()}.${ext}`;
+    await platform().photos.put(id, bytes);
+    const old = (db.sounds ?? []).find(s => s.kind === kind);
+    if (old) void platform().photos.remove(old.id).catch(() => {});
+    const sound: StoreSound = { kind, id, name, size: bytes.length, uploadedBy: actorOf(me), uploadedAt: Date.now() };
+    db.sounds = [...(db.sounds ?? []).filter(s => s.kind !== kind), sound];
+    save();
+    broadcast({ type: 'sounds', sounds: db.sounds });
+    res.json(sound);
+  });
+  app.post(`${api}/sounds/:kind/reset`, auth, managerOnly, (req, res) => {
+    const old = (db.sounds ?? []).find(s => s.kind === req.params.kind);
+    if (old) void platform().photos.remove(old.id).catch(() => {});
+    db.sounds = (db.sounds ?? []).filter(s => s.kind !== req.params.kind);
+    save();
+    broadcast({ type: 'sounds', sounds: db.sounds });
+    res.json({ ok: true });
+  });
+  app.get(`${api}/sounds/:id`, auth, async (req, res) => {
+    const sound = (db.sounds ?? []).find(s => s.id === req.params.id);
+    if (!sound) return res.status(404).end();
+    const bytes = await platform().photos.get(sound.id);
+    if (!bytes) return res.status(404).end();
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.type(SOUND_TYPES[sound.id.split('.').pop()!]).send(bytes);
   });
 
   // ---- 사진 간단 요약 (실적표·보고 자료) ----
