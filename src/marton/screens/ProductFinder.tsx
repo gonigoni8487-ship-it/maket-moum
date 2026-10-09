@@ -11,17 +11,22 @@ export function ProductRow({ p, promo, onRequest, onShow }: { p: Product; promo?
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <div className="font-bold text-slate-900">{p.name}</div>
-          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-blue-700">
-            <MapPin className="size-4" />{p.floor} · {p.corner} · {bayText(p)}
+          <div className="mt-1 flex items-start gap-1 text-sm font-semibold text-blue-700">
+            <MapPin className="mt-0.5 size-4 shrink-0" />{p.floor} · {p.corner} · {bayText(p)}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-sm font-bold text-slate-900">{won(promo?.price ?? p.price)}</div>
-          {promo && <div className="mt-0.5 rounded bg-pink-100 px-1.5 text-[11px] font-bold text-pink-700">행사 {promo.condition || ''}</div>}
+        <div className="shrink-0 text-right">
+          {promo?.price && promo.price !== p.price && <s className="block text-xs text-slate-400">{won(p.price)}</s>}
+          <div className={cx('text-sm font-bold', promo?.price ? 'text-pink-600' : 'text-slate-900')}>{won(promo?.price ?? p.price)}</div>
         </div>
       </div>
+      {promo && (
+        <div className="mt-2 rounded-lg bg-pink-50 px-2.5 py-1.5 text-xs font-bold text-pink-700">
+          이번 주 행사{promo.condition ? ` · ${promo.condition}` : ''}{promo.period ? <span className="font-normal text-pink-600"> · {promo.period}</span> : null}
+        </div>
+      )}
       {onShow && (
         <button onClick={onShow} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-50 py-2.5 text-sm font-bold text-blue-700 active:bg-blue-100">
           <Maximize2 className="size-4" />고객에게 크게 보여주기
