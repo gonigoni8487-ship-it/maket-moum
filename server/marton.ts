@@ -462,7 +462,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
     const fallback = (): AskResult => ({
       answer: products.length
-        ? `${products[0].name}은(는) ${products[0].floor} ${products[0].corner} ${products[0].shelf}에 있습니다.`
+        ? `${products[0].name}: ${products[0].floor} ${products[0].corner}, ${products[0].shelf}에 있습니다.`
         : '상품 DB에서 찾지 못했습니다. 해당 부서에 위치 확인 요청을 보내보세요.',
       products,
     });
