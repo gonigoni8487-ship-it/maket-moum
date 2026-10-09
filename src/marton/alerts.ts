@@ -14,13 +14,18 @@ export interface AlertPrefs {
 }
 
 const PREFS_KEY = 'marton-alert-prefs';
-export const defaultPrefs: AlertPrefs = { sound: true, vibrate: true, call: true, voice: false, alarm: 'digital' };
+export const defaultPrefs: AlertPrefs = { sound: true, vibrate: true, call: true, voice: false, alarm: 'song' };
 
 export function loadPrefs(): AlertPrefs {
-  try { return { ...defaultPrefs, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return defaultPrefs; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    // 매장 경보음이 생기기 전에 저장된 설정은 한 번 매장 경보음으로 바꾼다
+    if (!saved.songAlarm) delete saved.alarm;
+    return { ...defaultPrefs, ...saved };
+  } catch { return defaultPrefs; }
 }
 export function savePrefs(p: AlertPrefs) {
-  try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch { /* 무시 */ }
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...p, songAlarm: true })); } catch { /* 무시 */ }
 }
 
 let pushActive = false;
@@ -49,15 +54,16 @@ function wavUrl(seconds: number, sample: (t: number) => number) {
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 
-// 긴급 경보음 (확인할 때까지 반복). 구급차처럼 높낮이가 오가는 사이렌 대신 업무용 알람 소리 3가지 중에서 고른다.
-export type AlarmTone = 'digital' | 'bell' | 'chime';
+// 긴급 경보음 (확인할 때까지 반복). 기본은 매장 경보음 음원, 업무용 알람 소리 3가지 중에서도 고를 수 있다.
+export type AlarmTone = 'song' | 'digital' | 'bell' | 'chime';
 export const ALARM_TONES: { id: AlarmTone; label: string; hint: string }[] = [
+  { id: 'song', label: '매장 경보음', hint: '마트ON 전용 경보음' },
   { id: 'digital', label: '디지털 알람', hint: '삐삐삐삐— 알람시계처럼' },
   { id: 'bell', label: '전자 벨', hint: '따르르릉 울리는 벨' },
   { id: 'chime', label: '업무 차임', hint: '띵동 띵동 반복' },
 ];
 const env = (t: number, a: number, b: number, fadeIn = 0.005, fadeOut = 0.01) => Math.max(0, Math.min(1, (t - a) / fadeIn, (b - t) / fadeOut));
-const ALARM_SAMPLES: Record<AlarmTone, (t: number) => number> = {
+const ALARM_SAMPLES: Record<Exclude<AlarmTone, 'song'>, (t: number) => number> = {
   // 2초에 "삐삐삐삐" 두 번: 짧고 또렷한 단음 (알람시계·업무용 단말기 소리)
   digital: t => {
     const g = t % 1;
@@ -88,7 +94,11 @@ const ALARM_SAMPLES: Record<AlarmTone, (t: number) => number> = {
     return v;
   },
 };
-let alarmTone: AlarmTone = 'digital';
+let alarmTone: AlarmTone = 'song';
+// 매장 음원 (public/marton/sounds): 경보음 30초 반복, 생일 축하 노래 30초
+const SONG_ALARM = '/marton/sounds/alarm.mp3';
+const BIRTHDAY_SONG = '/marton/sounds/birthday.mp3';
+const alarmSrc = (tone: AlarmTone) => (tone === 'song' ? SONG_ALARM : wavUrl(2, ALARM_SAMPLES[tone]));
 // 일반 알림: 딩-동
 const chimeSample = (t: number) => {
   const f = t < 0.2 ? 880 : 1320;
@@ -151,12 +161,12 @@ export function setCustomSounds(urls: Partial<Record<SoundKind, string | undefin
 
 function players() {
   if (!siren) {
-    siren = new Audio(wavUrl(2, ALARM_SAMPLES[alarmTone]));
+    siren = new Audio(alarmSrc(alarmTone));
     siren.loop = true;
     chime = new Audio(wavUrl(0.6, chimeSample));
     defaultUrl.call = wavUrl(CALL_SECONDS, callSample);
     defaultUrl.coupon = wavUrl(COUPON_SECONDS, couponSample);
-    defaultUrl.birthday = wavUrl(BDAY_SECONDS, bdaySample);
+    defaultUrl.birthday = BIRTHDAY_SONG;
     call = new Audio(customUrl.call ?? defaultUrl.call);
     coupon = new Audio(customUrl.coupon ?? defaultUrl.coupon);
     bday = new Audio(customUrl.birthday ?? defaultUrl.birthday);
@@ -167,12 +177,12 @@ function players() {
 
 /** 긴급 경보음 바꾸기 (설정에서 고를 때 · 앱 시작 때) */
 export function setAlarmTone(tone: AlarmTone) {
-  if (!ALARM_SAMPLES[tone] || tone === alarmTone) return;
+  if (!ALARM_TONES.some(t => t.id === tone) || tone === alarmTone) return;
   alarmTone = tone;
   if (siren) {
     const playing = !siren.paused;
     siren.pause();
-    siren.src = wavUrl(2, ALARM_SAMPLES[tone]);
+    siren.src = alarmSrc(tone);
     if (playing) void siren.play().catch(() => {});
   }
 }
@@ -240,49 +250,18 @@ async function playChime(tone: 'chime' | 'call' | 'coupon' = 'chime') {
   if ((tone === 'call' && customUrl.call) || (tone === 'coupon' && customUrl.coupon)) window.setTimeout(() => c.pause(), 6000);
 }
 
-// 생일 축하: 빵빠레 디지털 팡파레 (8비트 게임기 소리, 약 4초)
-// [시작 시각(초), 길이(초), 음 높이(반음, 도5=0)] — 멜로디는 각진 사각파, 아래에 베이스·북소리를 깐다
-const FANFARE: [number, number, number][] = [
-  [0.00, 0.09, -5], [0.10, 0.09, 0], [0.20, 0.09, 4], [0.30, 0.34, 7], // 빠바바밤—
-  [0.70, 0.09, 4], [0.80, 0.45, 7], // 빠밤—
-  [1.40, 0.14, 9], [1.60, 0.14, 9], [1.80, 0.14, 11], // 빠! 빠! 빠!
-  [2.00, 1.10, 12], // 빠아아~
-  [3.20, 0.80, 12], [3.20, 0.80, 16], [3.20, 0.80, 19], // 밤! (화음)
-];
-const FANFARE_BASS: [number, number, number][] = [[0, 0.6, -24], [0.7, 0.6, -17], [1.4, 0.5, -15], [2.0, 1.1, -12], [3.2, 0.8, -24]];
-const FANFARE_DRUM = [0, 0.7, 1.4, 1.6, 1.8, 2.0, 3.2];
-const square = (f: number, t: number, duty = 0.25) => ((f * t) % 1 < duty ? 1 : -1);
-const BDAY_SECONDS = 4.3;
-const bdaySample = (t: number) => {
-  let v = 0;
-  for (const [a, len, semi] of FANFARE) {
-    if (t < a || t > a + len + 0.05) continue;
-    const l = t - a;
-    const vib = l > 0.4 ? 1 + 0.006 * Math.sin(2 * Math.PI * 6 * l) : 1; // 긴 음은 살짝 떨림
-    const e = Math.min(1, l / 0.008) * (t > a + len ? Math.max(0, 1 - (t - a - len) / 0.05) : 1) * (len > 0.5 ? Math.exp(-l * 0.8) : 1);
-    v += square(523.25 * 2 ** (semi / 12) * vib, t) * e * 0.12;
-  }
-  for (const [a, len, semi] of FANFARE_BASS) {
-    if (t < a || t > a + len) continue;
-    const f = 523.25 * 2 ** (semi / 12);
-    v += (Math.abs(((f * t) % 1) * 4 - 2) - 1) * Math.min(1, (a + len - t) / 0.03) * 0.22; // 삼각파 베이스
-  }
-  for (const d of FANFARE_DRUM) {
-    const l = t - d;
-    if (l >= 0 && l < 0.08) v += (Math.random() * 2 - 1) * Math.exp(-l * 60) * 0.25; // 짧은 북소리
-  }
-  return Math.max(-1, Math.min(1, v));
-};
+// 생일 축하 노래 (약 30초, 끝부분은 서서히 작아진다)
+const BDAY_SECONDS = 30;
 let bday: HTMLAudioElement | null = null;
 
-/** 생일 축하: 빵빠레 팡파레가 끝나면 "OO 담당님 생일 축하드립니다"를 읽어 준다. 소리가 막히면 false */
+/** 생일 축하: 축하 노래가 끝나면 "OO 담당님 생일 축하드립니다"를 읽어 준다. 소리가 막히면 false */
 export async function celebrateBirthday(message: string): Promise<boolean> {
   const { bday: b } = players();
   b.currentTime = 0;
   try {
     await b.play();
-    // 올린 노래는 최대 30초까지 듣고 축하 음성
-    window.setTimeout(() => { if (customUrl.birthday) b.pause(); speak(message); }, lengthOf(b, BDAY_SECONDS, 30) * 1000);
+    // 노래는 최대 30초까지 듣고 축하 음성
+    window.setTimeout(() => { b.pause(); speak(message); }, lengthOf(b, BDAY_SECONDS, 30) * 1000);
     return true;
   } catch {
     speak(message);

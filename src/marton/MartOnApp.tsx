@@ -335,8 +335,8 @@ export default function MartOnApp() {
   }, [pending, flushOutbox]);
 
   const updatePrefs = (p: AlertPrefs) => { setPrefs(p); savePrefs(p); setAlarmTone(p.alarm); };
-  // 경보음을 고르면 2.5초 들려준다
-  const previewAlarm = (tone: AlarmTone) => { updatePrefs({ ...prefs, alarm: tone }); stopAlarm(); void startSiren(); setTimeout(stopAlarm, 2500); };
+  // 경보음을 고르면 3초 들려준다
+  const previewAlarm = (tone: AlarmTone) => { updatePrefs({ ...prefs, alarm: tone }); stopAlarm(); void startSiren(); setTimeout(stopAlarm, 3000); };
 
   const openRequest = (d: Draft) => { setDraft({ ...d }); setTab('request'); };
 
@@ -423,7 +423,7 @@ export default function MartOnApp() {
             )}
             <div className="space-y-1.5">
               <span className="text-sm font-semibold">긴급 경보음 <span className="font-normal text-slate-400">(누르면 들려줍니다)</span></span>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {ALARM_TONES.map(t => (
                   <button key={t.id} onClick={() => previewAlarm(t.id)} aria-pressed={prefs.alarm === t.id}
                     className={cx('rounded-xl border-2 px-1 py-2 text-xs', prefs.alarm === t.id ? 'border-red-600 bg-red-50 font-bold text-red-700' : 'border-slate-200 text-slate-700')}>
@@ -437,7 +437,7 @@ export default function MartOnApp() {
               <button className="rounded-xl bg-amber-50 py-2.5 text-amber-800" onClick={() => alert({ title: '호출 테스트', body: '받은 요청은 이 소리와 음성으로 알립니다.', urgent: false, tag: 'test', prefs, tone: 'call', announce: callPhrase(me.dept, '테스트') })}>호출음 테스트</button>
               <button className="rounded-xl bg-red-50 py-2.5 text-red-700" onClick={() => { void startSiren(); setTimeout(stopAlarm, 3000); }}>긴급 경보음 테스트 (3초)</button>
               <button className="rounded-xl bg-[#f3e9dc] py-2.5 text-[#4a2c1d]" onClick={() => alert({ title: `☕ ${COUPON_ARRIVED}`, body: '쿠폰 알림음 테스트', urgent: false, tag: 'test', prefs, tone: 'coupon', announce: COUPON_ARRIVED })}>☕ 쿠폰 알림음 테스트</button>
-              <button className="rounded-xl bg-rose-50 py-2.5 text-rose-700" onClick={() => void celebrateBirthday(birthdayMessage(me.name))}>🎂 생일 축하 팡파레</button>
+              <button className="rounded-xl bg-rose-50 py-2.5 text-rose-700" onClick={() => void celebrateBirthday(birthdayMessage(me.name))}>🎂 생일 축하 노래</button>
               <button className="rounded-xl bg-slate-100 py-2.5 disabled:opacity-50" disabled={push !== 'on'} onClick={() => api<{ devices: number }>('/push/test', {}).then(r => showToast(`푸시를 보냈습니다 (기기 ${r.devices}대). 앱을 닫고 확인해 보세요.`), e => onError(e.message))}>푸시 테스트</button>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 text-sm">
@@ -524,7 +524,7 @@ export default function MartOnApp() {
             <div className="text-6xl">🎂</div>
             <p className="text-2xl font-black text-rose-600 [text-wrap:balance] [word-break:keep-all]">{birthday}</p>
             <p className="text-sm text-slate-500">마트ON 동료 모두가 함께 축하합니다 🎉</p>
-            <button onClick={() => void celebrateBirthday(birthday)} className="w-full rounded-xl bg-rose-50 py-3 font-bold text-rose-700">🎺 축하 팡파레 다시 듣기</button>
+            <button onClick={() => void celebrateBirthday(birthday)} className="w-full rounded-xl bg-rose-50 py-3 font-bold text-rose-700">🎂 축하 노래 다시 듣기</button>
             <button onClick={() => setBirthday(null)} className="w-full rounded-xl bg-rose-600 py-3.5 font-bold text-white">고맙습니다</button>
           </div>
         </div>
