@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform } from './platform';
@@ -180,13 +180,7 @@ function searchProducts(q: string, limit = 8): Product[] {
   return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, limit).map(s => s.p);
 }
 
-function promotionFor(p: Product) {
-  const key = p.name.replace(/\s+/g, '');
-  return db.promotions.find(pr => {
-    const n = pr.name.replace(/\s+/g, '');
-    return key.includes(n) || n.includes(key) || p.aliases.some(a => n.includes(a));
-  });
-}
+const promotionFor = (p: Product) => sharedPromotionFor(p, db.promotions);
 
 const describe = (p: Product) => `${p.name}: ${p.floor} ${p.corner}, ${p.shelf} (${p.dept}, ${p.price.toLocaleString()}원)`;
 
@@ -200,6 +194,27 @@ function parseImage(dataUrl: unknown) {
   if (typeof dataUrl !== 'string') return null;
   const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(dataUrl);
   return m ? { mimeType: m[1], data: m[2] } : null;
+}
+
+/** 금액: 2980, "2,980원", "2980.0" 모두 숫자로 */
+const amount = (v: unknown) => {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) && n > 0 && n < 100_000_000 ? Math.round(n) : undefined;
+};
+
+/** 전단 인식·직원 입력을 같은 모양으로 정리 */
+function cleanFlyerItem(it: any, fallbackPeriod?: string): FlyerItem | null {
+  const name = text(it?.name, 60);
+  if (!name) return null;
+  const code = String(it?.code ?? '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 20) || undefined;
+  return {
+    name, code,
+    spec: text(it?.spec, 30) || undefined,
+    price: amount(it?.price),
+    originalPrice: amount(it?.originalPrice),
+    condition: text(it?.condition ?? it?.promo, 60) || undefined,
+    period: text(it?.period, 40) || fallbackPeriod || undefined,
+  };
 }
 
 export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
@@ -414,21 +429,25 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
   app.post(`${api}/promotions`, auth, (req, res) => {
     const me = (req as AuthedRequest).staff;
-    const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 50) : [];
+    const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 100) : [];
     const added: Promotion[] = [];
     for (const it of items) {
-      const name = text(it?.name, 60);
-      if (!name) continue;
+      const item = cleanFlyerItem(it);
+      if (!item) continue;
+      // 같은 상품(판매코드 또는 상품명+규격)이 이미 있으면 새 전단 내용으로 바꾼다
+      const same = db.promotions.findIndex(pr => (item.code && pr.code === item.code) || (pr.name === item.name && (pr.spec ?? '') === (item.spec ?? '')));
       const promotion: Promotion = {
-        id: newId().slice(0, 8), name,
-        price: Number(it.price) || undefined, originalPrice: Number(it.originalPrice) || undefined,
-        period: text(it.period, 40) || undefined, condition: text(it.condition, 60) || undefined,
+        ...item, id: same >= 0 ? db.promotions[same].id : newId().slice(0, 8),
+        productId: matchProduct(item, db.products)?.id,
         createdAt: Date.now(), by: actorOf(me),
       };
-      db.promotions.push(promotion);
+      if (same >= 0) db.promotions[same] = promotion;
+      else db.promotions.push(promotion);
       added.push(promotion);
       broadcast({ type: 'promotion', promotion });
     }
+    // 오래된 행사는 최근 500개만 보관
+    if (db.promotions.length > 500) db.promotions.splice(0, db.promotions.length - 500);
     save();
     res.json(added);
   });
@@ -451,7 +470,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
     try {
       const catalog = (products.length ? products : db.products).map(describe).join('\n');
-      const promos = db.promotions.slice(-30).map(p => `${p.name} ${p.price ?? ''}원 ${p.period ?? ''} ${p.condition ?? ''}`).join('\n');
+      const promos = db.promotions.slice(-30).map(p => `${p.name} ${p.spec ?? ''} ${p.price ?? ''}원 ${p.condition ?? ''} ${p.period ?? ''}`).join('\n');
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
         contents: [{ parts: [{ text: `당신은 대형마트 직원용 안내 AI입니다. 아래 상품 위치 데이터만 근거로, 직원이 고객에게 바로 말해줄 수 있게 한국어 존댓말 1~2문장으로 답하세요. 데이터에 없으면 모른다고 하고 어느 부서에 물어볼지 제안하세요. 행사 정보가 있으면 덧붙이세요.\n\n[상품 위치]\n${catalog}\n\n[진행 중 행사]\n${promos || '없음'}\n\n[질문]\n${question}` }] }],
@@ -505,7 +524,18 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
     if (!aiEnabled) return res.status(503).json({ error: 'AI 키(GEMINI_API_KEY)가 설정되지 않아 사진 분석을 할 수 없습니다.' });
 
     const prompts = {
-      flyer: '이 마트 행사 전단 사진에서 행사 상품을 모두 추출하세요. JSON: {"items":[{"name":"상품명","price":행사가숫자,"originalPrice":정상가숫자또는null,"period":"행사기간","condition":"1+1, 카드할인 등 조건"}]}',
+      flyer: [
+        '이 사진은 한국 대형마트의 행사 전단지(또는 행사 POP·쇼카드)입니다. 보이는 행사 상품을 빠짐없이 한 상품당 한 줄로 추출하세요.',
+        '- name: 상품명 (브랜드 포함, 규격·가격은 빼고)',
+        '- code: 판매코드·상품코드·바코드 숫자. 전단에 적혀 있을 때만, 없으면 null',
+        '- spec: 규격·단위 (예: 1L, 500g, 120g×5입, 1팩(10구), 100g당). 없으면 null',
+        '- price: 행사 판매가(원, 숫자만). 100g당 가격이면 그 숫자',
+        '- originalPrice: 정상가(취소선 가격 등, 숫자만). 없으면 null',
+        '- condition: 행사 프로모션 (예: 1+1, 2+1, 30% 할인, 회원 3,000원 할인, 카드 할인, 덤 증정, 2개 이상 구매 시). 없으면 null',
+        '- period: 행사기간 (예: 10/9~10/15). 전단 전체 공통 기간이면 각 상품에 똑같이',
+        '읽을 수 없거나 확실하지 않은 값은 지어내지 말고 null.',
+        'JSON: {"period":"전단 공통 행사기간 또는 null","items":[{"name":"","code":null,"spec":null,"price":0,"originalPrice":null,"condition":null,"period":null}]}',
+      ].join('\n'),
       price: '이 가격표(쇼카드/전자가격표) 사진에서 상품명과 표시 가격을 읽으세요. JSON: {"name":"상품명","price":숫자}',
       barcode: '이 사진에서 바코드 아래 숫자(EAN/UPC)와 상품명을 읽으세요. JSON: {"barcode":"숫자만","name":"보이는 상품명 또는 null"}',
     } as const;
@@ -520,7 +550,12 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
       const raw = parseJson<Record<string, any>>(response.text);
 
       if (mode === 'flyer') {
-        return res.json({ mode, items: Array.isArray(raw.items) ? raw.items : [] } satisfies VisionResult);
+        const period = text(raw.period, 40) || undefined;
+        const items = (Array.isArray(raw.items) ? raw.items : []).slice(0, 100)
+          .map((it: unknown) => cleanFlyerItem(it, period))
+          .filter((it: FlyerItem | null): it is FlyerItem => Boolean(it))
+          .map((it: FlyerItem) => ({ ...it, productId: matchProduct(it, db.products)?.id }));
+        return res.json({ mode, items } satisfies VisionResult);
       }
       if (mode === 'price') {
         const name = raw.name as string | undefined;

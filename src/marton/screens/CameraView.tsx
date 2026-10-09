@@ -12,6 +12,9 @@ const GUIDE: Record<CameraMode, { title: string; hint: string; frame?: string }>
   photo: { title: '사진 첨부', hint: '상품·가격표·바코드가 잘 보이게 찍어 주세요. 사람 얼굴은 찍지 않습니다.' },
 };
 
+/** 전단은 작은 글씨(판매코드·규격)까지 읽어야 해서 더 크게 저장 */
+export const FLYER_MAX_SIDE = 2000;
+
 const HELP_AFTER_MS = 6000; // 이 시간 동안 바코드를 못 읽으면 대처 방법 안내
 
 /**
@@ -99,12 +102,12 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
     if (!ready) return;
     setFlash(true);
     setTimeout(() => setFlash(false), 150);
-    onCapture(grab());
+    onCapture(grab(mode === 'flyer' ? FLYER_MAX_SIDE : 1280));
   };
 
   const fromFile = async (file?: File) => {
     if (!file) return;
-    const photo = await fileToJpeg(file);
+    const photo = await fileToJpeg(file, mode === 'flyer' ? FLYER_MAX_SIDE : 1280);
     if (mode === 'barcode' && onBarcode) {
       const code = await readBarcode(await createImageBitmap(file));
       if (code) return onBarcode(code, photo);

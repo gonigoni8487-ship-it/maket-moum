@@ -1,16 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { Camera, CheckCircle2, AlertTriangle, HelpCircle, MapPin, ScanLine, Keyboard, Send } from 'lucide-react';
-import type { Product, Promotion, Staff, Task, VisionBarcodeResult, VisionFlyerResult, VisionPriceResult, VisionResult } from '../shared';
+import type { Product, Staff, Task, VisionBarcodeResult, VisionPriceResult, VisionResult } from '../shared';
 import { api } from '../api';
 import { cx, inputCls, primaryBtn, won, type Draft } from '../ui';
 import CameraView from './CameraView';
 import PhotoUpload from './PhotoUpload';
+import FlyerUpload from './FlyerUpload';
 
 type Mode = VisionResult['mode'];
 const MODES: { mode: Mode; label: string; hint: string; button: string }[] = [
   { mode: 'price', label: '가격표', hint: '가격표를 찍으면 시스템 가격(행사가 포함)과 비교하고, 다르면 바로 가격 오류 요청을 보냅니다.', button: '가격표 촬영' },
   { mode: 'barcode', label: '바코드', hint: '바코드를 비추면 자동으로 읽어 상품·위치·가격을 보여 줍니다. 안 읽히거나 훼손됐으면 번호 입력이나 훼손 신고로 처리합니다.', button: '바코드 스캔' },
-  { mode: 'flyer', label: '행사 전단', hint: '전단을 찍으면 행사상품·가격·기간을 뽑아 전 직원이 함께 보는 행사 목록에 등록합니다.', button: '전단 촬영' },
+  { mode: 'flyer', label: '행사 전단', hint: '전단 사진을 올리면 상품명·판매코드·규격·금액·행사 프로모션·기간을 자동으로 읽습니다. 확인·수정 후 등록하면 전 직원 상품찾기와 가격표 확인에 바로 반영됩니다.', button: '전단 촬영' },
 ];
 
 function ProductCard({ p, onRequest, photo }: { p: Product; onRequest: (d: Draft) => void; photo?: string }) {
@@ -36,8 +37,8 @@ function ProductCard({ p, onRequest, photo }: { p: Product; onRequest: (d: Draft
   );
 }
 
-export default function PhotoAI({ me, aiEnabled, onRequest, onSent, onError, onToast }: {
-  me: Staff; aiEnabled: boolean; onRequest: (d: Draft) => void; onSent: (t: Task | null) => void; onError: (m: string) => void; onToast: (m: string) => void;
+export default function PhotoAI({ me, aiEnabled, products, onRequest, onSent, onError, onToast }: {
+  me: Staff; aiEnabled: boolean; products: Product[]; onRequest: (d: Draft) => void; onSent: (t: Task | null) => void; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   const [upload, setUpload] = useState(true); // 첫 화면: 사진 올리기
   const [mode, setMode] = useState<Mode>('price');
@@ -109,15 +110,6 @@ export default function PhotoAI({ me, aiEnabled, onRequest, onSent, onError, onT
     void analyze({ barcode: digits });
   };
 
-  const savePromotions = async (r: VisionFlyerResult) => {
-    try {
-      const added = await api<Promotion[]>('/promotions', { items: r.items });
-      onToast(`행사상품 ${added.length}건을 등록했습니다.`);
-    } catch (e) {
-      onError((e as Error).message);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex gap-1 rounded-xl bg-slate-200/70 p-1">
@@ -135,16 +127,18 @@ export default function PhotoAI({ me, aiEnabled, onRequest, onSent, onError, onT
           <p className="text-sm text-slate-500">가격표·바코드·상품 사진을 찍거나 앨범에서 골라 담당 부서에 바로 보냅니다.</p>
           <PhotoUpload me={me} onSent={onSent} onError={onError} />
         </>
+      ) : mode === 'flyer' ? (
+        <>
+          <p className="text-sm text-slate-500">{info.hint}</p>
+          <FlyerUpload aiEnabled={aiEnabled} products={products} onError={onError} onToast={onToast} />
+        </>
       ) : <>
       <p className="text-sm text-slate-500">{info.hint}</p>
       {!aiEnabled && mode === 'price' && (
         <p className="rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">AI 키가 없어 가격 자동 대조는 꺼져 있습니다. 사진을 찍어 해당 부서에 가격 확인을 요청할 수 있습니다.</p>
       )}
-      {!aiEnabled && mode === 'flyer' && (
-        <p className="rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">AI 키가 없어 전단 자동 추출은 꺼져 있습니다.</p>
-      )}
 
-      <button onClick={() => setCamera(true)} disabled={busy || (!aiEnabled && mode === 'flyer')} className={cx(primaryBtn, 'flex items-center justify-center gap-2 py-5')}>
+      <button onClick={() => setCamera(true)} disabled={busy} className={cx(primaryBtn, 'flex items-center justify-center gap-2 py-5')}>
         {mode === 'barcode' ? <ScanLine className="size-5" /> : <Camera className="size-5" />}{busy ? '확인하는 중…' : info.button}
       </button>
 
@@ -172,19 +166,6 @@ export default function PhotoAI({ me, aiEnabled, onRequest, onSent, onError, onT
         <button onClick={() => priceErrorRequest()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3.5 text-sm font-bold text-white">
           <Send className="size-4" />이 사진으로 가격 확인 요청 보내기
         </button>
-      )}
-
-      {result?.mode === 'flyer' && (
-        <div className="space-y-2">
-          {result.items.length === 0 && <p className="text-sm text-slate-500">행사상품을 찾지 못했습니다.</p>}
-          {result.items.map((it, i) => (
-            <div key={i} className="rounded-xl bg-white px-3.5 py-3 text-sm">
-              <div className="flex justify-between font-bold"><span>{it.name}</span><span className="text-pink-600">{won(it.price)}</span></div>
-              <div className="mt-0.5 text-xs text-slate-500">{it.originalPrice ? <s className="mr-1.5">{won(it.originalPrice)}</s> : null}{it.condition} {it.period}</div>
-            </div>
-          ))}
-          {result.items.length > 0 && <button onClick={() => savePromotions(result)} className="w-full rounded-xl bg-pink-600 py-3 text-sm font-bold text-white">행사상품으로 등록 (전 직원 공유)</button>}
-        </div>
       )}
 
       {result?.mode === 'price' && (

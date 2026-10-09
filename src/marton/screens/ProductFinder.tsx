@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Mic, Search, Sparkles, MapPin, Send } from 'lucide-react';
-import type { AskResult, Product, Promotion } from '../shared';
+import { promotionFor, type AskResult, type Product, type Promotion } from '../shared';
 import { api } from '../api';
 import { speak } from '../alerts';
 import { cx, Empty, inputCls, won, type Draft } from '../ui';
@@ -33,11 +33,6 @@ export function ProductRow({ p, promo, onRequest }: { p: Product; promo?: Promot
       </div>
     </div>
   );
-}
-
-export function promotionFor(p: Product, promotions: Promotion[]) {
-  const key = norm(p.name);
-  return promotions.find(pr => { const n = norm(pr.name); return key.includes(n) || n.includes(key) || p.aliases.some(a => n.includes(norm(a))); });
 }
 
 export default function ProductFinder({ products, promotions, onRequest, onError }: {
@@ -112,11 +107,21 @@ export default function ProductFinder({ products, promotions, onRequest, onError
 
       {!q.trim() && promotions.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-bold text-slate-700">등록된 행사상품</h3>
-          {promotions.slice(-10).reverse().map(p => (
-            <div key={p.id} className="flex justify-between rounded-xl bg-white px-3.5 py-2.5 text-sm">
-              <span className="font-semibold">{p.name} <span className="text-pink-600">{p.condition}</span></span>
-              <span className="text-slate-500">{won(p.price)} {p.period}</span>
+          <h3 className="text-sm font-bold text-slate-700">등록된 행사상품 <span className="font-normal text-slate-400">{promotions.length}개</span></h3>
+          {promotions.slice(-20).reverse().map(p => (
+            <div key={p.id} className="rounded-xl bg-white px-3.5 py-2.5 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 font-semibold">{p.name}{p.spec && <span className="ml-1 font-normal text-slate-500">{p.spec}</span>}</span>
+                <span className="shrink-0 text-right">
+                  {p.originalPrice && p.originalPrice !== p.price && <s className="mr-1 text-xs text-slate-400">{won(p.originalPrice)}</s>}
+                  <b className="text-pink-600">{won(p.price)}</b>
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+                {p.condition && <span className="rounded bg-pink-100 px-1.5 font-bold text-pink-700">{p.condition}</span>}
+                {p.code && <span className="font-mono">{p.code}</span>}
+                {p.period && <span>{p.period}</span>}
+              </div>
             </div>
           ))}
         </div>

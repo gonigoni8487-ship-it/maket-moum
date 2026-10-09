@@ -87,15 +87,47 @@ export interface Product {
   price: number;
 }
 
-export interface Promotion {
-  id: string;
+/** 행사 전단 한 줄 (전단 인식 결과이자 행사상품 등록 입력) */
+export interface FlyerItem {
   name: string;
+  /** 판매코드 (상품코드·바코드 숫자) */
+  code?: string;
+  /** 규격·단위 (예: 1L, 120g×5입) */
+  spec?: string;
+  /** 행사 판매가 */
   price?: number;
   originalPrice?: number;
-  period?: string;
+  /** 행사 프로모션 (예: 1+1, 30% 할인, 카드 할인) */
   condition?: string;
+  period?: string;
+}
+
+export interface Promotion extends FlyerItem {
+  id: string;
+  /** 매장 상품 DB와 연결된 경우 */
+  productId?: string;
   createdAt: number;
   by: Actor;
+}
+
+/**
+ * 판매코드가 같으면 같은 상품. 코드가 없으면 상품명이 겹치고 규격(1L, 100g 등)도 매장 상품명에 들어 있을 때만 같은 상품으로 본다
+ * ("한우 등심 100g" 행사가가 "한우 등심 300g" 가격표 확인에 쓰이지 않게).
+ */
+export function matchProduct(item: { name: string; code?: string; spec?: string }, products: Product[]): Product | undefined {
+  const code = item.code?.replace(/\D/g, '');
+  if (code && code.length >= 8) {
+    const byCode = products.find(p => p.barcode === code);
+    if (byCode) return byCode;
+  }
+  const n = item.name.replace(/\s+/g, '').toLowerCase();
+  if (n.length < 2) return undefined;
+  const spec = item.spec?.replace(/\s+/g, '').toLowerCase();
+  return products.find(p => {
+    const k = p.name.replace(/\s+/g, '').toLowerCase();
+    const nameHit = k.includes(n) || n.includes(k) || p.aliases.some(a => a.length >= 2 && n.includes(a.replace(/\s+/g, '').toLowerCase()));
+    return nameHit && (!spec || k.includes(spec));
+  });
 }
 
 export interface Bootstrap {
@@ -122,9 +154,18 @@ export type StreamEvent =
   | { type: 'handover'; handover: Handover }
   | { type: 'presence'; online: Record<string, number> };
 
+/** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
+export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {
+  for (let i = promotions.length - 1; i >= 0; i--) {
+    const pr = promotions[i];
+    if (pr.productId ? pr.productId === p.id : matchProduct(pr, [p]) === p) return pr;
+  }
+  return undefined;
+}
+
 export interface VisionFlyerResult {
   mode: 'flyer';
-  items: { name: string; price?: number; originalPrice?: number; period?: string; condition?: string }[];
+  items: (FlyerItem & { productId?: string })[];
 }
 
 export interface VisionPriceResult {
