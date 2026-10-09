@@ -58,9 +58,9 @@ export interface Attachment {
 export const MAX_FILE_BYTES = 1.8 * 1024 * 1024;
 
 // ---- 매장 소리 (관리자가 올린 파일) ----
-export const SOUND_KINDS = ['birthday', 'coupon', 'call'] as const;
+export const SOUND_KINDS = ['birthday', 'coupon', 'call', 'bell', 'morning'] as const;
 export type StoreSoundKind = (typeof SOUND_KINDS)[number];
-export const SOUND_LABEL: Record<StoreSoundKind, string> = { birthday: '생일 축하', coupon: '커피쿠폰 도착', call: '부서 호출음' };
+export const SOUND_LABEL: Record<StoreSoundKind, string> = { birthday: '생일 축하', coupon: '커피쿠폰 도착', call: '부서 호출음', bell: '고객 호출벨', morning: '아침 명언 배경음악' };
 export const MAX_SOUND_BYTES = 1.5 * 1024 * 1024;
 export interface StoreSound {
   kind: StoreSoundKind;
@@ -194,6 +194,22 @@ export const emergencySpeech = (e: Pick<Emergency, 'type' | 'location'>) =>
   `${e.type}. ${e.type}. ${e.location ? `위치 ${e.location}. ` : ''}${EMERGENCY_INFO[e.type].say}.`;
 /** 비상 상황을 해제할 수 있는 사람: 점장·부점장, 보안(MS), 알린 사람 */
 export const canClearEmergency = (s: Staff, e: Emergency) => s.role === 'manager' || s.dept === 'MS' || s.id === e.by.id;
+
+// ---- 고객 호출벨: 누군가 응대하겠다고 누를 때까지 전 직원 휴대폰에서 반복 ----
+export const BELL_PLACES = ['지하1층 게이트', '1층 고객센터', '계산대'] as const;
+export interface CustomerBell {
+  id: string;
+  place: string;
+  createdAt: number;
+  /** 같은 곳에서 다시 누른 횟수 */
+  rings: number;
+  lastRingAt: number;
+  /** 누가 눌렀나: 직원 이름 또는 장치 이름 */
+  source: string;
+  answeredAt?: number;
+  answeredBy?: Actor;
+}
+export const bellPhrase = (place: string) => `${place} 고객님 호출벨이 울렸습니다`;
 
 // ---- 도와드리겠습니다: 고객 컴플레인 접수건 공유 ----
 export const COMPLAINT_STATUSES = ['접수', '처리중', '처리완료'] as const;
@@ -387,6 +403,8 @@ export interface Bootstrap {
   emergencies: Emergency[];
   /** 도와드리겠습니다 컴플레인 공유 (최근 90일) */
   complaints: Complaint[];
+  /** 고객 호출벨 (응대 대기 중 + 오늘) */
+  bells: CustomerBell[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -406,7 +424,8 @@ export type StreamEvent =
   | { type: 'birthday'; staffId: string; name: string }
   | { type: 'sounds'; sounds: StoreSound[] }
   | { type: 'emergency'; emergency: Emergency; action: 'created' | 'cleared' }
-  | { type: 'complaint'; complaint: Complaint; action: 'created' | 'updated' };
+  | { type: 'complaint'; complaint: Complaint; action: 'created' | 'updated' }
+  | { type: 'bell'; bell: CustomerBell; action: 'ring' | 'answered' };
 
 /** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
 export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {

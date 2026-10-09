@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type CustomerBell, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform, onJob } from './platform';
@@ -79,6 +79,7 @@ export interface Db {
   sounds?: StoreSound[];
   emergencies?: Emergency[];
   complaints?: Complaint[];
+  bells?: CustomerBell[];
   /** 생일 축하를 보낸 해 (직원별) */
   birthdayDone?: Record<string, number>;
   vapid?: { publicKey: string; privateKey: string };
@@ -319,6 +320,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       sounds: db.sounds ?? [],
       emergencies: (db.emergencies ?? []).filter(e => !e.clearedAt || e.createdAt > Date.now() - 7 * 24 * 60 * 60 * 1000),
       complaints: (db.complaints ?? []).slice(-100),
+      bells: (db.bells ?? []).filter(b => !b.answeredAt || b.answeredAt > Date.now() - 12 * 60 * 60 * 1000),
       expiryChecks: db.expiryChecks.filter(c => (me.role === 'manager' || c.dept === me.dept) && c.at > Date.now() - 7 * 24 * 60 * 60 * 1000),
       online: onlineCounts(),
       aiEnabled,

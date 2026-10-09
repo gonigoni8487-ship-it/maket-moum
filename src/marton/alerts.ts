@@ -137,11 +137,26 @@ let siren: HTMLAudioElement | null = null;
 let chime: HTMLAudioElement | null = null;
 let call: HTMLAudioElement | null = null;
 let coupon: HTMLAudioElement | null = null;
+let bellEl: HTMLAudioElement | null = null;
+
+// 고객 호출벨: 맑은 "딩-동, 딩-동" 초인종 소리 (약 2.4초)
+const BELL_NOTES: [number, number][] = [[0, 1318.5], [0.45, 1046.5], [1.2, 1318.5], [1.65, 1046.5]]; // 미-도, 미-도
+const bellSample = (t: number) => {
+  let v = 0;
+  for (const [start, f] of BELL_NOTES) {
+    if (t < start) continue;
+    const l = t - start;
+    // 실로폰·차임벨 느낌: 기본음 + 비정수 배음, 천천히 사라짐
+    v += (Math.sin(2 * Math.PI * f * t) + 0.4 * Math.sin(2 * Math.PI * f * 2.76 * t) * Math.exp(-l * 6) + 0.2 * Math.sin(2 * Math.PI * f * 0.5 * t)) * Math.exp(-l * 2.6) * Math.min(1, l / 0.004) * 0.36;
+  }
+  return Math.max(-1, Math.min(1, v));
+};
+const BELL_SECONDS = 2.4;
 let unlocked = false;
 const soundListeners = new Set<(ok: boolean) => void>();
 
 // ---- 매장에서 올린 소리 파일 (생일 축하·쿠폰 도착·호출음) ----
-export type SoundKind = 'birthday' | 'coupon' | 'call';
+export type SoundKind = 'birthday' | 'coupon' | 'call' | 'bell' | 'morning';
 const customUrl: Partial<Record<SoundKind, string>> = {};
 const defaultUrl: Partial<Record<SoundKind, string>> = {};
 /** 소리 길이(초): 올린 파일은 실제 길이(최대 cap), 아니면 기본 길이 */
@@ -150,11 +165,12 @@ const lengthOf = (el: HTMLAudioElement | null, fallback: number, cap: number) =>
 
 /** 관리자가 올린 소리로 바꾼다 (없으면 기본 소리). 같은 audio 요소를 그대로 써서 이미 허용된 소리가 계속 난다 */
 export function setCustomSounds(urls: Partial<Record<SoundKind, string | undefined>>) {
-  (['birthday', 'coupon', 'call'] as SoundKind[]).forEach(kind => {
+  (['birthday', 'coupon', 'call', 'bell', 'morning'] as SoundKind[]).forEach(kind => {
     const next = urls[kind];
     if (customUrl[kind] === next) return;
     if (next) customUrl[kind] = next; else delete customUrl[kind];
-    const el = kind === 'birthday' ? bday : kind === 'coupon' ? coupon : call;
+    if (kind === 'morning') return; // 아침 명언 음악은 카드뉴스를 열 때 직접 재생
+    const el = kind === 'birthday' ? bday : kind === 'coupon' ? coupon : kind === 'bell' ? bellEl : call;
     if (el) { el.src = next ?? defaultUrl[kind]!; el.load(); }
   });
 }
@@ -167,12 +183,15 @@ function players() {
     defaultUrl.call = wavUrl(CALL_SECONDS, callSample);
     defaultUrl.coupon = wavUrl(COUPON_SECONDS, couponSample);
     defaultUrl.birthday = BIRTHDAY_SONG;
+    defaultUrl.bell = wavUrl(BELL_SECONDS, bellSample);
+    bellEl = new Audio(customUrl.bell ?? defaultUrl.bell);
+    bellEl.preload = 'auto';
     call = new Audio(customUrl.call ?? defaultUrl.call);
     coupon = new Audio(customUrl.coupon ?? defaultUrl.coupon);
     bday = new Audio(customUrl.birthday ?? defaultUrl.birthday);
     [call, coupon, bday].forEach(el => { el.preload = 'auto'; });
   }
-  return { siren, chime: chime!, call: call!, coupon: coupon!, bday: bday! };
+  return { siren, chime: chime!, call: call!, coupon: coupon!, bday: bday!, bell: bellEl! };
 }
 
 /** 긴급 경보음 바꾸기 (설정에서 고를 때 · 앱 시작 때) */
@@ -210,8 +229,8 @@ export function unlockAudio() {
   primeSpeech(); // 음성 안내도 첫 터치 때 깨워 둔다 (아이폰·일부 안드로이드)
   if (unlocked) return;
   try {
-    const { siren: s, chime: c, call: cl, coupon: cp, bday: bd } = players();
-    for (const el of [c, cl, cp, bd, s]) {
+    const { siren: s, chime: c, call: cl, coupon: cp, bday: bd, bell: bl } = players();
+    for (const el of [c, cl, cp, bd, bl, s]) {
       el.muted = true;
       void el.play().then(() => {
         if (el === s && !alarmOn) { el.pause(); el.currentTime = 0; }
@@ -241,13 +260,13 @@ export async function startSiren(): Promise<boolean> {
   }
 }
 
-async function playChime(tone: 'chime' | 'call' | 'coupon' = 'chime') {
-  const { chime, call: cl, coupon: cp } = players();
-  const c = tone === 'call' ? cl : tone === 'coupon' ? cp : chime;
+async function playChime(tone: 'chime' | 'call' | 'coupon' | 'bell' = 'chime') {
+  const { chime, call: cl, coupon: cp, bell: bl } = players();
+  const c = tone === 'call' ? cl : tone === 'coupon' ? cp : tone === 'bell' ? bl : chime;
   c.currentTime = 0;
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); return; }
   // 올린 소리가 길면 6초에서 끊고 음성 안내로 넘어간다
-  if ((tone === 'call' && customUrl.call) || (tone === 'coupon' && customUrl.coupon)) window.setTimeout(() => c.pause(), 6000);
+  if ((tone === 'call' && customUrl.call) || (tone === 'coupon' && customUrl.coupon) || (tone === 'bell' && customUrl.bell)) window.setTimeout(() => c.pause(), 6000);
 }
 
 // 생일 축하 노래 (약 30초, 끝부분은 서서히 작아진다)
@@ -381,6 +400,26 @@ export async function startUrgentCall(): Promise<boolean> {
   return unlocked;
 }
 
+let bellTimer: number | null = null;
+/**
+ * 고객 호출벨: 초인종 소리 → "지하1층 게이트 고객님 호출벨이 울렸습니다"를
+ * 누군가 응대할 때까지(stopAlarm) 12초마다 반복한다.
+ */
+export async function startBellCall(message: string, prefs: AlertPrefs): Promise<boolean> {
+  stopAlarm();
+  const ring = async () => {
+    if (prefs.vibrate) navigator.vibrate?.([300, 120, 300, 120, 300]);
+    if (prefs.sound) await playChime('bell');
+    window.setTimeout(() => { if (bellTimer !== null) speak(message); }, (prefs.sound ? lengthOf(bellEl, BELL_SECONDS, 6) : 0) * 1000);
+  };
+  bellTimer = window.setInterval(() => void ring(), 12000);
+  await ring();
+  return unlocked;
+}
+
+/** 아침 명언 배경음악 주소 (매장에서 올린 음악이 있으면 그것) */
+export const morningMusicUrl = () => customUrl.morning ?? '/marton/sounds/morning.mp3';
+
 /** 사이렌을 잠시 줄이고 음성 안내 (위치가 들리도록) */
 function speakOverSiren(message: string) {
   if (siren) siren.volume = 0.25;
@@ -397,6 +436,9 @@ export function stopAlarm() {
   vibrateTimer = null;
   if (urgentTimer !== null) clearInterval(urgentTimer);
   urgentTimer = null;
+  if (bellTimer !== null) clearInterval(bellTimer);
+  bellTimer = null;
+  if (bellEl) bellEl.pause();
   navigator.vibrate?.(0);
   if (siren) { siren.pause(); siren.currentTime = 0; siren.volume = 1; }
 }

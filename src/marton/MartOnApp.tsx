@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Megaphone, Settings, Siren, X, Mic, Coffee, Home as HomeIcon, ChevronLeft, BellRing } from 'lucide-react';
-import { birthdayMessage, canClearEmergency, complaintCallPhrase, emergencySpeech, EMERGENCY_INFO, canHandleIncident, COUPON_ARRIVED, expiryCallPhrase, isBirthdayToday, noticeFor, storeTime, noticeSpeech, noticeTarget, type Bootstrap, type Emergency, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
+import { bellPhrase, birthdayMessage, canClearEmergency, complaintCallPhrase, emergencySpeech, EMERGENCY_INFO, canHandleIncident, COUPON_ARRIVED, expiryCallPhrase, isBirthdayToday, noticeFor, storeTime, noticeSpeech, noticeTarget, type Bootstrap, type CustomerBell, type Emergency, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { ALARM_TONES, alert, onVoiceChange, setCustomSounds, voiceStatus, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, startUrgentCall, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { ALARM_TONES, alert, onVoiceChange, setCustomSounds, voiceStatus, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startBellCall, startSiren, startUrgentCall, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -20,12 +20,14 @@ import { HandoverInbox, HandoverSheet } from './screens/Handover';
 import Home, { type HomeGo } from './screens/Home';
 import Complaints from './screens/Complaints';
 import { EmergencyDetail, EmergencySheet } from './screens/Emergency';
+import { BellKiosk, BellSheet } from './screens/Bell';
+import MorningCards, { markMorningSeen, shouldShowMorning } from './screens/MorningCards';
 
 const CACHE_KEY = 'marton-cache';
 
 type Tab = 'home' | 'tasks' | 'request' | 'find' | 'photo' | 'complaint' | 'notices' | 'security' | 'manager';
 const TAB_IDS: Tab[] = ['home', 'tasks', 'request', 'find', 'photo', 'complaint', 'notices', 'security', 'manager'];
-type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice } | { kind: 'incident'; incident: Incident } | { kind: 'emergency'; emergency: Emergency };
+type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice } | { kind: 'incident'; incident: Incident } | { kind: 'emergency'; emergency: Emergency } | { kind: 'bell'; bell: CustomerBell };
 
 function usePwaHead() {
   useEffect(() => {
@@ -69,6 +71,16 @@ export default function MartOnApp() {
   const [urgent, setUrgent] = useState<Urgent | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [bellSheet, setBellSheet] = useState(false);
+  const [morningOpen, setMorningOpen] = useState(false);
+  // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
+  const [kiosk, setKiosk] = useState<string | null>(() => { try { return localStorage.getItem('marton-kiosk'); } catch { return null; } });
+  const kioskRef = useRef(kiosk);
+  kioskRef.current = kiosk;
+  const openKiosk = (place: string | null) => {
+    try { if (place) localStorage.setItem('marton-kiosk', place); else localStorage.removeItem('marton-kiosk'); } catch { /* 저장 불가 */ }
+    setKiosk(place);
+  };
   const [boardSection, setBoardSection] = useState<BoardSection>('notice');
   const [birthday, setBirthday] = useState<string | null>(null);
   const [voiceOk, setVoiceOk] = useState(voiceStatus);
@@ -136,6 +148,14 @@ export default function MartOnApp() {
 
   useEffect(() => { if (session.token) void load(); }, [load]);
 
+  // 아침(4시~12시)에 그날 처음 앱을 열면 명언 카드뉴스 (생일인 날은 생일 축하가 먼저)
+  useEffect(() => {
+    const me = data?.me;
+    if (!me || kioskRef.current || isBirthdayToday(me.birthday) || !shouldShowMorning()) return;
+    markMorningSeen();
+    setMorningOpen(true);
+  }, [data?.me]);
+
   // 생일인 날 처음 앱을 열면 축하 (해마다 한 번)
   useEffect(() => {
     const me = data?.me;
@@ -151,7 +171,7 @@ export default function MartOnApp() {
   useEffect(() => {
     const url = (id: string) => `/api/marton/sounds/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
     const by = Object.fromEntries((data?.sounds ?? []).map(x => [x.kind, url(x.id)]));
-    setCustomSounds({ birthday: by.birthday, coupon: by.coupon, call: by.call });
+    setCustomSounds({ birthday: by.birthday, coupon: by.coupon, call: by.call, bell: by.bell, morning: by.morning });
   }, [soundKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEvent = useCallback((e: StreamEvent) => {
@@ -250,6 +270,19 @@ export default function MartOnApp() {
         setUrgent(u => { if (u?.kind === 'emergency' && u.emergency.id === em.id) { stopAlarm(); return null; } return u; });
         if (em.clearedBy?.id !== me.id) alert({ title: `✅ ${em.type} 상황 해제`, body: `${em.clearedBy?.name ?? ''}님이 상황 해제를 알렸습니다.`, urgent: false, tag: `emergency-${em.id}`, prefs: { ...p, call: true }, announce: `${em.type} 상황이 해제되었습니다` });
         showToast(`✅ ${em.type} 상황이 해제되었습니다.`);
+      }
+      return;
+    }
+    if (e.type === 'bell') {
+      const b = e.bell;
+      setData(d => d && { ...d, bells: upsert(d.bells ?? [], b) });
+      if (e.action === 'ring') {
+        if (kioskRef.current) return; // 호출벨 화면 기기는 울리지 않는다
+        void startBellCall(bellPhrase(b.place), p);
+        setUrgent({ kind: 'bell', bell: b });
+      } else {
+        setUrgent(u => { if (u?.kind === 'bell' && u.bell.id === b.id) { stopAlarm(); return null; } return u; });
+        if (b.answeredBy && b.answeredBy.id !== me.id && !kioskRef.current) showToast(`🙋 ${b.answeredBy.dept} ${b.answeredBy.name}님이 ${b.place} 고객님을 응대합니다.`);
       }
       return;
     }
@@ -376,6 +409,11 @@ export default function MartOnApp() {
     if (!u || !data) return;
     try {
       if (u.kind === 'emergency') return; // 내 휴대폰 사이렌만 끈다 (상황 해제는 따로)
+      if (u.kind === 'bell') {
+        await api(`/bells/${u.bell.id}/answer`, {});
+        showToast(`${u.bell.place}로 가 주세요. 다른 직원들의 알림은 꺼졌습니다.`);
+        return;
+      }
       if (u.kind === 'notice') await send(`/notices/${u.notice.id}/read`, {}, '긴급 공지 확인');
       else if (u.kind === 'incident') {
         if (u.incident.status === '접수') await send(`/incidents/${u.incident.id}/status`, { status: '확인' }, '보안 경보 확인');
@@ -415,6 +453,8 @@ export default function MartOnApp() {
     if (to === 'voice') { unlockAudio(); return setVoiceOpen(true); }
     if (to === 'wallet') return setWalletOpen(true);
     if (to === 'settings') return setShowSettings(true);
+    if (to === 'morning') return setMorningOpen(true);
+    if (to === 'bell') return setBellSheet(true);
     if (to === 'notice' || to === 'share' || to === 'schedule' || to === 'expiry') { setBoardSection(to); return setTab('notices'); }
     setTab(to);
   };
@@ -558,6 +598,10 @@ export default function MartOnApp() {
         />
       )}
 
+      {morningOpen && <MorningCards name={me.name} onClose={() => setMorningOpen(false)} />}
+      {bellSheet && <BellSheet onClose={() => setBellSheet(false)} onKiosk={pl => { setBellSheet(false); openKiosk(pl); }} onError={onError} onToast={showToast} />}
+      {kiosk && <BellKiosk place={kiosk} bells={data.bells ?? []} onExit={() => openKiosk(null)} onError={onError} />}
+
       {emergencyOpen && (
         <EmergencySheet onClose={() => setEmergencyOpen(false)} onError={onError}
           onSent={em => { setEmergencyOpen(false); setData(d => d && { ...d, emergencies: upsert(d.emergencies ?? [], em) }); showToast(`🚨 ${em.type} — 전 직원에게 사이렌을 울렸습니다.`); }} />
@@ -616,15 +660,22 @@ export default function MartOnApp() {
       )}
 
       {urgent && (
-        <div className={cx('fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 overflow-y-auto p-6 text-center text-white', urgent.kind === 'emergency' ? 'bg-red-600' : 'bg-orange-600')}>
-          {urgent.kind === 'emergency' ? <Siren className="size-16 animate-pulse" /> : <BellRing className="size-16 animate-pulse" />}
+        <div className={cx('fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 overflow-y-auto p-6 text-center text-white', urgent.kind === 'emergency' ? 'bg-red-600' : urgent.kind === 'bell' ? 'bg-sky-600' : 'bg-orange-600')}>
+          {urgent.kind === 'emergency' ? <Siren className="size-16 animate-pulse" /> : urgent.kind === 'bell' ? null : <BellRing className="size-16 animate-pulse" />}
           {!soundOk && prefs.sound && (
-            <button onClick={() => void (urgent.kind === 'emergency' ? startSiren() : startUrgentCall())} className="rounded-full bg-black/30 px-5 py-2.5 text-sm font-bold text-white ring-2 ring-white/60">
+            <button onClick={() => void (urgent.kind === 'emergency' ? startSiren() : urgent.kind === 'bell' ? startBellCall(bellPhrase(urgent.bell.place), prefs) : startUrgentCall())} className="rounded-full bg-black/30 px-5 py-2.5 text-sm font-bold text-white ring-2 ring-white/60">
               🔇 소리가 막혀 있습니다 · 눌러서 {urgent.kind === 'emergency' ? '사이렌' : '호출음'} 켜기
             </button>
           )}
           {urgent.kind === 'emergency' ? (
             <EmergencyDetail e={urgent.emergency} />
+          ) : urgent.kind === 'bell' ? (
+            <div>
+              <div className="text-6xl">🔔</div>
+              <div className="mt-3 text-4xl font-black">{urgent.bell.place}</div>
+              <div className="mt-2 text-2xl font-bold">고객님 호출벨이 울렸습니다</div>
+              <div className="mt-2 text-sm text-sky-100">{new Date(urgent.bell.lastRingAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}{urgent.bell.rings > 1 ? ` · ${urgent.bell.rings}번째 호출` : ''} · 누군가 응대할 때까지 반복됩니다</div>
+            </div>
           ) : urgent.kind === 'task' ? (
             <div>
               <div className="text-lg font-bold text-red-100">긴급 {urgent.task.category}</div>
@@ -647,8 +698,8 @@ export default function MartOnApp() {
               {urgent.notice.body && <p className="mt-3 text-base text-red-50">{urgent.notice.body}</p>}
             </div>
           )}
-          <button onClick={acknowledgeUrgent} className={cx('w-full max-w-sm rounded-2xl bg-white py-5 text-xl font-black', urgent.kind === 'emergency' ? 'text-red-600 active:bg-red-50' : 'text-orange-600 active:bg-orange-50')}>
-            {urgent.kind === 'emergency' ? '확인했습니다 (내 사이렌 끄기)' : '확인했습니다'}
+          <button onClick={acknowledgeUrgent} className={cx('w-full max-w-sm rounded-2xl bg-white py-5 text-xl font-black', urgent.kind === 'emergency' ? 'text-red-600 active:bg-red-50' : urgent.kind === 'bell' ? 'text-sky-700 active:bg-sky-50' : 'text-orange-600 active:bg-orange-50')}>
+            {urgent.kind === 'emergency' ? '확인했습니다 (내 사이렌 끄기)' : urgent.kind === 'bell' ? '🙋 제가 응대하겠습니다' : '확인했습니다'}
           </button>
           {urgent.kind === 'emergency' && !urgent.emergency.clearedAt && canClearEmergency(me, urgent.emergency) && (
             <button onClick={() => { const em = urgent.emergency; stopAlarm(); setUrgent(null); api(`/emergencies/${em.id}/clear`, {}).then(() => showToast(`✅ ${em.type} 상황 해제를 전 직원에게 알렸습니다.`), err => onError(err.message)); }}

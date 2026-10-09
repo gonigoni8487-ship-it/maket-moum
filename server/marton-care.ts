@@ -1,17 +1,38 @@
 // 마트ON 안전·고객: 비상 알림(화재·사고·재난 사이렌), 도와드리겠습니다 컴플레인 공유
 import {
   COMPLAINT_STATUSES, DEPARTMENTS, EMERGENCY_TYPES, MAX_COMPLAINT_PHOTOS, canClearEmergency, canEditComplaint,
-  type Complaint, type ComplaintStatus, type Department, type Emergency, type EmergencyType,
+  type Complaint, type ComplaintStatus, type CustomerBell, type Department, type Emergency, type EmergencyType,
 } from '../src/marton/shared';
+import type { Request, Response } from 'express';
+import { integrationKey, keyMatches } from './marton-security';
 import { db, save, broadcast, auth, actorOf, text, newId, savePhotos, deletePhotos, type AuthedRequest, type RouteApp } from './marton';
 
 const DAY = 24 * 60 * 60 * 1000;
 const isDept = (d: unknown): d is Department => DEPARTMENTS.includes(d as Department);
 const deptsOf = (input: unknown) => (Array.isArray(input) ? [...new Set(input.filter(isDept))] : []);
 
+/** 호출벨 울리기: 같은 곳에 응대 대기 중인 벨이 있으면 다시 울린다 */
+function ringBell(place: string, source: string) {
+  const now = Date.now();
+  db.bells ??= [];
+  let bell = db.bells.find(b => !b.answeredAt && b.place === place);
+  if (bell) {
+    bell.rings += 1;
+    bell.lastRingAt = now;
+  } else {
+    bell = { id: newId().slice(0, 8), place, createdAt: now, lastRingAt: now, rings: 1, source };
+    db.bells.push(bell);
+  }
+  save();
+  broadcast({ type: 'bell', bell, action: 'ring' });
+  return bell;
+}
+
 /** 오래된 기록 정리: 해제된 비상 알림 90일, 처리완료 컴플레인 90일 (사진도 삭제) */
 export function pruneCare() {
   const cutoff = Date.now() - 90 * DAY;
+  // 호출벨은 30일, 응대 안 된 벨도 하루 지나면 정리
+  if (db.bells) db.bells = db.bells.filter(b => (b.answeredAt ? b.answeredAt > Date.now() - 30 * DAY : b.lastRingAt > Date.now() - DAY)).slice(-500);
   if (db.emergencies) db.emergencies = db.emergencies.filter(e => !e.clearedAt || e.clearedAt > cutoff).slice(-200);
   if (db.complaints) {
     const old = db.complaints.filter(c => c.status === '처리완료' && c.updatedAt <= cutoff);
@@ -53,6 +74,33 @@ export function registerCare(app: RouteApp) {
     save();
     broadcast({ type: 'emergency', emergency: e, action: 'cleared' });
     res.json(e);
+  });
+
+  // ---- 고객 호출벨 ----
+  // 매장 태블릿·직원 휴대폰에서 누르기 (로그인 필요)
+  app.post(`${api}/bells`, auth, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const place = text(req.body.place, 30) || '지하1층 게이트';
+    res.json(ringBell(place, `${me.dept} ${me.name}`));
+  });
+  // 실제 호출벨 장치 연동 (웹훅): POST /api/marton/integrations/bell  헤더 X-MartON-Key  { "place": "지하1층 게이트", "deviceId"?: "BELL-1" }
+  app.post(`${api}/integrations/bell`, (req: Request, res: Response) => {
+    if (!integrationKey()) return res.status(503).json({ error: 'MARTON_INTEGRATION_KEY가 설정되지 않아 연동이 비활성화되어 있습니다.' });
+    if (!keyMatches(req.header('x-marton-key'))) return res.status(401).json({ error: 'invalid key' });
+    const place = text(req.body.place, 30) || '지하1층 게이트';
+    res.json({ id: ringBell(place, text(req.body.deviceId, 30) || '호출벨').id });
+  });
+  // 어느 부서든 한 명이 "응대하겠습니다"를 누르면 모든 휴대폰에서 알림 해제
+  app.post(`${api}/bells/:id/answer`, auth, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const bell = db.bells?.find(b => b.id === req.params.id);
+    if (!bell) return res.status(404).json({ error: '호출벨을 찾을 수 없습니다.' });
+    if (bell.answeredAt) return res.json(bell); // 이미 다른 분이 응대 중
+    bell.answeredAt = Date.now();
+    bell.answeredBy = actorOf(me);
+    save();
+    broadcast({ type: 'bell', bell, action: 'answered' });
+    res.json(bell);
   });
 
   // ---- 도와드리겠습니다: 컴플레인 접수건 공유 ----

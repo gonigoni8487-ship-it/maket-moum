@@ -1,14 +1,16 @@
 import { useRef, useState } from 'react';
 import { Music, Play, RotateCcw, Upload } from 'lucide-react';
-import { COUPON_ARRIVED, MAX_SOUND_BYTES, SOUND_KINDS, SOUND_LABEL, birthdayMessage, type StoreSound, type StoreSoundKind } from '../shared';
+import { bellPhrase, COUPON_ARRIVED, MAX_SOUND_BYTES, SOUND_KINDS, SOUND_LABEL, birthdayMessage, type StoreSound, type StoreSoundKind } from '../shared';
 import { api } from '../api';
-import { alert, callPhrase, celebrateBirthday, loadPrefs } from '../alerts';
+import { alert, callPhrase, celebrateBirthday, loadPrefs, morningMusicUrl, startBellCall, stopAlarm } from '../alerts';
 import { Section } from '../ui';
 
 const HINT: Record<StoreSoundKind, string> = {
   birthday: '생일날 축하 음성 전에 나옵니다 (최대 30초)',
   coupon: '커피쿠폰이 도착하면 나옵니다 (최대 6초)',
   call: '요청·방송·중회·소비기한 호출 때 나옵니다 (최대 6초)',
+  bell: '고객 호출벨이 울릴 때 음성 전에 나옵니다 (최대 6초)',
+  morning: '아침 명언 카드뉴스 배경음악 (1분 이내 권장)',
 };
 const readDataUrl = (f: File) => new Promise<string>((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = fail; r.readAsDataURL(f); });
 
@@ -38,6 +40,8 @@ export default function SoundSettings({ sounds, myName, myDept, onError, onToast
     const prefs = { ...loadPrefs(), sound: true, call: true };
     if (kind === 'birthday') void celebrateBirthday(birthdayMessage(myName));
     else if (kind === 'coupon') void alert({ title: `☕ ${COUPON_ARRIVED}`, body: '미리 듣기', urgent: false, tag: 'test', prefs, tone: 'coupon', announce: COUPON_ARRIVED });
+    else if (kind === 'bell') { void startBellCall(bellPhrase('지하1층 게이트'), prefs); window.setTimeout(stopAlarm, 9000); }
+    else if (kind === 'morning') { const a = new Audio(morningMusicUrl()); void a.play().catch(() => {}); window.setTimeout(() => a.pause(), 12000); }
     else void alert({ title: '호출음 미리 듣기', body: '미리 듣기', urgent: false, tag: 'test', prefs, tone: 'call', announce: callPhrase(myDept, '미리 듣기') });
   };
 

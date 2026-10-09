@@ -10,7 +10,7 @@ import { db, save, broadcast, auth, managerOnly, actorOf, text, parseJson, newId
 import { platform, onJob } from './platform';
 
 const AI_MODEL = 'gemini-3.5-flash';
-const integrationKey = () => platform().env('MARTON_INTEGRATION_KEY') || '';
+export const integrationKey = () => platform().env('MARTON_INTEGRATION_KEY') || '';
 const DAY = 24 * 60 * 60 * 1000;
 
 function publish(incident: Incident, action: 'created' | 'updated') {
@@ -46,7 +46,7 @@ function createIncident(input: {
 }
 
 /** 연동 키 비교 (길이가 같으면 끝까지 비교해 시간 차이로 키를 추측하지 못하게) */
-function keyMatches(given: string | undefined) {
+export function keyMatches(given: string | undefined) {
   const key = integrationKey();
   if (!key || !given || given.length !== key.length) return false;
   let diff = 0;

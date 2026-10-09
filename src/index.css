@@ -110,3 +110,17 @@
   0% { transform: translateY(0) rotate(0deg); opacity: 1; }
   100% { transform: translateY(110vh) rotate(540deg); opacity: 0.6; }
 }
+
+/* 마트ON 아침 명언 카드: 배경이 천천히 움직이고 글자가 떠오른다 */
+@keyframes morning-drift {
+  0% { transform: scale(1.05) translate(0, 0); }
+  100% { transform: scale(1.18) translate(-3%, -2%); }
+}
+@keyframes morning-rise {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes morning-bar {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
