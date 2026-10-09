@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mic, Search, Sparkles, MapPin, Send, X, Keyboard, Maximize2 } from 'lucide-react';
-import { promotionFor, type AskResult, type Product, type Promotion } from '../shared';
+import { Mic, Search, Sparkles, MapPin, Send, X, Keyboard, Maximize2, Volume2 } from 'lucide-react';
+import { bayText, floorText, promotionFor, questionKeywords, type AskResult, type Product, type Promotion } from '../shared';
 import { api } from '../api';
 import { speak } from '../alerts';
 import { cx, Empty, inputCls, won, type Draft } from '../ui';
@@ -14,7 +14,7 @@ export function ProductRow({ p, promo, onRequest, onShow }: { p: Product; promo?
         <div>
           <div className="font-bold text-slate-900">{p.name}</div>
           <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-blue-700">
-            <MapPin className="size-4" />{p.floor} · {p.corner} · {p.shelf}
+            <MapPin className="size-4" />{p.floor} · {p.corner} · {bayText(p)}
           </div>
         </div>
         <div className="text-right">
@@ -30,7 +30,7 @@ export function ProductRow({ p, promo, onRequest, onShow }: { p: Product; promo?
       <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
         <span>{p.dept} · {p.barcode}</span>
         <button
-          onClick={() => onRequest({ toDept: p.dept, category: '상품 위치 확인', title: `${p.name} 위치/재고 확인`, detail: `등록 위치: ${p.floor} ${p.corner} ${p.shelf}` })}
+          onClick={() => onRequest({ toDept: p.dept, category: '상품 위치 확인', title: `${p.name} 위치/재고 확인`, detail: `등록 위치: ${p.floor} ${p.corner} ${bayText(p)}` })}
           className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 font-semibold text-slate-700"
         >
           <Send className="size-3.5" />{p.dept}에 확인 요청
@@ -130,9 +130,13 @@ function CustomerCard({ p, promo, onClose }: { p: Product; promo?: Promotion; on
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white px-6 text-center" role="dialog" aria-modal="true" aria-label={`${p.name} 위치`} onClick={onClose}>
       <p className="text-2xl font-bold text-slate-600">{p.name}</p>
       <div className="space-y-1">
-        <p className="text-7xl font-black tracking-tight text-blue-700">{p.floor}</p>
-        <p className="text-4xl font-black text-slate-900 [text-wrap:balance]">{p.corner}</p>
-        <p className="text-2xl font-bold text-slate-700 [text-wrap:balance]">{p.shelf}</p>
+        <p className="text-2xl font-bold text-slate-600">{floorText(p.floor)} · {p.corner}</p>
+        {p.bay
+          ? <>
+              <p className="text-7xl font-black tracking-tight text-blue-700">{p.bay}번 매대</p>
+              {p.slot && <p className="text-4xl font-black text-slate-900">{p.slot === 1 ? '첫' : p.slot}번째 칸</p>}
+            </>
+          : <p className="text-4xl font-black text-blue-700 [text-wrap:balance]">{p.shelf}</p>}
       </div>
       <div className="space-y-2">
         <p className="text-3xl font-black text-slate-900">{won(promo?.price ?? p.price)}</p>
@@ -155,16 +159,17 @@ export default function ProductFinder({ products, promotions, onRequest, onError
 
   // 매장 상품 목록에 없는 전단 상품도 찾을 수 있게 행사상품에서도 찾는다
   const promoHits = useMemo(() => {
-    const words = q.replace(/(어디|있어요|있나요|있어|위치|알려줘|찾아줘|행사|해요|하나요|\?)/g, ' ').split(/\s+/).map(norm).filter(w => w.length >= 2);
+    const words = questionKeywords(q).map(norm).filter(w => w.length >= 2);
     const code = q.replace(/\D/g, '');
     if (!words.length && code.length < 8) return [];
     return promotions.filter(p => (code.length >= 8 && p.code === code) || words.some(w => norm(p.name).includes(w))).slice(-10).reverse();
   }, [q, promotions]);
 
   const results = useMemo(() => {
-    const n = norm(q);
-    if (!n) return [];
-    return products.filter(p => p.barcode === q.trim() || [p.name, ...p.aliases, p.corner].some(x => norm(x).includes(n) || n.includes(norm(x))));
+    if (!q.trim()) return [];
+    if (/^\d{8,14}$/.test(q.trim())) return products.filter(p => p.barcode === q.trim());
+    const words = questionKeywords(q).map(norm);
+    return products.filter(p => [p.name, ...p.aliases, p.corner].map(norm).some(x => words.some(w => (w.length >= 2 && x.includes(w)) || x === w || (x.length >= 2 && w.includes(x)))));
   }, [q, products]);
 
   const ask = async (question = q) => {
@@ -173,7 +178,7 @@ export default function ProductFinder({ products, promotions, onRequest, onError
     try {
       const r = await api<AskResult>('/ai/ask', { question });
       setAi(r);
-      speak(r.answer);
+      speak(r.speech ?? r.answer);
     } catch (e) {
       onError((e as Error).message);
     } finally {
@@ -183,6 +188,7 @@ export default function ProductFinder({ products, promotions, onRequest, onError
 
   const heard = (said: string) => {
     setListening(false);
+    setAi(null);
     setQ(said);
     void ask(said);
   };
@@ -204,12 +210,15 @@ export default function ProductFinder({ products, promotions, onRequest, onError
       </form>
 
       <button onClick={() => ask()} disabled={!q.trim() || asking} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-50">
-        <Sparkles className="size-4" />{asking ? 'AI가 찾는 중…' : 'AI에게 위치 묻기'}
+        <Sparkles className="size-4" />{asking ? '찾는 중…' : '위치·행사 물어보기'}
       </button>
 
       {ai && (
         <div className="rounded-2xl bg-indigo-50 p-4 text-[15px] font-medium leading-relaxed text-indigo-950">
-          <div className="mb-1 flex items-center gap-1 text-xs font-bold text-indigo-600"><Sparkles className="size-3.5" />AI 답변</div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1 text-xs font-bold text-indigo-600"><Volume2 className="size-3.5" />고객 안내</span>
+            <button type="button" onClick={() => speak(ai.speech ?? ai.answer)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 active:bg-indigo-100"><Volume2 className="size-3.5" />다시 듣기</button>
+          </div>
           {ai.answer}
         </div>
       )}

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Camera, CheckCircle2, AlertTriangle, HelpCircle, MapPin, ScanLine, Keyboard, Send } from 'lucide-react';
-import type { Product, Staff, Task, VisionBarcodeResult, VisionPriceResult, VisionResult } from '../shared';
+import { bayText, type Product, type Staff, type Task, type VisionBarcodeResult, type VisionPriceResult, type VisionResult } from '../shared';
 import { api } from '../api';
 import { cx, inputCls, primaryBtn, won, type Draft } from '../ui';
 import CameraView from './CameraView';
@@ -20,14 +20,14 @@ function ProductCard({ p, onRequest, photo }: { p: Product; onRequest: (d: Draft
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-bold text-slate-900">{p.name}</div>
-          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-blue-700"><MapPin className="size-4 shrink-0" />{p.floor} · {p.corner} · {p.shelf}</div>
+          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-blue-700"><MapPin className="size-4 shrink-0" />{p.floor} · {p.corner} · {bayText(p)}</div>
         </div>
         <div className="shrink-0 text-sm font-bold">{won(p.price)}</div>
       </div>
       <div className="flex items-center justify-between text-xs text-slate-500">
         <span>{p.dept} · {p.barcode}</span>
         <button
-          onClick={() => onRequest({ toDept: p.dept, category: '재고/보충', title: `${p.name} 재고/진열 확인`, location: `${p.corner} ${p.shelf}`, photos: photo ? [photo] : undefined })}
+          onClick={() => onRequest({ toDept: p.dept, category: '재고/보충', title: `${p.name} 재고/진열 확인`, location: `${p.corner} ${bayText(p)}`, photos: photo ? [photo] : undefined })}
           className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 font-semibold text-slate-700"
         >
           <Send className="size-3.5" />{p.dept}에 확인 요청
@@ -98,7 +98,7 @@ export default function PhotoAI({ me, aiEnabled, products, onRequest, onSent, on
     category: '가격 오류',
     title: r?.matched ? `${r.matched.name} 가격표 오류` : '가격표 오류 확인',
     detail: r?.message ?? '가격표 사진을 확인해 주세요.',
-    location: r?.matched ? `${r.matched.corner} ${r.matched.shelf}` : undefined,
+    location: r?.matched ? `${r.matched.corner} ${bayText(r.matched)}` : undefined,
     photos: preview ? [preview] : undefined,
   });
 

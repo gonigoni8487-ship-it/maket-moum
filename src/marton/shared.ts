@@ -84,6 +84,10 @@ export interface Product {
   floor: string;
   corner: string;
   shelf: string;
+  /** 매대 번호 (예: 12 → "12번 매대") */
+  bay?: number;
+  /** 매대에서 몇 번째 칸 (예: 3 → "3번째 칸") */
+  slot?: number;
   price: number;
 }
 
@@ -190,28 +194,75 @@ export interface VisionBarcodeResult {
 export type VisionResult = VisionFlyerResult | VisionPriceResult | VisionBarcodeResult;
 
 export interface AskResult {
+  /** 화면에 보여 줄 안내 */
   answer: string;
+  /** 음성으로 읽을 안내 (1+1 → 원 플러스 원, 10/8~10/14 → 10월 8일부터 …) */
+  speech?: string;
   products: Product[];
+  promotion?: Promotion;
 }
 
 export const SEED_PRODUCTS: Product[] = [
-  { id: 'p1', name: '완도 활전복 (대) 1kg', aliases: ['전복', '활전복'], barcode: '8801234500011', dept: '수산', floor: 'B1', corner: '수산 활어코너', shelf: '수조 2번', price: 59800 },
-  { id: 'p2', name: '노르웨이 생연어 필렛 300g', aliases: ['연어', '생연어'], barcode: '8801234500028', dept: '수산', floor: 'B1', corner: '수산 냉장', shelf: '오픈쇼케이스 3단', price: 15900 },
-  { id: 'p3', name: '국산 고등어 2마리', aliases: ['고등어'], barcode: '8801234500035', dept: '수산', floor: 'B1', corner: '선어 매대', shelf: '얼음매대 좌측', price: 7980 },
-  { id: 'p4', name: '한우 1++ 등심 300g', aliases: ['한우', '등심', '소고기'], barcode: '8801234500042', dept: '축산', floor: 'B1', corner: '정육 한우', shelf: '냉장 쇼케이스 1번', price: 42000 },
-  { id: 'p5', name: '국내산 삼겹살 500g', aliases: ['삼겹살', '돼지고기'], barcode: '8801234500059', dept: '축산', floor: 'B1', corner: '정육 돈육', shelf: '냉장 쇼케이스 4번', price: 13900 },
-  { id: 'p6', name: '양념 LA갈비 1kg', aliases: ['LA갈비', '갈비'], barcode: '8801234500066', dept: '축산', floor: 'B1', corner: '양념육', shelf: '냉장 평대', price: 29900 },
-  { id: 'p7', name: '청송 꿀사과 1.5kg', aliases: ['사과'], barcode: '8801234500073', dept: '농산', floor: 'B1', corner: '과일 메인 평대', shelf: '입구 앞 평대', price: 12900 },
-  { id: 'p8', name: '친환경 대파 1단', aliases: ['대파', '파'], barcode: '8801234500080', dept: '농산', floor: 'B1', corner: '채소 냉장', shelf: '다단 냉장 2단', price: 3480 },
-  { id: 'p9', name: '신라면 5입', aliases: ['라면', '신라면'], barcode: '8801043014809', dept: '가공', floor: 'B1', corner: '라면/면류', shelf: '7번 통로 좌측 3단', price: 4480 },
-  { id: 'p10', name: '서울우유 1L', aliases: ['우유'], barcode: '8801115114154', dept: '가공', floor: 'B1', corner: '유제품 냉장', shelf: '워크인 냉장 2번 도어', price: 2980 },
-  { id: 'p11', name: '햇반 210g 12입', aliases: ['햇반', '즉석밥'], barcode: '8801007160337', dept: '가공', floor: 'B1', corner: '즉석식품', shelf: '5번 통로 우측 2단', price: 13980 },
-  { id: 'p12', name: '카스 500ml 6캔', aliases: ['맥주', '카스'], barcode: '8801021230113', dept: '가공', floor: 'B1', corner: '주류', shelf: '10번 통로 엔드', price: 11800 },
-  { id: 'p13', name: '퐁퐁 주방세제 1.2L', aliases: ['주방세제', '세제'], barcode: '8801046290118', dept: '생활문화', floor: '1F', corner: '주방세제', shelf: '15번 통로 좌측 2단', price: 5980 },
-  { id: 'p14', name: '깨끗한나라 화장지 30롤', aliases: ['화장지', '휴지'], barcode: '8801166030113', dept: '생활문화', floor: '1F', corner: '제지류', shelf: '18번 통로 하단 파렛트', price: 17900 },
-  { id: 'p15', name: '스테인리스 프라이팬 28cm', aliases: ['프라이팬', '후라이팬'], barcode: '8801234500165', dept: '생활문화', floor: '1F', corner: '주방용품', shelf: '20번 통로 우측 4단', price: 34900 },
+  { id: 'p1', name: '완도 활전복 (대) 1kg', aliases: ['전복', '활전복'], barcode: '8801234500011', dept: '수산', floor: 'B1', corner: '수산 활어코너', shelf: '수조 2번', bay: 1, slot: 2, price: 59800 },
+  { id: 'p2', name: '노르웨이 생연어 필렛 300g', aliases: ['연어', '생연어'], barcode: '8801234500028', dept: '수산', floor: 'B1', corner: '수산 냉장', shelf: '오픈쇼케이스 3단', bay: 2, slot: 3, price: 15900 },
+  { id: 'p3', name: '국산 고등어 2마리', aliases: ['고등어'], barcode: '8801234500035', dept: '수산', floor: 'B1', corner: '선어 매대', shelf: '얼음매대 좌측', bay: 3, slot: 1, price: 7980 },
+  { id: 'p17', name: '제주 생갈치 (대) 1마리', aliases: ['갈치', '생갈치', '제주갈치'], barcode: '8801234500189', dept: '수산', floor: 'B1', corner: '선어 매대', shelf: '얼음매대 중앙', bay: 3, slot: 2, price: 6490 },
+  { id: 'p18', name: '부산 사각어묵 400g', aliases: ['오뎅', '어묵', '부산어묵', '사각어묵'], barcode: '8801234500196', dept: '가공', floor: 'B1', corner: '냉장 가공', shelf: '어묵·두부 냉장 3단', bay: 12, slot: 3, price: 3980 },
+  { id: 'p4', name: '한우 1++ 등심 300g', aliases: ['한우', '등심', '소고기'], barcode: '8801234500042', dept: '축산', floor: 'B1', corner: '정육 한우', shelf: '냉장 쇼케이스 1번', bay: 5, slot: 1, price: 42000 },
+  { id: 'p5', name: '국내산 삼겹살 500g', aliases: ['삼겹살', '돼지고기'], barcode: '8801234500059', dept: '축산', floor: 'B1', corner: '정육 돈육', shelf: '냉장 쇼케이스 4번', bay: 6, slot: 4, price: 13900 },
+  { id: 'p6', name: '양념 LA갈비 1kg', aliases: ['LA갈비', 'la갈비'], barcode: '8801234500066', dept: '축산', floor: 'B1', corner: '양념육', shelf: '냉장 평대', bay: 7, slot: 1, price: 29900 },
+  { id: 'p7', name: '청송 꿀사과 1.5kg', aliases: ['사과'], barcode: '8801234500073', dept: '농산', floor: 'B1', corner: '과일 메인 평대', shelf: '입구 앞 평대', bay: 8, slot: 1, price: 12900 },
+  { id: 'p8', name: '친환경 대파 1단', aliases: ['대파', '파'], barcode: '8801234500080', dept: '농산', floor: 'B1', corner: '채소 냉장', shelf: '다단 냉장 2단', bay: 9, slot: 2, price: 3480 },
+  { id: 'p9', name: '신라면 5입', aliases: ['라면', '신라면'], barcode: '8801043014809', dept: '가공', floor: 'B1', corner: '라면/면류', shelf: '7번 통로 좌측 3단', bay: 17, slot: 3, price: 4480 },
+  { id: 'p10', name: '서울우유 1L', aliases: ['우유'], barcode: '8801115114154', dept: '가공', floor: 'B1', corner: '유제품 냉장', shelf: '워크인 냉장 2번 도어', bay: 11, slot: 2, price: 2980 },
+  { id: 'p11', name: '햇반 210g 12입', aliases: ['햇반', '즉석밥'], barcode: '8801007160337', dept: '가공', floor: 'B1', corner: '즉석식품', shelf: '5번 통로 우측 2단', bay: 15, slot: 2, price: 13980 },
+  { id: 'p12', name: '카스 500ml 6캔', aliases: ['맥주', '카스'], barcode: '8801021230113', dept: '가공', floor: 'B1', corner: '주류', shelf: '10번 통로 엔드', bay: 20, slot: 1, price: 11800 },
+  { id: 'p13', name: '퐁퐁 주방세제 1.2L', aliases: ['주방세제', '세제'], barcode: '8801046290118', dept: '생활문화', floor: '1F', corner: '주방세제', shelf: '15번 통로 좌측 2단', bay: 25, slot: 2, price: 5980 },
+  { id: 'p14', name: '깨끗한나라 화장지 30롤', aliases: ['화장지', '휴지'], barcode: '8801166030113', dept: '생활문화', floor: '1F', corner: '제지류', shelf: '18번 통로 하단 파렛트', bay: 28, slot: 1, price: 17900 },
+  { id: 'p15', name: '스테인리스 프라이팬 28cm', aliases: ['프라이팬', '후라이팬'], barcode: '8801234500165', dept: '생활문화', floor: '1F', corner: '주방용품', shelf: '20번 통로 우측 4단', bay: 30, slot: 4, price: 34900 },
   { id: 'p16', name: '건전지 AA 10입', aliases: ['건전지', '배터리'], barcode: '8801234500172', dept: '생활문화', floor: '1F', corner: '계산대 앞', shelf: '계산대 3번 앞 걸이', price: 6900 },
 ];
+
+const FLOOR_SPEECH: Record<string, string> = { B1: '지하 1층', B2: '지하 2층', '1F': '1층', '2F': '2층', '3F': '3층' };
+export const floorText = (f: string) => FLOOR_SPEECH[f] ?? f;
+
+/** 매대 위치 짧게: "12번 매대 3번째 칸" (매대 번호가 없으면 진열 위치 글) */
+export const bayText = (p: Product) => (p.bay ? `${p.bay}번 매대${p.slot ? ` ${p.slot === 1 ? '첫 번째' : `${p.slot}번째`} 칸` : ''}` : p.shelf);
+
+/** 위치 전체: "B1 냉장 가공 · 12번 매대 3번째 칸" */
+export const locationText = (p: Product) => `${p.floor} ${p.corner} · ${bayText(p)}`;
+
+/** 받침이 있으면 a(은/이), 없으면 b(는/가) */
+export function josa(word: string, a: string, b: string) {
+  const last = word.trim().slice(-1);
+  const code = last.charCodeAt(0) - 0xac00;
+  // 숫자는 읽는 소리로: 영·일·삼·육·칠·팔(받침 있음) / 이·사·오·구(받침 없음)
+  if (/[0-9]/.test(last)) return '013678'.includes(last) ? a : b;
+  if (code < 0 || code > 11171) return /[LlMmNnRr]$/.test(last) ? a : b; // 영문은 대략
+  return code % 28 ? a : b;
+}
+
+// 고객 질문에서 상품 이름만 남긴다 ("오뎅은 어디로 가면 살 수 있어요?" → ["오뎅"])
+const QUESTION_NOISE = /(어디로\s*가면|어디에\s*가면|어디\s*있|어디|위치|살\s*수\s*있|살수있|사려면|팔아요|파나요|파는|찾아\s*줘|찾아|알려\s*줘|알려|있어요|있나요|있어|있니|얼마예요|얼마에요|얼마야|얼마|가격|이번\s*주|이번주|금주|전단지?|행사|할인|세일|하나요|해요|해|돼요|되나요|인가요|에요|예요|이에요|요|\?|!|\.)/g;
+const PARTICLE = /(은|는|이|가|을|를|도|좀|로|으로|에서|에)$/;
+export function questionKeywords(question: string): string[] {
+  return question.replace(QUESTION_NOISE, ' ').split(/\s+/)
+    .map(w => w.replace(PARTICLE, '').replace(/[^0-9A-Za-z가-힣+]/g, ''))
+    .filter(w => w.length >= 2 || /^[가-힣]$/.test(w) && !/^(어|거|것|그|저|좀|제|뭐|님|요|게|걸)$/.test(w))
+    .filter(w => !/^(고객|손님|어디|어디에|여기|거기)$/.test(w));
+}
+
+/** 가격·행사를 묻는 질문인지 */
+export const asksPrice = (q: string) => /(얼마|가격|행사|할인|세일|전단|싸|1\+1|원이)/.test(q);
+
+/** "10/8~10/14" → "10월 8일부터 10월 14일까지" (음성으로 읽기 좋게) */
+export function periodSpeech(period?: string) {
+  if (!period) return '';
+  const m = /(\d{1,2})[./](\d{1,2})[^~]*~\s*(?:(\d{1,2})[./])?(\d{1,2})/.exec(period);
+  if (!m) return period;
+  return `${m[1]}월 ${m[2]}일부터 ${m[3] ?? m[1]}월 ${m[4]}일까지`;
+}
+
 
 // ---- 보안/손실방지 ----
 // 원칙: 사람(인상착의·신원)이 아니라 상황·위치·시간·상품을 기록한다.
@@ -566,3 +617,89 @@ export interface Handover {
 }
 
 export const HANDOVER_CHIPS = ['특이사항 없음', '진열 보충 필요', '냉장·냉동 온도 확인', '행사 POP 교체 필요', '고객 클레임 진행 중', '발주 확인 필요'];
+
+// ---- 고객 질문 안내 ("오뎅 어디 있어요?", "이번 주 갈치 얼마야?") ----
+
+function scoreProducts(words: string[], products: Product[]) {
+  return products.map(p => {
+    const names = [p.name, ...p.aliases].map(n => n.replace(/\s+/g, '').toLowerCase());
+    let score = 0;
+    let hit: string | undefined;
+    for (const w of words.map(x => x.toLowerCase())) {
+      for (const n of names) {
+        const s = n === w ? 50 : w.length >= 2 && n.includes(w) ? 30 : n.length >= 2 && w.includes(n) ? 20 : 0;
+        if (s > score) { score = s; hit = w; }
+      }
+    }
+    return { p, score, hit };
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+}
+
+const sizeOf = (spec?: string) => {
+  const first = spec?.split('/')[0].replace(/^각\s*/, '').trim();
+  return first && /\d/.test(first) ? first : undefined; // "마리"·"팩"처럼 숫자 없는 건 규격으로 안 씀
+};
+/** 괄호를 뺀 낱말 기준으로 조사를 붙인다: "감귤(2kg)" → "감귤(2kg)은", "할인 (카드 제외)" → "할인이에요 (카드 제외)" */
+const plain = (t: string) => t.replace(/\s*\([^)]*\)\s*$/g, '').replace(/\([^)]*\)/g, '').trim();
+const topic = (t: string) => `${t}${josa(plain(t), '은', '는')}`;
+function copula(t: string) {
+  const tail = /\s*(\([^)]*\))\s*$/.exec(t);
+  const main = tail ? t.slice(0, tail.index) : t;
+  return `${main}${josa(main, '이에요', '예요')}${tail ? ` ${tail[1]}` : ''}`;
+}
+const say = (t: string) => t
+  .replace(/(\d)\+(\d)/g, (_, a, b) => `${'영원투쓰리포'[+a] ?? a} 플러스 ${'영원투쓰리포'[+b] ?? b}`)
+  .replace(/L\.POINT/gi, '엘포인트')
+  .replace(/(\d{1,2})[./](\d{1,2})\s*~\s*(?:(\d{1,2})[./])?(\d{1,2})/g, (_, m1, d1, m2, d2) => `${m1}월 ${d1}일부터 ${m2 ?? m1}월 ${d2}일까지`)
+  .replace(/\bB(\d)\b/g, '지하 $1층').replace(/\b(\d)F\b/g, '$1층')
+  .replace(/\s*\(([^)]*)\)/g, ' $1 ')
+  .replace(/\s+(은|는|이에요|예요)(?=[\s.,])/g, '$1')
+  .replace(/\s+([.,])/g, '$1')
+  .replace(/\s{2,}/g, ' ')
+  .replace(/·/g, ',');
+
+/**
+ * 고객 질문에 매장 데이터만으로 답한다. 찾지 못하면 null (서버가 AI에 넘긴다).
+ * 위치 질문 → "오뎅은 B1 냉장 가공, 12번 매대 3번째 칸에 있어요."
+ * 가격 질문 → 이번 주 행사가·행사 프로모션·기간 안내
+ */
+export function answerQuestion(question: string, products: Product[], promotions: Promotion[]): AskResult | null {
+  const words = questionKeywords(question);
+  if (!words.length) return null;
+  const ranked = scoreProducts(words, products);
+  let product = ranked[0]?.p;
+  const nameWords = words.filter(w => w.length >= 2);
+  const linked = product && promotionFor(product, promotions);
+  const promo = linked ?? [...promotions].reverse().find(pr => nameWords.some(w => pr.name.replace(/\s+/g, '').includes(w)));
+  // "유기농우유" 행사인데 "우유"로만 걸린 다른 상품(서울우유 1L)의 위치를 말하지 않게
+  if (product && promo && !linked && ranked[0].score < 50) product = undefined;
+  if (!product && !promo) return null;
+
+  const subject = ranked[0]?.hit && product && product.aliases.includes(ranked[0].hit) ? ranked[0].hit : product?.name ?? promo!.name;
+
+  const where = product ? `${product.floor} ${product.corner}, ${bayText(product)}` : '';
+  const promoName = promo ? `${promo.name}${sizeOf(promo.spec) ? `(${sizeOf(promo.spec)})` : ''}` : '';
+  const promoLine = promo ? [
+    promo.price ? `행사가 ${promo.price.toLocaleString()}원${promo.originalPrice && promo.originalPrice > promo.price ? `(정상가 ${promo.originalPrice.toLocaleString()}원)` : ''}` : '',
+    promo.condition ?? '',
+  ].filter(Boolean).join(', ') : '';
+  const periodLine = promo?.period ? ` 행사 기간은 ${copula(promo.period)}.` : '';
+
+  let answer: string;
+  if (asksPrice(question)) {
+    if (promo) {
+      answer = `이번 주 ${topic(promoName)} 전단 행사 상품이에요. ${copula(promoLine)}.${periodLine}`;
+      if (product) answer += ` ${topic(subject)} ${where}에 있어요.`;
+      else answer += ' 진열 위치는 상품 목록에 없어 담당 부서에 확인해 주세요.';
+    } else {
+      answer = `${topic(subject)} ${product!.price.toLocaleString()}원이에요. 이번 주 전단 행사 상품은 아니에요. ${where}에 있어요.`;
+    }
+  } else if (product) {
+    answer = `${topic(subject)} ${where}에 있어요.`;
+    if (promo) answer += ` 이번 주 행사 상품이에요. ${copula(promoLine)}.${periodLine}`;
+  } else {
+    answer = `${topic(promoName)} 이번 주 전단 행사 상품이에요. ${copula(promoLine)}.${periodLine} 진열 위치는 상품 목록에 없어 담당 부서에 확인해 주세요.`;
+  }
+  answer = answer.replace(/\.\./g, '.').replace(/\s+/g, ' ').trim();
+  return { answer, speech: say(answer), products: ranked.slice(0, 5).map(r => r.p), promotion: promo };
+}

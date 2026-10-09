@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, answerQuestion, bayText, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform } from './platform';
@@ -81,6 +81,12 @@ function parseDb(raw: string | null): Db {
     db.reports ??= [];
     db.pushSubs ??= [];
     db.handovers ??= [];
+    // 기본 상품: 새로 생긴 항목(오뎅·갈치 등)과 매대 번호를 기존 데이터에도 채운다
+    for (const seed of SEED_PRODUCTS) {
+      const have = db.products.find(p => p.id === seed.id);
+      if (!have) db.products.push(seed);
+      else if (have.bay === undefined && seed.bay !== undefined && have.shelf === seed.shelf) Object.assign(have, { bay: seed.bay, slot: seed.slot });
+    }
     return db;
   } catch {
     return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [] };
@@ -182,7 +188,7 @@ function searchProducts(q: string, limit = 8): Product[] {
 
 const promotionFor = (p: Product) => sharedPromotionFor(p, db.promotions);
 
-const describe = (p: Product) => `${p.name}: ${p.floor} ${p.corner}, ${p.shelf} (${p.dept}, ${p.price.toLocaleString()}원)`;
+const describe = (p: Product) => `${p.name}: ${p.floor} ${p.corner}, ${bayText(p)} (${p.dept}, ${p.price.toLocaleString()}원)`;
 
 export function parseJson<T>(raw: string | undefined): T {
   let t = raw || '{}';
@@ -457,35 +463,23 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   app.post(`${api}/ai/ask`, auth, async (req, res) => {
     const question = text(req.body.question, 200);
     if (!question) return res.status(400).json({ error: '질문을 입력해 주세요.' });
-    const keyword = question.replace(/(어디|있어요|있나요|있어|위치|알려줘|찾아줘|은|는|이|가|\?|요)/g, ' ').trim();
-    let products = searchProducts(keyword || question);
-    if (!products.length) products = keyword.split(/\s+/).flatMap(w => searchProducts(w, 3)).slice(0, 5);
+    // 매장 데이터로 답할 수 있으면 바로 답한다 (항상 같은 말투: "오뎅은 … 12번 매대 3번째 칸에 있어요")
+    const direct = answerQuestion(question, db.products, db.promotions);
+    if (direct) return res.json(direct);
 
-    // 매장 상품 목록에 없어도 이번 전단 행사상품이면 행사 내용은 알려 준다
-    const words = keyword.split(/\s+/).filter(w => w.length >= 2);
-    const promo = [...db.promotions].reverse().find(p => words.some(w => p.name.replace(/\s+/g, '').includes(w)));
-    const promoText = (p: Promotion) => `${p.name}${p.spec ? `(${p.spec.split('/')[0]})` : ''} 행사 중${p.price ? ` ${p.price.toLocaleString()}원` : ''}${p.condition ? `, ${p.condition}` : ''}`;
-    const fallback = (): AskResult => ({
-      answer: products.length
-        ? `${products[0].name}: ${products[0].floor} ${products[0].corner}, ${products[0].shelf}에 있습니다.${promo && promotionFor(products[0]) === promo ? ` ${promoText(promo)}입니다.` : ''}`
-        : promo
-          ? `${promoText(promo)}입니다. 진열 위치는 상품 목록에 없어 담당 부서에 확인해 주세요.`
-          : '상품 DB에서 찾지 못했습니다. 해당 부서에 위치 확인 요청을 보내보세요.',
-      products,
-    });
-    if (!aiEnabled) return res.json(fallback());
-
+    const notFound: AskResult = { answer: '상품 목록과 이번 주 행사에서 찾지 못했어요. 담당 부서에 위치 확인 요청을 보내 주세요.', products: [] };
+    if (!aiEnabled) return res.json(notFound);
     try {
-      const catalog = (products.length ? products : db.products).map(describe).join('\n');
-      const promos = db.promotions.slice(-30).map(p => `${p.name} ${p.spec ?? ''} ${p.price ?? ''}원 ${p.condition ?? ''} ${p.period ?? ''}`).join('\n');
+      const catalog = db.products.map(describe).join('\n');
+      const promos = db.promotions.slice(-50).map(p => `${p.name} ${p.spec ?? ''} ${p.price ?? ''}원 ${p.condition ?? ''} ${p.period ?? ''}`).join('\n');
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
-        contents: [{ parts: [{ text: `당신은 대형마트 직원용 안내 AI입니다. 아래 상품 위치 데이터만 근거로, 직원이 고객에게 바로 말해줄 수 있게 한국어 존댓말 1~2문장으로 답하세요. 데이터에 없으면 모른다고 하고 어느 부서에 물어볼지 제안하세요. 행사 정보가 있으면 덧붙이세요.\n\n[상품 위치]\n${catalog}\n\n[진행 중 행사]\n${promos || '없음'}\n\n[질문]\n${question}` }] }],
+        contents: [{ parts: [{ text: `당신은 대형마트 직원용 안내 AI입니다. 아래 상품 위치·행사 데이터만 근거로, 직원이 고객에게 바로 말해 줄 수 있게 한국어 존댓말 1~2문장으로 답하세요. 위치는 "N번 매대 N번째 칸" 형식을 쓰세요. 데이터에 없으면 모른다고 하고 어느 부서에 물어볼지 제안하세요.\n\n[상품 위치]\n${catalog}\n\n[이번 주 행사]\n${promos || '없음'}\n\n[질문]\n${question}` }] }],
       });
-      res.json({ answer: response.text?.trim() || fallback().answer, products });
+      res.json({ answer: response.text?.trim() || notFound.answer, products: [] } satisfies AskResult);
     } catch (error) {
       console.error('MartON ask error:', error);
-      res.json(fallback());
+      res.json(notFound);
     }
   });
 

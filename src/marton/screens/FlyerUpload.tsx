@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Camera, CheckCircle2, Image as ImageIcon, Loader2, MapPin, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
-import { matchProduct, type FlyerItem, type Product, type Promotion, type VisionFlyerResult } from '../shared';
+import { bayText, matchProduct, type FlyerItem, type Product, type Promotion, type VisionFlyerResult } from '../shared';
 import { api } from '../api';
 import { fileToJpeg } from '../camera';
 import { cx, won } from '../ui';
@@ -185,7 +185,7 @@ export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   {off > 0 && <span className="rounded bg-pink-100 px-1.5 py-0.5 font-bold text-pink-700">{off}% ↓ {won(r.originalPrice! - r.price!)} 할인</span>}
                   {product
-                    ? <span className="inline-flex items-center gap-1 font-semibold text-blue-700"><MapPin className="size-3.5" />매장 상품: {product.name} · {product.floor} {product.corner} {product.shelf}</span>
+                    ? <span className="inline-flex items-center gap-1 font-semibold text-blue-700"><MapPin className="size-3.5" />매장 상품: {product.name} · {product.floor} {product.corner} {bayText(product)}</span>
                     : r.name.trim() && <span className="inline-flex items-center gap-1 text-slate-400"><AlertTriangle className="size-3.5" />매장 상품 목록에 없음 (행사 목록에만 등록)</span>}
                 </div>
               </div>
