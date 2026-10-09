@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic } from 'lucide-react';
 import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { alert, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { ALARM_CATEGORIES, alert, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -187,7 +187,7 @@ export default function MartOnApp() {
     if (e.action === 'created') {
       const forMe = t.toDept === me.dept && t.createdBy.id !== me.id;
       if (forMe || (me.role === 'manager' && t.urgent && t.createdBy.id !== me.id)) {
-        alert({ title: `${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}`, prefs: p });
+        alert({ title: `${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}`, prefs: p, tone: ALARM_CATEGORIES.includes(t.category) ? 'alarm' : 'chime' });
         if (t.urgent) setUrgent({ kind: 'task', task: t });
       }
     } else {
@@ -340,6 +340,7 @@ export default function MartOnApp() {
             ))}
             <div className="grid grid-cols-2 gap-2 text-sm font-semibold">
               <button className="rounded-xl bg-slate-100 py-2.5" onClick={() => alert({ title: '테스트 알림', body: '알림이 정상 동작합니다.', urgent: false, tag: 'test', prefs })}>알림음 테스트</button>
+              <button className="rounded-xl bg-amber-50 py-2.5 text-amber-800" onClick={() => alert({ title: '경보음 테스트', body: '바코드 훼손·가격 오류 요청은 이 소리로 울립니다.', urgent: false, tag: 'test', prefs, tone: 'alarm' })}>경보음 테스트 (바코드·가격)</button>
               <button className="rounded-xl bg-red-50 py-2.5 text-red-700" onClick={() => { void startSiren(); setTimeout(stopAlarm, 3000); }}>사이렌 테스트 (3초)</button>
               <button className="rounded-xl bg-slate-100 py-2.5 disabled:opacity-50" disabled={push !== 'on'} onClick={() => api<{ devices: number }>('/push/test', {}).then(r => showToast(`푸시를 보냈습니다 (기기 ${r.devices}대). 앱을 닫고 확인해 보세요.`), e => onError(e.message))}>푸시 테스트</button>
             </div>

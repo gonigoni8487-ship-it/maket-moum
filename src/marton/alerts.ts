@@ -55,8 +55,17 @@ const chimeSample = (t: number) => {
   return Math.sin(2 * Math.PI * f * t) * Math.exp(-local * 9) * 0.8;
 };
 
+// 경보음: 삐삐삐 — 삐삐삐 (바코드 훼손·가격 오류처럼 계산대가 멈추는 요청, 약 2.4초)
+const beepSample = (t: number) => {
+  const inGroup = t % 1.2;
+  const on = inGroup < 0.75 && inGroup % 0.25 < 0.17;
+  if (!on) return 0;
+  return Math.tanh(Math.sin(2 * Math.PI * 1500 * t) * 3) * 0.95;
+};
+
 let siren: HTMLAudioElement | null = null;
 let chime: HTMLAudioElement | null = null;
+let beep: HTMLAudioElement | null = null;
 let unlocked = false;
 const soundListeners = new Set<(ok: boolean) => void>();
 
@@ -65,8 +74,9 @@ function players() {
     siren = new Audio(wavUrl(2, sirenSample));
     siren.loop = true;
     chime = new Audio(wavUrl(0.6, chimeSample));
+    beep = new Audio(wavUrl(2.4, beepSample));
   }
-  return { siren, chime: chime! };
+  return { siren, chime: chime!, beep: beep! };
 }
 
 function setUnlocked(ok: boolean) {
@@ -91,12 +101,12 @@ export function unlockAudio() {
   } catch { /* 지원 안 함 */ }
   if (unlocked) return;
   try {
-    const { siren: s, chime: c } = players();
-    for (const el of [c, s]) {
+    const { siren: s, chime: c, beep: bp } = players();
+    for (const el of [c, bp, s]) {
       el.muted = true;
       void el.play().then(() => {
         if (el === s && !alarmOn) { el.pause(); el.currentTime = 0; }
-        if (el === c) { el.pause(); el.currentTime = 0; }
+        if (el !== s) { el.pause(); el.currentTime = 0; }
         el.muted = false;
         setUnlocked(true);
       }).catch(() => { el.muted = false; });
@@ -122,8 +132,9 @@ export async function startSiren(): Promise<boolean> {
   }
 }
 
-async function playChime() {
-  const { chime: c } = players();
+async function playChime(tone: 'chime' | 'alarm' = 'chime') {
+  const { chime, beep: bp } = players();
+  const c = tone === 'alarm' ? bp : chime;
   c.currentTime = 0;
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
 }
@@ -159,12 +170,13 @@ async function systemNotify(title: string, body: string, urgent: boolean, tag: s
  * 새 업무/공지 알림. 긴급이면 확인(stopAlarm)할 때까지 사이렌(반복)과 진동이 계속된다.
  * 돌려주는 값: 소리가 실제로 났는지 (막혔으면 화면에 "눌러서 사이렌 켜기"를 보여준다)
  */
-export async function alert(opts: { title: string; body: string; urgent: boolean; tag: string; prefs: AlertPrefs }): Promise<boolean> {
-  const { title, body, urgent, tag, prefs } = opts;
+export async function alert(opts: { title: string; body: string; urgent: boolean; tag: string; prefs: AlertPrefs; tone?: 'chime' | 'alarm' }): Promise<boolean> {
+  const { title, body, urgent, tag, prefs, tone } = opts;
   void systemNotify(title, body, urgent, tag);
   if (prefs.voice) speak(`${urgent ? '긴급 요청. ' : ''}${title}. ${body}`);
 
-  const vibrate = () => { if (prefs.vibrate) navigator.vibrate?.(urgent ? [500, 200, 500, 200, 500] : [200, 100, 200]); };
+  const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'alarm' ? [300, 100, 300, 100, 300, 400, 300, 100, 300, 100, 300] : [200, 100, 200];
+  const vibrate = () => { if (prefs.vibrate) navigator.vibrate?.(pattern); };
   vibrate();
   if (urgent) {
     stopAlarm();
@@ -172,9 +184,12 @@ export async function alert(opts: { title: string; body: string; urgent: boolean
   }
   if (!prefs.sound) return true;
   if (urgent) return startSiren();
-  await playChime();
+  await playChime(tone);
   return unlocked;
 }
+
+/** 바코드 훼손·가격 오류 요청은 일반 알림보다 강한 경보음으로 알린다 */
+export const ALARM_CATEGORIES: readonly string[] = ['바코드 훼손/미인식', '가격 오류'];
 
 export function stopAlarm() {
   alarmOn = false;
