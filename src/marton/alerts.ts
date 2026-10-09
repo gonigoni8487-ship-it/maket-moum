@@ -214,31 +214,42 @@ async function playChime(tone: 'chime' | 'call' | 'coupon' = 'chime') {
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
 }
 
-// 생일 축하 멜로디: "생일 축하합니다" 한 소절 (오르골 소리, 약 7초)
-const BDAY: [number, number][] = [ // [음 높이(반음, 도=0), 박자]
-  [-5, .75], [-5, .25], [-3, 1], [-5, 1], [0, 1], [-1, 2],
-  [-5, .75], [-5, .25], [-3, 1], [-5, 1], [2, 1], [0, 2],
-  [-5, .75], [-5, .25], [7, 1], [4, 1], [0, 1], [-1, 1], [-3, 2],
-  [5, .75], [5, .25], [4, 1], [0, 1], [2, 1], [0, 2],
+// 생일 축하: 빵빠레 디지털 팡파레 (8비트 게임기 소리, 약 4초)
+// [시작 시각(초), 길이(초), 음 높이(반음, 도5=0)] — 멜로디는 각진 사각파, 아래에 베이스·북소리를 깐다
+const FANFARE: [number, number, number][] = [
+  [0.00, 0.09, -5], [0.10, 0.09, 0], [0.20, 0.09, 4], [0.30, 0.34, 7], // 빠바바밤—
+  [0.70, 0.09, 4], [0.80, 0.45, 7], // 빠밤—
+  [1.40, 0.14, 9], [1.60, 0.14, 9], [1.80, 0.14, 11], // 빠! 빠! 빠!
+  [2.00, 1.10, 12], // 빠아아~
+  [3.20, 0.80, 12], [3.20, 0.80, 16], [3.20, 0.80, 19], // 밤! (화음)
 ];
-const BEAT = 0.36;
-const BDAY_SECONDS = BDAY.reduce((t, [, b]) => t + b, 0) * BEAT + 0.6;
+const FANFARE_BASS: [number, number, number][] = [[0, 0.6, -24], [0.7, 0.6, -17], [1.4, 0.5, -15], [2.0, 1.1, -12], [3.2, 0.8, -24]];
+const FANFARE_DRUM = [0, 0.7, 1.4, 1.6, 1.8, 2.0, 3.2];
+const square = (f: number, t: number, duty = 0.25) => ((f * t) % 1 < duty ? 1 : -1);
+const BDAY_SECONDS = 4.3;
 const bdaySample = (t: number) => {
-  let start = 0;
-  for (const [semi, beats] of BDAY) {
-    const len = beats * BEAT;
-    if (t < start + len + 0.4 && t >= start) {
-      const f = 523.25 * 2 ** (semi / 12);
-      const l = t - start;
-      return (Math.sin(2 * Math.PI * f * t) + 0.4 * Math.sin(4 * Math.PI * f * t) + 0.15 * Math.sin(6 * Math.PI * f * t)) * Math.exp(-l * 3) * 0.45;
-    }
-    start += len;
+  let v = 0;
+  for (const [a, len, semi] of FANFARE) {
+    if (t < a || t > a + len + 0.05) continue;
+    const l = t - a;
+    const vib = l > 0.4 ? 1 + 0.006 * Math.sin(2 * Math.PI * 6 * l) : 1; // 긴 음은 살짝 떨림
+    const e = Math.min(1, l / 0.008) * (t > a + len ? Math.max(0, 1 - (t - a - len) / 0.05) : 1) * (len > 0.5 ? Math.exp(-l * 0.8) : 1);
+    v += square(523.25 * 2 ** (semi / 12) * vib, t) * e * 0.12;
   }
-  return 0;
+  for (const [a, len, semi] of FANFARE_BASS) {
+    if (t < a || t > a + len) continue;
+    const f = 523.25 * 2 ** (semi / 12);
+    v += (Math.abs(((f * t) % 1) * 4 - 2) - 1) * Math.min(1, (a + len - t) / 0.03) * 0.22; // 삼각파 베이스
+  }
+  for (const d of FANFARE_DRUM) {
+    const l = t - d;
+    if (l >= 0 && l < 0.08) v += (Math.random() * 2 - 1) * Math.exp(-l * 60) * 0.25; // 짧은 북소리
+  }
+  return Math.max(-1, Math.min(1, v));
 };
 let bday: HTMLAudioElement | null = null;
 
-/** 생일 축하: 멜로디가 끝나면 "OO 담당님 생일 축하드립니다"를 읽어 준다. 소리가 막히면 false */
+/** 생일 축하: 빵빠레 팡파레가 끝나면 "OO 담당님 생일 축하드립니다"를 읽어 준다. 소리가 막히면 false */
 export async function celebrateBirthday(message: string): Promise<boolean> {
   bday ??= new Audio(wavUrl(BDAY_SECONDS, bdaySample));
   bday.currentTime = 0;
