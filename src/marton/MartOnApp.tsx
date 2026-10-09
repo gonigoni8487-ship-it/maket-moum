@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic, Coffee } from 'lucide-react';
 import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, expiryCallPhrase, isBirthdayToday, noticeFor, storeTime, noticeSpeech, noticeTarget, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { alert, callPhrase, celebrateBirthday, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { ALARM_TONES, alert, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -68,7 +68,7 @@ export default function MartOnApp() {
   const [birthday, setBirthday] = useState<string | null>(null);
   const [couponArrived, setCouponArrived] = useState<{ count: number; from: string; message?: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
-  const [prefs, setPrefs] = useState<AlertPrefs>(loadPrefs);
+  const [prefs, setPrefs] = useState<AlertPrefs>(() => { const p = loadPrefs(); setAlarmTone(p.alarm); return p; });
   const [showSettings, setShowSettings] = useState(false);
   const [push, setPush] = useState<PushState>('off');
   const [soundOk, setSoundOk] = useState(soundReady);
@@ -320,7 +320,9 @@ export default function MartOnApp() {
     return () => clearInterval(t);
   }, [pending, flushOutbox]);
 
-  const updatePrefs = (p: AlertPrefs) => { setPrefs(p); savePrefs(p); };
+  const updatePrefs = (p: AlertPrefs) => { setPrefs(p); savePrefs(p); setAlarmTone(p.alarm); };
+  // 경보음을 고르면 2.5초 들려준다
+  const previewAlarm = (tone: AlarmTone) => { updatePrefs({ ...prefs, alarm: tone }); stopAlarm(); void startSiren(); setTimeout(stopAlarm, 2500); };
 
   const openRequest = (d: Draft) => { setDraft({ ...d }); setTab('request'); };
 
@@ -398,10 +400,21 @@ export default function MartOnApp() {
                 {label}<input type="checkbox" className="size-5 accent-blue-600" checked={prefs[k]} onChange={e => updatePrefs({ ...prefs, [k]: e.target.checked })} />
               </label>
             ))}
+            <div className="space-y-1.5">
+              <span className="text-sm font-semibold">긴급 경보음 <span className="font-normal text-slate-400">(누르면 들려줍니다)</span></span>
+              <div className="grid grid-cols-3 gap-2">
+                {ALARM_TONES.map(t => (
+                  <button key={t.id} onClick={() => previewAlarm(t.id)} aria-pressed={prefs.alarm === t.id}
+                    className={cx('rounded-xl border-2 px-1 py-2 text-xs', prefs.alarm === t.id ? 'border-red-600 bg-red-50 font-bold text-red-700' : 'border-slate-200 text-slate-700')}>
+                    <span className="block text-sm font-bold">{t.label}</span>{t.hint}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-sm font-semibold">
               <button className="rounded-xl bg-slate-100 py-2.5" onClick={() => alert({ title: '테스트 알림', body: '알림이 정상 동작합니다.', urgent: false, tag: 'test', prefs })}>알림음 테스트</button>
               <button className="rounded-xl bg-amber-50 py-2.5 text-amber-800" onClick={() => alert({ title: '호출 테스트', body: '받은 요청은 이 소리와 음성으로 알립니다.', urgent: false, tag: 'test', prefs, tone: 'call', announce: callPhrase(me.dept, '테스트') })}>호출음 테스트</button>
-              <button className="rounded-xl bg-red-50 py-2.5 text-red-700" onClick={() => { void startSiren(); setTimeout(stopAlarm, 3000); }}>사이렌 테스트 (3초)</button>
+              <button className="rounded-xl bg-red-50 py-2.5 text-red-700" onClick={() => { void startSiren(); setTimeout(stopAlarm, 3000); }}>긴급 경보음 테스트 (3초)</button>
               <button className="rounded-xl bg-slate-100 py-2.5 disabled:opacity-50" disabled={push !== 'on'} onClick={() => api<{ devices: number }>('/push/test', {}).then(r => showToast(`푸시를 보냈습니다 (기기 ${r.devices}대). 앱을 닫고 확인해 보세요.`), e => onError(e.message))}>푸시 테스트</button>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 text-sm">
@@ -415,7 +428,7 @@ export default function MartOnApp() {
 
       <main className="mx-auto max-w-2xl px-4 pt-4">
         {!soundOk && prefs.sound && (
-          <div className="mb-4 rounded-2xl bg-slate-800 p-3 text-center text-[13px] font-semibold text-white">🔈 긴급 사이렌이 울리려면 화면을 한 번 눌러 주세요</div>
+          <div className="mb-4 rounded-2xl bg-slate-800 p-3 text-center text-[13px] font-semibold text-white">🔈 긴급 경보음이 울리려면 화면을 한 번 눌러 주세요</div>
         )}
         {push === 'off' && (
           <div className="mb-4 flex items-center gap-3 rounded-2xl bg-amber-50 p-3 text-[13px] text-amber-900">
@@ -524,7 +537,7 @@ export default function MartOnApp() {
           <Siren className="size-20 animate-pulse" />
           {!soundOk && prefs.sound && (
             <button onClick={() => void startSiren()} className="rounded-full bg-black/30 px-5 py-2.5 text-sm font-bold text-white ring-2 ring-white/60">
-              🔇 소리가 막혀 있습니다 · 눌러서 사이렌 켜기
+              🔇 소리가 막혀 있습니다 · 눌러서 경보음 켜기
             </button>
           )}
           {urgent.kind === 'task' ? (

@@ -9,10 +9,12 @@ export interface AlertPrefs {
   call: boolean;
   /** 모든 알림 내용을 읽어 줌 (베타) */
   voice: boolean;
+  /** 긴급 경보음 종류 */
+  alarm: AlarmTone;
 }
 
 const PREFS_KEY = 'marton-alert-prefs';
-export const defaultPrefs: AlertPrefs = { sound: true, vibrate: true, call: true, voice: false };
+export const defaultPrefs: AlertPrefs = { sound: true, vibrate: true, call: true, voice: false, alarm: 'digital' };
 
 export function loadPrefs(): AlertPrefs {
   try { return { ...defaultPrefs, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return defaultPrefs; }
@@ -47,17 +49,46 @@ function wavUrl(seconds: number, sample: (t: number) => number) {
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 
-// 긴급 경보음: "띠-리- 띠-리-" 두 음을 부드럽게 오가는 소리 (반복 재생).
-// 예전 각진 사이렌(1000/700Hz)이 너무 시끄러워, 둥근 음색과 짧은 쉼을 넣어 귀가 덜 피곤하게 했다.
-const ALARM_NOTES = [[0, 0.32, 988], [0.4, 0.72, 740], [1.0, 1.32, 988], [1.4, 1.72, 740]] as const; // 2초 한 바퀴
-const sirenSample = (t: number) => {
-  const note = ALARM_NOTES.find(([a, b]) => t >= a && t < b);
-  if (!note) return 0;
-  const [a, b, f] = note;
-  const env = Math.min(1, (t - a) / 0.03, (b - t) / 0.06); // 부드럽게 시작·끝
-  const x = Math.sin(2 * Math.PI * f * t) + 0.25 * Math.sin(2 * Math.PI * f * 2 * t);
-  return x * env * 0.6;
+// 긴급 경보음 (확인할 때까지 반복). 구급차처럼 높낮이가 오가는 사이렌 대신 업무용 알람 소리 3가지 중에서 고른다.
+export type AlarmTone = 'digital' | 'bell' | 'chime';
+export const ALARM_TONES: { id: AlarmTone; label: string; hint: string }[] = [
+  { id: 'digital', label: '디지털 알람', hint: '삐삐삐삐— 알람시계처럼' },
+  { id: 'bell', label: '전자 벨', hint: '따르르릉 울리는 벨' },
+  { id: 'chime', label: '업무 차임', hint: '띵동 띵동 반복' },
+];
+const env = (t: number, a: number, b: number, fadeIn = 0.005, fadeOut = 0.01) => Math.max(0, Math.min(1, (t - a) / fadeIn, (b - t) / fadeOut));
+const ALARM_SAMPLES: Record<AlarmTone, (t: number) => number> = {
+  // 2초에 "삐삐삐삐" 두 번: 짧고 또렷한 단음 (알람시계·업무용 단말기 소리)
+  digital: t => {
+    const g = t % 1;
+    const i = Math.floor(g / 0.12);
+    if (i > 3) return 0;
+    const a = i * 0.12, b = a + 0.075;
+    if (g > b) return 0;
+    const f = 2093; // 높은 도
+    return (Math.sin(2 * Math.PI * f * t) + 0.3 * Math.sin(2 * Math.PI * f * 3 * t)) * env(g, a, b) * 0.5;
+  },
+  // 따르르릉: 벨이 빠르게 떨리는 소리 0.9초 + 쉼
+  bell: t => {
+    const g = t % 1;
+    if (g > 0.9) return 0;
+    const trem = 0.55 + 0.45 * Math.sign(Math.sin(2 * Math.PI * 22 * t)); // 망치가 때리는 떨림
+    const x = Math.sin(2 * Math.PI * 1318 * t) + 0.6 * Math.sin(2 * Math.PI * 1760 * t) + 0.25 * Math.sin(2 * Math.PI * 2637 * t);
+    return x * trem * env(g, 0, 0.9, 0.01, 0.08) * 0.32;
+  },
+  // 띵동 띵동: 맑은 실로폰 두 음을 반복
+  chime: t => {
+    const notes: [number, number][] = [[0, 1319], [0.3, 1047], [1.0, 1319], [1.3, 1047]];
+    let v = 0;
+    for (const [start, f] of notes) {
+      if (t < start) continue;
+      const l = t - start;
+      v += (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(2 * Math.PI * f * 4 * t)) * Math.exp(-l * 4.5) * 0.45;
+    }
+    return v;
+  },
 };
+let alarmTone: AlarmTone = 'digital';
 // 일반 알림: 딩-동
 const chimeSample = (t: number) => {
   const f = t < 0.2 ? 880 : 1320;
@@ -101,13 +132,25 @@ const soundListeners = new Set<(ok: boolean) => void>();
 
 function players() {
   if (!siren) {
-    siren = new Audio(wavUrl(2, sirenSample));
+    siren = new Audio(wavUrl(2, ALARM_SAMPLES[alarmTone]));
     siren.loop = true;
     chime = new Audio(wavUrl(0.6, chimeSample));
     call = new Audio(wavUrl(CALL_SECONDS, callSample));
     coupon = new Audio(wavUrl(COUPON_SECONDS, couponSample));
   }
   return { siren, chime: chime!, call: call!, coupon: coupon! };
+}
+
+/** 긴급 경보음 바꾸기 (설정에서 고를 때 · 앱 시작 때) */
+export function setAlarmTone(tone: AlarmTone) {
+  if (!ALARM_SAMPLES[tone] || tone === alarmTone) return;
+  alarmTone = tone;
+  if (siren) {
+    const playing = !siren.paused;
+    siren.pause();
+    siren.src = wavUrl(2, ALARM_SAMPLES[tone]);
+    if (playing) void siren.play().catch(() => {});
+  }
 }
 
 function setUnlocked(ok: boolean) {
