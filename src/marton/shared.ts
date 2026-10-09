@@ -57,6 +57,20 @@ export interface Attachment {
 }
 export const MAX_FILE_BYTES = 1.8 * 1024 * 1024;
 
+// ---- 매장 소리 (관리자가 올린 파일) ----
+export const SOUND_KINDS = ['birthday', 'coupon', 'call'] as const;
+export type StoreSoundKind = (typeof SOUND_KINDS)[number];
+export const SOUND_LABEL: Record<StoreSoundKind, string> = { birthday: '생일 축하', coupon: '커피쿠폰 도착', call: '부서 호출음' };
+export const MAX_SOUND_BYTES = 1.5 * 1024 * 1024;
+export interface StoreSound {
+  kind: StoreSoundKind;
+  id: string;
+  name: string;
+  size: number;
+  uploadedBy: Actor;
+  uploadedAt: number;
+}
+
 // ---- 월 근무계획 ----
 export const SHIFTS = ['1근', '2근', '3근', '휴무', '연차', '반차'] as const;
 export interface ShiftEntry {
@@ -302,6 +316,8 @@ export interface Bootstrap {
   schedules: WorkSchedule[];
   /** 소비기한 점검 일정 (지난 7일 ~ 앞으로) */
   expiryChecks: ExpiryCheck[];
+  /** 매장에서 바꾼 소리 */
+  sounds: StoreSound[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -318,7 +334,8 @@ export type StreamEvent =
   | { type: 'coupon'; coupons: Coupon[]; action: 'received' | 'used' }
   | { type: 'schedule'; schedule: WorkSchedule }
   | { type: 'expiry'; checks: ExpiryCheck[]; action: 'saved' | 'deleted' | 'call' }
-  | { type: 'birthday'; staffId: string; name: string };
+  | { type: 'birthday'; staffId: string; name: string }
+  | { type: 'sounds'; sounds: StoreSound[] };
 
 /** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
 export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {

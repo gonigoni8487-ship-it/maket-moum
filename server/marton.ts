@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform, onJob } from './platform';
@@ -75,6 +75,7 @@ export interface Db {
   couponBatch?: number;
   schedules: WorkSchedule[];
   expiryChecks: ExpiryCheck[];
+  sounds?: StoreSound[];
   /** 생일 축하를 보낸 해 (직원별) */
   birthdayDone?: Record<string, number>;
   vapid?: { publicKey: string; privateKey: string };
@@ -310,6 +311,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       handovers: db.handovers.filter(h => h.createdAt > Date.now() - 3 * 24 * 60 * 60 * 1000 && (me.role === 'manager' || h.dept === me.dept)),
       coupons: db.coupons.filter(c => c.to.id === me.id),
       schedules: db.schedules.slice(-3),
+      sounds: db.sounds ?? [],
       expiryChecks: db.expiryChecks.filter(c => (me.role === 'manager' || c.dept === me.dept) && c.at > Date.now() - 7 * 24 * 60 * 60 * 1000),
       online: onlineCounts(),
       aiEnabled,

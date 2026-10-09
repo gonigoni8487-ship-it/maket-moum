@@ -1,13 +1,14 @@
 import { Mic, MicOff } from 'lucide-react';
 import { useDictation } from '../dictation';
 import { useState, type FormEvent } from 'react';
-import { BROADCAST_TITLE, DEPARTMENTS, meetingTitle, type Department, type Handover, type Notice, type Staff, type Task } from '../shared';
+import { BROADCAST_TITLE, DEPARTMENTS, meetingTitle, type Department, type Handover, type Notice, type Staff, type StoreSound, type Task } from '../shared';
 import { api } from '../api';
 import { TaskCard } from './TaskBoard';
 import { NoticeCard } from './Notices';
 import { HandoverList } from './Handover';
 import InviteQR from './InviteQR';
 import CouponSend from './CouponSend';
+import SoundSettings from './SoundSettings';
 import { Chip, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -40,8 +41,8 @@ function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
   );
 }
 
-export default function Manager({ me, tasks, notices, handovers, online, onError, onToast }: {
-  me: Staff; tasks: Task[]; notices: Notice[]; handovers: Handover[]; online: Record<string, number>; onError: (m: string) => void; onToast: (m: string) => void;
+export default function Manager({ me, tasks, notices, handovers, online, sounds, onError, onToast }: {
+  me: Staff; tasks: Task[]; notices: Notice[]; handovers: Handover[]; online: Record<string, number>; sounds: StoreSound[]; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   // 받는 파트 (비어 있으면 전체)
   const [targets, setTargets] = useState<Department[]>([]);
@@ -165,6 +166,8 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
       </Section>
 
       <CouponSend onError={onError} onToast={onToast} />
+
+      <SoundSettings sounds={sounds} myName={me.name} myDept={me.dept} onError={onError} onToast={onToast} />
 
       <div className="grid grid-cols-2 gap-2">
         {kpis.map(([label, value, alarm]) => (

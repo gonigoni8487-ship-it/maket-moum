@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic, Coffee } from 'lucide-react';
 import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, expiryCallPhrase, isBirthdayToday, noticeFor, storeTime, noticeSpeech, noticeTarget, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { ALARM_TONES, alert, onVoiceChange, voiceStatus, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { ALARM_TONES, alert, onVoiceChange, setCustomSounds, voiceStatus, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -141,6 +141,14 @@ export default function MartOnApp() {
   }, [data?.me]);
   useEffect(() => { if (birthday) void celebrateBirthday(birthday); }, [birthday]);
 
+  // 매장에서 올린 소리 (생일 축하·쿠폰 도착·호출음)로 바꾸기
+  const soundKey = (data?.sounds ?? []).map(x => x.id).join(',');
+  useEffect(() => {
+    const url = (id: string) => `/api/marton/sounds/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
+    const by = Object.fromEntries((data?.sounds ?? []).map(x => [x.kind, url(x.id)]));
+    setCustomSounds({ birthday: by.birthday, coupon: by.coupon, call: by.call });
+  }, [soundKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleEvent = useCallback((e: StreamEvent) => {
     const me = meRef.current;
     if (!me) return;
@@ -223,6 +231,10 @@ export default function MartOnApp() {
           showToast(`⏰ 소비기한 점검 시간입니다: ${c.area}`);
         }
       }
+      return;
+    }
+    if (e.type === 'sounds') {
+      setData(d => d && { ...d, sounds: e.sounds });
       return;
     }
     if (e.type === 'birthday') {
@@ -460,7 +472,7 @@ export default function MartOnApp() {
             section={boardSection} onSection={setBoardSection} onError={onError} onToast={showToast} />
         )}
         {tab === 'security' && <Security me={me} incidents={incidents} patrols={patrols} reports={reports} products={products} onError={onError} onToast={showToast} />}
-        {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} handovers={handovers} online={online} onError={onError} onToast={showToast} />}
+        {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} handovers={handovers} online={online} sounds={data.sounds ?? []} onError={onError} onToast={showToast} />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">

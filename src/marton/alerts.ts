@@ -130,15 +130,39 @@ let coupon: HTMLAudioElement | null = null;
 let unlocked = false;
 const soundListeners = new Set<(ok: boolean) => void>();
 
+// ---- 매장에서 올린 소리 파일 (생일 축하·쿠폰 도착·호출음) ----
+export type SoundKind = 'birthday' | 'coupon' | 'call';
+const customUrl: Partial<Record<SoundKind, string>> = {};
+const defaultUrl: Partial<Record<SoundKind, string>> = {};
+/** 소리 길이(초): 올린 파일은 실제 길이(최대 cap), 아니면 기본 길이 */
+const lengthOf = (el: HTMLAudioElement | null, fallback: number, cap: number) =>
+  el && Number.isFinite(el.duration) && el.duration > 0 ? Math.min(el.duration, cap) : fallback;
+
+/** 관리자가 올린 소리로 바꾼다 (없으면 기본 소리). 같은 audio 요소를 그대로 써서 이미 허용된 소리가 계속 난다 */
+export function setCustomSounds(urls: Partial<Record<SoundKind, string | undefined>>) {
+  (['birthday', 'coupon', 'call'] as SoundKind[]).forEach(kind => {
+    const next = urls[kind];
+    if (customUrl[kind] === next) return;
+    if (next) customUrl[kind] = next; else delete customUrl[kind];
+    const el = kind === 'birthday' ? bday : kind === 'coupon' ? coupon : call;
+    if (el) { el.src = next ?? defaultUrl[kind]!; el.load(); }
+  });
+}
+
 function players() {
   if (!siren) {
     siren = new Audio(wavUrl(2, ALARM_SAMPLES[alarmTone]));
     siren.loop = true;
     chime = new Audio(wavUrl(0.6, chimeSample));
-    call = new Audio(wavUrl(CALL_SECONDS, callSample));
-    coupon = new Audio(wavUrl(COUPON_SECONDS, couponSample));
+    defaultUrl.call = wavUrl(CALL_SECONDS, callSample);
+    defaultUrl.coupon = wavUrl(COUPON_SECONDS, couponSample);
+    defaultUrl.birthday = wavUrl(BDAY_SECONDS, bdaySample);
+    call = new Audio(customUrl.call ?? defaultUrl.call);
+    coupon = new Audio(customUrl.coupon ?? defaultUrl.coupon);
+    bday = new Audio(customUrl.birthday ?? defaultUrl.birthday);
+    [call, coupon, bday].forEach(el => { el.preload = 'auto'; });
   }
-  return { siren, chime: chime!, call: call!, coupon: coupon! };
+  return { siren, chime: chime!, call: call!, coupon: coupon!, bday: bday! };
 }
 
 /** 긴급 경보음 바꾸기 (설정에서 고를 때 · 앱 시작 때) */
@@ -176,8 +200,8 @@ export function unlockAudio() {
   primeSpeech(); // 음성 안내도 첫 터치 때 깨워 둔다 (아이폰·일부 안드로이드)
   if (unlocked) return;
   try {
-    const { siren: s, chime: c, call: cl, coupon: cp } = players();
-    for (const el of [c, cl, cp, s]) {
+    const { siren: s, chime: c, call: cl, coupon: cp, bday: bd } = players();
+    for (const el of [c, cl, cp, bd, s]) {
       el.muted = true;
       void el.play().then(() => {
         if (el === s && !alarmOn) { el.pause(); el.currentTime = 0; }
@@ -211,7 +235,9 @@ async function playChime(tone: 'chime' | 'call' | 'coupon' = 'chime') {
   const { chime, call: cl, coupon: cp } = players();
   const c = tone === 'call' ? cl : tone === 'coupon' ? cp : chime;
   c.currentTime = 0;
-  try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
+  try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); return; }
+  // 올린 소리가 길면 6초에서 끊고 음성 안내로 넘어간다
+  if ((tone === 'call' && customUrl.call) || (tone === 'coupon' && customUrl.coupon)) window.setTimeout(() => c.pause(), 6000);
 }
 
 // 생일 축하: 빵빠레 디지털 팡파레 (8비트 게임기 소리, 약 4초)
@@ -251,11 +277,12 @@ let bday: HTMLAudioElement | null = null;
 
 /** 생일 축하: 빵빠레 팡파레가 끝나면 "OO 담당님 생일 축하드립니다"를 읽어 준다. 소리가 막히면 false */
 export async function celebrateBirthday(message: string): Promise<boolean> {
-  bday ??= new Audio(wavUrl(BDAY_SECONDS, bdaySample));
-  bday.currentTime = 0;
+  const { bday: b } = players();
+  b.currentTime = 0;
   try {
-    await bday.play();
-    window.setTimeout(() => speak(message), BDAY_SECONDS * 1000);
+    await b.play();
+    // 올린 노래는 최대 30초까지 듣고 축하 음성
+    window.setTimeout(() => { if (customUrl.birthday) b.pause(); speak(message); }, lengthOf(b, BDAY_SECONDS, 30) * 1000);
     return true;
   } catch {
     speak(message);
@@ -344,7 +371,8 @@ export async function alert(opts: {
   void systemNotify(title, body, urgent, tag);
   const spoken = announce && prefs.call ? announce : prefs.voice ? `${urgent ? '긴급 요청. ' : ''}${title}. ${body}` : null;
   // 호출음이 끝난 뒤 말한다 (사이렌은 계속 울리므로 바로)
-  if (spoken) window.setTimeout(() => speak(spoken), prefs.sound && !urgent && tone === 'call' ? CALL_SECONDS * 1000 : prefs.sound && tone === 'coupon' ? COUPON_SECONDS * 1000 : 0);
+  const after = !prefs.sound || urgent ? 0 : tone === 'call' ? lengthOf(call, CALL_SECONDS, 6) : tone === 'coupon' ? lengthOf(coupon, COUPON_SECONDS, 6) : 0;
+  if (spoken) window.setTimeout(() => speak(spoken), after * 1000);
 
   const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'call' ? [250, 100, 250, 100, 250, 100, 600] : tone === 'coupon' ? [80, 60, 80, 60, 300] : [200, 100, 200];
   const vibrate = () => { if (prefs.vibrate) navigator.vibrate?.(pattern); };
