@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic } from 'lucide-react';
 import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { ALARM_CATEGORIES, alert, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { alert, callPhrase, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -167,7 +167,8 @@ export default function MartOnApp() {
         // 보안/관리자는 진행 중이면 사이렌, 구역 부서는 일반 알림(주변 고객 응대 요청)
         const handler = canHandleIncident(me);
         const body = `${i.zone}${i.productName ? ` · ${i.productName}` : ''}${handler ? '' : ' — 주변 고객 응대로 확인 부탁드립니다'}`;
-        alert({ title: `보안 ${i.type}`, body, urgent: handler && i.urgent, tag: `incident-${i.id}`, prefs: p });
+        // 보안 담당 호출은 매장에서 들려도 되게 유형·위치를 말하지 않는다
+        alert({ title: `보안 ${i.type}`, body, urgent: handler && i.urgent, tag: `incident-${i.id}`, prefs: p, ...(handler ? { tone: 'call' as const, announce: `${i.urgent ? '긴급 호출. ' : ''}보안 담당님 호출입니다.` } : {}) });
         if (handler && i.urgent) setUrgent({ kind: 'incident', incident: i });
       } else {
         const last = i.history[i.history.length - 1];
@@ -187,7 +188,7 @@ export default function MartOnApp() {
     if (e.action === 'created') {
       const forMe = t.toDept === me.dept && t.createdBy.id !== me.id;
       if (forMe || (me.role === 'manager' && t.urgent && t.createdBy.id !== me.id)) {
-        alert({ title: `${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}`, prefs: p, tone: ALARM_CATEGORIES.includes(t.category) ? 'alarm' : 'chime' });
+        alert({ title: `${t.urgent ? '🚨 긴급 · ' : '📣 '}${t.toDept} 담당님 호출입니다`, body: `${t.fromDept} ${t.category}: ${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}`, prefs: p, tone: 'call', announce: callPhrase(t.toDept, t.category, t.location, t.urgent) });
         if (t.urgent) setUrgent({ kind: 'task', task: t });
       }
     } else {
@@ -333,14 +334,14 @@ export default function MartOnApp() {
         <div className="mx-auto max-w-2xl px-4 pt-3">
           <div className="space-y-3 rounded-2xl bg-white p-4 shadow">
             <div className="flex items-center justify-between font-bold">알림 설정<button onClick={() => setShowSettings(false)}><X className="size-5" /></button></div>
-            {([['sound', '알림음'], ['vibrate', '진동'], ['voice', '음성 안내 (베타)']] as const).map(([k, label]) => (
+            {([['sound', '알림음'], ['vibrate', '진동'], ['call', '부서 호출 음성 ("○○ 담당님 호출입니다")'], ['voice', '모든 알림 읽어 주기 (베타)']] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between text-sm">
                 {label}<input type="checkbox" className="size-5 accent-blue-600" checked={prefs[k]} onChange={e => updatePrefs({ ...prefs, [k]: e.target.checked })} />
               </label>
             ))}
             <div className="grid grid-cols-2 gap-2 text-sm font-semibold">
               <button className="rounded-xl bg-slate-100 py-2.5" onClick={() => alert({ title: '테스트 알림', body: '알림이 정상 동작합니다.', urgent: false, tag: 'test', prefs })}>알림음 테스트</button>
-              <button className="rounded-xl bg-amber-50 py-2.5 text-amber-800" onClick={() => alert({ title: '경보음 테스트', body: '바코드 훼손·가격 오류 요청은 이 소리로 울립니다.', urgent: false, tag: 'test', prefs, tone: 'alarm' })}>경보음 테스트</button>
+              <button className="rounded-xl bg-amber-50 py-2.5 text-amber-800" onClick={() => alert({ title: '호출 테스트', body: '받은 요청은 이 소리와 음성으로 알립니다.', urgent: false, tag: 'test', prefs, tone: 'call', announce: callPhrase(me.dept, '테스트') })}>호출음 테스트</button>
               <button className="rounded-xl bg-red-50 py-2.5 text-red-700" onClick={() => { void startSiren(); setTimeout(stopAlarm, 3000); }}>사이렌 테스트 (3초)</button>
               <button className="rounded-xl bg-slate-100 py-2.5 disabled:opacity-50" disabled={push !== 'on'} onClick={() => api<{ devices: number }>('/push/test', {}).then(r => showToast(`푸시를 보냈습니다 (기기 ${r.devices}대). 앱을 닫고 확인해 보세요.`), e => onError(e.message))}>푸시 테스트</button>
             </div>

@@ -71,7 +71,7 @@ function urgentTaskPush(id: string) {
   if (!t || t.status !== '접수') return null;
   return {
     who: (s: Staff) => s.id !== t.createdBy.id && s.dept === t.toDept,
-    msg: { title: `🚨 긴급 ${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: true, tag: `task-${t.id}` },
+    msg: { title: `🚨 긴급 · ${t.toDept} 담당님 호출입니다`, body: `${t.fromDept} ${t.category}: ${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: true, tag: `task-${t.id}` },
   };
 }
 
@@ -102,7 +102,7 @@ export function pushFor(event: StreamEvent) {
     const t = event.task;
     if (event.action === 'created') {
       const who = (s: Staff) => s.id !== t.createdBy.id && (s.dept === t.toDept || (t.urgent && s.role === 'manager'));
-      const msg = { title: `${t.urgent ? '🚨 긴급 ' : ''}${t.fromDept} → ${t.toDept} ${t.category}`, body: `${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}` };
+      const msg = { title: `${t.urgent ? '🚨 긴급 · ' : '📣 '}${t.toDept} 담당님 호출입니다`, body: `${t.fromDept} ${t.category}: ${t.title}${t.location ? ` (${t.location})` : ''}`, urgent: t.urgent, tag: `task-${t.id}` };
       void sendTo(who, msg);
       if (t.urgent) scheduleRepeat({ kind: 'task', id: t.id, round: 1 });
     } else {
