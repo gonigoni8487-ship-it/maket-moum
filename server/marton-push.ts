@@ -1,5 +1,5 @@
 // 마트ON 웹 푸시: 앱이 닫혀 있거나 화면이 꺼져 있어도 업무요청·공지·보안 경보를 받는다.
-import { canHandleIncident, type Staff, type StreamEvent } from '../src/marton/shared';
+import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, noticeFor, type Staff, type StreamEvent } from '../src/marton/shared';
 import { db, save, auth, text, type AuthedRequest, type RouteApp } from './marton';
 import { platform, onJob } from './platform';
 import { generateVapidKeys, sendWebPush, type VapidKeys } from './webpush';
@@ -114,7 +114,22 @@ export function pushFor(event: StreamEvent) {
   } else if (event.type === 'notice') {
     const n = event.notice;
     if (n.readBy.length > 1) return; // 읽음 표시 갱신은 알리지 않음
-    void sendTo(s => s.id !== n.by.id && (n.scope === 'all' || n.scope === s.dept), { title: `${n.urgent ? '🚨 긴급 ' : ''}${n.scope === 'all' ? '전체' : n.scope} 공지`, body: n.title, urgent: n.urgent, tag: `notice-${n.id}` });
+    const title = n.kind === 'broadcast' ? `📢 ${n.title}` : n.kind === 'meeting' ? `🕑 ${n.title}` : n.kind === 'order' ? `📝 ${n.byTitle || '점장'}님 지시사항` : n.kind === 'share' ? `📊 실적 공유` : `${n.urgent ? '🚨 긴급 ' : ''}${n.scope === 'all' ? '전체' : n.scope} 공지`;
+    const body = n.kind ? n.body || n.title : n.title;
+    void sendTo(s => s.id !== n.by.id && noticeFor(n, s.dept), { title, body, urgent: n.urgent, tag: `notice-${n.id}` });
+  } else if (event.type === 'expiry') {
+    if (event.action !== 'call') return;
+    const c = event.checks[0];
+    void sendTo(s => s.dept === c.dept, { title: `⏰ ${c.dept} 소비기한 점검 시간`, body: `${c.area}${c.assignee ? ` · 담당 ${c.assignee}` : ''}`, urgent: false, tag: `expiry-${c.id}` });
+  } else if (event.type === 'birthday') {
+    void sendTo(s => s.id === event.staffId, { title: '🎂 생일 축하드립니다', body: birthdayMessage(event.name), urgent: false, tag: `birthday-${event.staffId}` });
+  } else if (event.type === 'schedule') {
+    const m = Number(event.schedule.month.slice(5));
+    void sendTo(s => s.id !== event.schedule.uploadedBy.id, { title: `📅 ${m}월 근무계획이 올라왔습니다`, body: '공지 → 근무표에서 내 근무를 확인하세요.', urgent: false, tag: `schedule-${event.schedule.month}` });
+  } else if (event.type === 'coupon') {
+    if (event.action !== 'received' || !event.coupons.length) return;
+    const c = event.coupons[0];
+    void sendTo(s => s.id === c.to.id, { title: `☕ ${COUPON_ARRIVED}`, body: `${c.from.name} ${c.from.title ?? ''}님이 보낸 커피쿠폰 ${event.coupons.length}장`.replace(' 님', '님'), urgent: false, tag: `coupon-${c.batchId}` });
   } else if (event.type === 'incident') {
     const i = event.incident;
     if (event.action === 'created') {

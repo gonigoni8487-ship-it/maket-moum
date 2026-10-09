@@ -16,16 +16,16 @@ export async function advance(task: Task, status: TaskStatus, note?: string) {
   return send<Task>(`/tasks/${task.id}/status`, { status, note }, `${task.title} → ${status}`);
 }
 
-const photoUrl = (id: string) => `/api/marton/photos/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
+export const photoUrl = (id: string) => `/api/marton/photos/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
 
 /** 요청에 첨부된 사진 (눌러서 크게 보기) */
-function TaskPhotos({ ids }: { ids: string[] }) {
+export function TaskPhotos({ ids, size = 'size-20' }: { ids: string[]; size?: string }) {
   const [big, setBig] = useState<string | null>(null);
   return (
     <>
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {ids.map(id => (
-          <button key={id} type="button" onClick={() => setBig(id)} className="size-20 overflow-hidden rounded-xl bg-slate-200">
+          <button key={id} type="button" onClick={() => setBig(id)} className={`${size} shrink-0 overflow-hidden rounded-xl bg-slate-200`}>
             <img src={photoUrl(id)} alt="첨부 사진" loading="lazy" className="size-full object-cover" />
           </button>
         ))}

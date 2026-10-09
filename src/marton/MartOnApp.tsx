@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic } from 'lucide-react';
-import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
+import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic, Coffee } from 'lucide-react';
+import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, expiryCallPhrase, isBirthdayToday, noticeFor, storeTime, noticeSpeech, noticeTarget, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { alert, callPhrase, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { alert, callPhrase, celebrateBirthday, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -11,10 +11,11 @@ import TaskBoard, { advance } from './screens/TaskBoard';
 import RequestForm from './screens/RequestForm';
 import ProductFinder from './screens/ProductFinder';
 import PhotoAI from './screens/PhotoAI';
-import Notices from './screens/Notices';
+import Notices, { type BoardSection } from './screens/Notices';
 import Manager from './screens/Manager';
 import Security from './screens/Security';
 import VoiceRequest from './screens/VoiceRequest';
+import CouponWallet from './screens/CouponWallet';
 import { HandoverInbox, HandoverSheet } from './screens/Handover';
 
 const CACHE_KEY = 'marton-cache';
@@ -62,6 +63,10 @@ export default function MartOnApp() {
   });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [urgent, setUrgent] = useState<Urgent | null>(null);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [boardSection, setBoardSection] = useState<BoardSection>('notice');
+  const [birthday, setBirthday] = useState<string | null>(null);
+  const [couponArrived, setCouponArrived] = useState<{ count: number; from: string; message?: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefs>(loadPrefs);
   const [showSettings, setShowSettings] = useState(false);
@@ -124,6 +129,16 @@ export default function MartOnApp() {
 
   useEffect(() => { if (session.token) void load(); }, [load]);
 
+  // 생일인 날 처음 앱을 열면 축하 (해마다 한 번)
+  useEffect(() => {
+    const me = data?.me;
+    if (!me || !isBirthdayToday(me.birthday)) return;
+    const key = `marton-bday-${me.id}-${storeTime(Date.now()).year}`;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch { /* 무시 */ }
+    setBirthday(birthdayMessage(me.name));
+  }, [data?.me]);
+  useEffect(() => { if (birthday) void celebrateBirthday(birthday); }, [birthday]);
+
   const handleEvent = useCallback((e: StreamEvent) => {
     const me = meRef.current;
     if (!me) return;
@@ -134,10 +149,15 @@ export default function MartOnApp() {
 
     if (e.type === 'notice') {
       const n = e.notice;
-      const relevant = n.scope === 'all' || n.scope === me.dept;
+      const relevant = noticeFor(n, me.dept);
       const isNew = !dataRef.current?.notices.some(x => x.id === n.id);
       if (isNew && relevant && n.by.id !== me.id) {
-        alert({ title: `${n.scope === 'all' ? '전체' : n.scope} 공지`, body: n.title, urgent: n.urgent, tag: `notice-${n.id}`, prefs: p });
+        const announce = noticeSpeech(n);
+        alert({
+          title: n.kind ? n.title : `${noticeTarget(n)} 공지`, body: n.kind ? n.body || n.title : n.title,
+          urgent: n.urgent, tag: `notice-${n.id}`, prefs: p,
+          ...(announce ? { tone: 'call' as const, announce } : {}),
+        });
         if (n.urgent) setUrgent({ kind: 'notice', notice: n });
       }
       if (relevant || me.role === 'manager') setData(d => d && { ...d, notices: upsert(d.notices, n) });
@@ -179,6 +199,40 @@ export default function MartOnApp() {
           if (u?.kind === 'incident' && u.incident.id === i.id && i.status !== '접수') { stopAlarm(); return null; }
           return u;
         });
+      }
+      return;
+    }
+
+    if (e.type === 'schedule') {
+      setData(d => d && { ...d, schedules: [...(d.schedules ?? []).filter(x => x.month !== e.schedule.month), e.schedule].sort((a, b) => a.month.localeCompare(b.month)) });
+      if (e.schedule.uploadedBy.id !== me.id) showToast(`📅 ${Number(e.schedule.month.slice(5))}월 근무계획이 올라왔습니다. 공지 → 근무표에서 확인하세요.`);
+      return;
+    }
+    if (e.type === 'expiry') {
+      setData(d => {
+        if (!d) return d;
+        const rest = (d.expiryChecks ?? []).filter(c => !e.checks.some(x => x.id === c.id));
+        return { ...d, expiryChecks: e.action === 'deleted' ? rest : [...rest, ...e.checks] };
+      });
+      if (e.action === 'call') {
+        const c = e.checks[0];
+        if (c.dept === me.dept || me.role === 'manager') {
+          alert({ title: `⏰ ${c.dept} 소비기한 점검 시간`, body: `${c.area}${c.assignee ? ` · 담당 ${c.assignee}` : ''}`, urgent: false, tag: `expiry-${c.id}`, prefs: p, tone: 'call', announce: expiryCallPhrase(c) });
+          showToast(`⏰ 소비기한 점검 시간입니다: ${c.area}`);
+        }
+      }
+      return;
+    }
+    if (e.type === 'birthday') {
+      if (e.staffId === me.id) setBirthday(birthdayMessage(e.name));
+      return;
+    }
+    if (e.type === 'coupon') {
+      setData(d => d && { ...d, coupons: [...(d.coupons ?? []).filter(c => !e.coupons.some(x => x.id === c.id)), ...e.coupons] });
+      if (e.action === 'received' && e.coupons.length) {
+        const c = e.coupons[0];
+        alert({ title: `☕ ${COUPON_ARRIVED}`, body: `${c.from.name} ${c.from.title ?? ''}님이 보낸 커피쿠폰 ${e.coupons.length}장`.replace(' 님', '님'), urgent: false, tag: `coupon-${c.batchId}`, prefs: p, tone: 'coupon', announce: COUPON_ARRIVED });
+        setCouponArrived({ count: e.coupons.length, from: `${c.from.name} ${c.from.title ?? ''}`.trim(), message: c.message });
       }
       return;
     }
@@ -293,7 +347,8 @@ export default function MartOnApp() {
   const { me, tasks, notices, products, promotions, incidents, patrols, reports, handovers, online, aiEnabled } = data;
   const openIncidents = incidents.filter(i => i.status !== '종결' && (canHandleIncident(me) || i.reportedBy.id === me.id || i.dept === me.dept)).length;
   const openForMe = tasks.filter(t => t.toDept === me.dept && t.status !== '완료').length;
-  const unreadNotices = notices.filter(n => (n.scope === 'all' || n.scope === me.dept) && !n.readBy.includes(me.id)).length;
+  const unreadNotices = notices.filter(n => noticeFor(n, me.dept) && !n.readBy.includes(me.id)).length;
+  const couponCount = (data.coupons ?? []).filter(c => !c.usedAt && c.expiresAt >= Date.now()).length;
 
   const tabs: { id: Tab; label: string; icon: typeof ClipboardList; badge?: number }[] = [
     { id: 'tasks', label: '업무', icon: ClipboardList, badge: openForMe },
@@ -315,6 +370,10 @@ export default function MartOnApp() {
             <div className="font-bold">{me.name} {me.title ?? ''}</div>
             <div className="text-blue-200">{me.dept} · {me.duty}</div>
           </div>
+          <button onClick={() => setWalletOpen(true)} aria-label="소통 커피쿠폰 보관함" className="relative rounded-lg p-1.5 active:bg-blue-800">
+            <Coffee className="size-5" />
+            {couponCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-orange-500 px-1 text-[11px] font-black">{couponCount}</span>}
+          </button>
           <button onClick={() => { unlockAudio(); setVoiceOpen(true); }} aria-label="말로 요청하기" className="rounded-full bg-red-500 p-2 active:bg-red-600"><Mic className="size-5" /></button>
           <button onClick={() => setShowSettings(s => !s)} aria-label="설정" className="rounded-lg p-1.5 active:bg-blue-800"><Settings className="size-5" /></button>
         </div>
@@ -372,7 +431,10 @@ export default function MartOnApp() {
         {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onVoice={() => setVoiceOpen(true)} onSent={t => { if (t) showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}
         {tab === 'photo' && <PhotoAI me={me} aiEnabled={aiEnabled} products={data.products} promotions={data.promotions} onRequest={openRequest} onError={onError} onToast={showToast} onSent={t => { if (t) showToast(`${t.toDept}에 사진을 보냈습니다.`); else showToast('연결되면 사진을 자동으로 보냅니다.'); setTab('tasks'); }} />}
-        {tab === 'notices' && <Notices notices={notices} me={me} onError={onError} />}
+        {tab === 'notices' && (
+          <Notices notices={notices} schedules={data.schedules ?? []} expiryChecks={data.expiryChecks ?? []} me={me} aiEnabled={aiEnabled}
+            section={boardSection} onSection={setBoardSection} onError={onError} onToast={showToast} />
+        )}
         {tab === 'security' && <Security me={me} incidents={incidents} patrols={patrols} reports={reports} products={products} onError={onError} onToast={showToast} />}
         {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} handovers={handovers} online={online} onError={onError} onToast={showToast} />}
       </main>
@@ -403,6 +465,46 @@ export default function MartOnApp() {
           onError={onError}
           onDone={() => { setHandoverOpen(false); void logout(); }}
         />
+      )}
+
+      {walletOpen && (
+        <CouponWallet
+          coupons={data.coupons ?? []}
+          onClose={() => setWalletOpen(false)}
+          onError={onError}
+          onUsed={c => { setData(d => d && { ...d, coupons: (d.coupons ?? []).map(x => (x.id === c.id ? c : x)) }); showToast(`${c.no}번 쿠폰을 사용했습니다. 맛있게 드세요 ☕`); }}
+        />
+      )}
+
+      {birthday && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/60 p-6" role="dialog" aria-modal="true" aria-label="생일 축하" onClick={() => setBirthday(null)}>
+          <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+            {Array.from({ length: 36 }, (_, i) => (
+              <span key={i} className="absolute top-[-5%] size-2.5 rounded-sm motion-safe:animate-[confetti_3.2s_linear_infinite]"
+                style={{ left: `${(i * 37) % 100}%`, background: ['#f43f5e', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'][i % 5], animationDelay: `${(i % 9) * 0.35}s` }} />
+            ))}
+          </div>
+          <div className="relative w-full max-w-sm space-y-4 rounded-3xl bg-white p-6 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="text-6xl">🎂</div>
+            <p className="text-2xl font-black text-rose-600 [text-wrap:balance] [word-break:keep-all]">{birthday}</p>
+            <p className="text-sm text-slate-500">마트ON 동료 모두가 함께 축하합니다 🎉</p>
+            <button onClick={() => void celebrateBirthday(birthday)} className="w-full rounded-xl bg-rose-50 py-3 font-bold text-rose-700">🎵 축하 노래 다시 듣기</button>
+            <button onClick={() => setBirthday(null)} className="w-full rounded-xl bg-rose-600 py-3.5 font-bold text-white">고맙습니다</button>
+          </div>
+        </div>
+      )}
+
+      {couponArrived && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" role="dialog" aria-modal="true" aria-label={COUPON_ARRIVED} onClick={() => setCouponArrived(null)}>
+          <div className="w-full max-w-sm space-y-4 rounded-3xl bg-[#f3e9dc] p-6 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto grid size-20 place-items-center rounded-full bg-[#4a2c1d] text-4xl">☕</div>
+            <p className="text-xl font-black text-[#4a2c1d]">{COUPON_ARRIVED}</p>
+            <p className="text-sm text-[#7a4a2e]">{couponArrived.from}님이 커피쿠폰 <b>{couponArrived.count}장</b>을 보냈습니다.</p>
+            {couponArrived.message && <p className="rounded-xl bg-white/70 px-4 py-3 text-sm font-semibold text-[#4a2c1d]">“{couponArrived.message}”</p>}
+            <button onClick={() => { setCouponArrived(null); setWalletOpen(true); }} className="w-full rounded-xl bg-[#4a2c1d] py-3.5 font-bold text-white">보관함 열기</button>
+            <button onClick={() => setCouponArrived(null)} className="w-full py-1 text-sm text-[#7a6a5e]">닫기</button>
+          </div>
+        </div>
       )}
 
       {voiceOpen && (

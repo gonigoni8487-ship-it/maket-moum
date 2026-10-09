@@ -3,12 +3,14 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, answerQuestion, bayText, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
-import { platform } from './platform';
+import { platform, onJob } from './platform';
 import { registerSecurity } from './marton-security';
 import { registerPush, pushFor, type PushSub } from './marton-push';
+import { registerCoupons, pruneCoupons } from './marton-coupons';
+import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
 export interface RouteApp {
@@ -29,11 +31,11 @@ function base64ToBytes(b64: string) {
   return bytes;
 }
 
-/** data URL 사진을 저장하고 id 목록을 돌려준다 (최대 3장, 장당 1.8MB) */
-async function savePhotos(input: unknown): Promise<string[]> {
+/** data URL 사진을 저장하고 id 목록을 돌려준다 (기본 최대 3장, 장당 1.8MB) */
+async function savePhotos(input: unknown, max = MAX_TASK_PHOTOS): Promise<string[]> {
   if (!Array.isArray(input)) return [];
   const ids: string[] = [];
-  for (const item of input.slice(0, MAX_TASK_PHOTOS)) {
+  for (const item of input.slice(0, max)) {
     const m = typeof item === 'string' ? /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(item) : null;
     if (!m) continue;
     const bytes = base64ToBytes(m[2]);
@@ -69,6 +71,12 @@ export interface Db {
   reports: WeeklyReport[];
   pushSubs: PushSub[];
   handovers: Handover[];
+  coupons: Coupon[];
+  couponBatch?: number;
+  schedules: WorkSchedule[];
+  expiryChecks: ExpiryCheck[];
+  /** 생일 축하를 보낸 해 (직원별) */
+  birthdayDone?: Record<string, number>;
   vapid?: { publicKey: string; privateKey: string };
 }
 
@@ -81,6 +89,9 @@ function parseDb(raw: string | null): Db {
     db.reports ??= [];
     db.pushSubs ??= [];
     db.handovers ??= [];
+    db.coupons ??= [];
+    db.schedules ??= [];
+    db.expiryChecks ??= [];
     // 기본 상품: 새로 생긴 항목(오뎅·갈치 등)과 매대 번호를 기존 데이터에도 채운다
     for (const seed of SEED_PRODUCTS) {
       const have = db.products.find(p => p.id === seed.id);
@@ -89,7 +100,7 @@ function parseDb(raw: string | null): Db {
     }
     return db;
   } catch {
-    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [] };
+    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [], coupons: [], schedules: [], expiryChecks: [] };
   }
 }
 
@@ -113,6 +124,8 @@ export function save() {
     db.incidents = db.incidents.filter(i => i.status !== '종결' || i.updatedAt > incidentCutoff);
     db.patrols = db.patrols.filter(p => p.at > Date.now() - 90 * 24 * 60 * 60 * 1000);
     db.reports = db.reports.slice(-52);
+    pruneCoupons();
+    pruneBoard();
     db.handovers = db.handovers.filter(h => h.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000);
     void platform().saveDb(JSON.stringify(db)).catch(e => console.error('MartON save failed:', e));
   }, platform().saveDelayMs);
@@ -260,7 +273,10 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       }
       role = 'manager';
     }
-    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined };
+    const level = STAFF_LEVELS.includes(req.body.level) ? req.body.level as StaffLevel : existing?.level;
+    const bday = text(req.body.birthday, 10);
+    const birthday = /^(\d{4}-)?\d{2}-\d{2}$/.test(bday) ? bday : req.body.birthday === '' ? undefined : existing?.birthday;
+    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, ...(level ? { level } : {}), ...(birthday ? { birthday } : {}) };
     db.staff[id] = staff;
     const token = newId();
     db.sessions[token] = id;
@@ -270,6 +286,8 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
   registerSecurity(app, genAI, aiEnabled);
   registerPush(app);
+  registerCoupons(app);
+  registerBoard(app, genAI, aiEnabled);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
@@ -283,13 +301,16 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     res.json({
       me,
       tasks: db.tasks,
-      notices: db.notices.filter(n => n.scope === 'all' || n.scope === me.dept || me.role === 'manager').slice(-50),
+      notices: db.notices.filter(n => noticeFor(n, me.dept) || me.role === 'manager').slice(-50),
       products: db.products,
       promotions: db.promotions,
       incidents: db.incidents.filter(i => canSeeIncident(me, i)),
       patrols: canHandleIncident(me) ? db.patrols.filter(p => p.at > Date.now() - 14 * 24 * 60 * 60 * 1000) : [],
       reports: me.role === 'manager' ? db.reports.slice(-12) : [],
       handovers: db.handovers.filter(h => h.createdAt > Date.now() - 3 * 24 * 60 * 60 * 1000 && (me.role === 'manager' || h.dept === me.dept)),
+      coupons: db.coupons.filter(c => c.to.id === me.id),
+      schedules: db.schedules.slice(-3),
+      expiryChecks: db.expiryChecks.filter(c => (me.role === 'manager' || c.dept === me.dept) && c.at > Date.now() - 7 * 24 * 60 * 60 * 1000),
       online: onlineCounts(),
       aiEnabled,
     });
@@ -345,7 +366,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   // 첨부 사진: 로그인한 직원만 (img 태그는 헤더를 못 보내므로 ?token= 사용)
   app.get(`${api}/photos/:id`, auth, async (req, res) => {
     const id = req.params.id;
-    if (!PHOTO_ID.test(id) || !db.tasks.some(t => t.photos?.includes(id))) return res.status(404).end();
+    if (!PHOTO_ID.test(id) || !(db.tasks.some(t => t.photos?.includes(id)) || db.notices.some(n => n.photos?.includes(id)))) return res.status(404).end();
     const bytes = await platform().photos.get(id);
     if (!bytes) return res.status(404).end();
     res.setHeader('Cache-Control', 'private, max-age=86400');
@@ -407,16 +428,61 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     res.json(handover);
   });
 
-  app.post(`${api}/notices`, auth, managerOnly, (req, res) => {
+  // 중회 10분 전: 같은 대상에게 "10분 후 14시 중회 있습니다"를 다시 알린다
+  onJob('meeting-remind', ({ id }: { id: string }) => {
+    const n = db.notices.find(x => x.id === id);
+    if (!n?.meetingAt) return;
+    const t = storeTime(n.meetingAt);
+    const minute = Math.round((n.meetingAt - storeDayStart(n.meetingAt)) / 60000) % 60;
+    const reminder: Notice = {
+      id: newId().slice(0, 8), scope: n.scope, depts: n.depts, title: meetingTitle(t.hour, minute, '10분 후'), body: n.body, urgent: false,
+      by: n.by, createdAt: Date.now(), readBy: [n.by.id], kind: 'meeting', meetingAt: n.meetingAt,
+    };
+    db.notices.push(reminder);
+    save();
+    broadcast({ type: 'notice', notice: reminder });
+  });
+
+  app.post(`${api}/notices`, auth, managerOnly, async (req, res) => {
     const me = (req as AuthedRequest).staff;
     const scope = req.body.scope === 'all' ? 'all' : req.body.scope;
     const title = text(req.body.title, 80);
-    if (!title || (scope !== 'all' && !isDept(scope))) return res.status(400).json({ error: '제목과 공지 대상을 확인해 주세요.' });
+    const kind = ['broadcast', 'meeting', 'order', 'share'].includes(req.body.kind) ? req.body.kind as Notice['kind'] : undefined;
+    // 여러 파트: depts 배열 (전체가 아니면 첫 부서를 scope로)
+    const depts = Array.isArray(req.body.depts) ? [...new Set((req.body.depts as unknown[]).filter(isDept))] as Department[] : [];
+    let target: Notice['scope'] = scope;
+    if (scope !== 'all' && depts.length) target = depts[0];
+    const bodyText = text(req.body.body, 1000);
+    const orderTitle = (kind === 'order' || kind === 'share') && !title ? bodyText.replace(/\s+/g, ' ').slice(0, 30) : title;
+    if ((!orderTitle && !kind) || ((kind === 'order' || kind === 'share') && !orderTitle) || (target !== 'all' && !isDept(target))) return res.status(400).json({ error: '제목과 공지 대상을 확인해 주세요.' });
+    if (kind === 'broadcast' && !text(req.body.body, 1000)) return res.status(400).json({ error: '방송 내용을 입력해 주세요.' });
     const notice: Notice = {
-      id: newId().slice(0, 8), scope, title, body: text(req.body.body, 1000), urgent: Boolean(req.body.urgent),
-      by: actorOf(me), createdAt: Date.now(), readBy: [me.id],
+      id: newId().slice(0, 8), scope: target, title: orderTitle, body: bodyText, urgent: Boolean(req.body.urgent),
+      by: actorOf(me), createdAt: Date.now(), readBy: [me.id], kind, byTitle: me.title,
+      ...(target !== 'all' && depts.length > 1 ? { depts } : {}),
     };
+    if (kind === 'broadcast') notice.title = BROADCAST_TITLE;
+    if (kind === 'meeting') {
+      const hour = Number(req.body.meetingHour), minute = Number(req.body.meetingMinute) || 0;
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return res.status(400).json({ error: '중회 시각을 확인해 주세요.' });
+      notice.title = meetingTitle(hour, minute);
+      notice.meetingAt = storeDayStart(Date.now()) + (hour * 60 + minute) * 60000;
+      // 10분 전 다시 알림
+      const remindAt = notice.meetingAt - 10 * 60000;
+      if (remindAt > Date.now()) void platform().schedule({ at: remindAt, type: 'meeting-remind', data: { id: notice.id }, key: `meeting-${notice.id}` });
+    }
+    const photos = await savePhotos(req.body.photos, MAX_NOTICE_PHOTOS);
+    if (photos.length) {
+      notice.photos = photos;
+      const caps = Array.isArray(req.body.photoCaptions) ? req.body.photoCaptions : [];
+      const captions = photos.map((_, i) => text(caps[i], 300));
+      if (captions.some(Boolean)) notice.photoCaptions = captions;
+    }
+    const files = await saveFiles(req.body.files);
+    if (files.length) notice.files = files;
     db.notices.push(notice);
+    // 공지는 최근 300개만 보관 (지난 공지의 사진도 지운다)
+    if (db.notices.length > 300) db.notices.splice(0, db.notices.length - 300).forEach(n => { deletePhotos(n.photos); n.files?.forEach(f => FILE_ID.test(f.id) && void platform().photos.remove(f.id).catch(() => {})); });
     save();
     broadcast({ type: 'notice', notice });
     res.json(notice);
