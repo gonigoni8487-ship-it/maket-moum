@@ -1,3 +1,4 @@
+import { speakNumbers } from './speech-ko';
 // 마트ON 서버/클라이언트 공용 타입과 상수
 
 export const DEPARTMENTS = ['고객센터', '수산', '축산', '농산', '가공', '생활문화', 'MS'] as const;
@@ -647,6 +648,7 @@ function copula(t: string) {
   const main = tail ? t.slice(0, tail.index) : t;
   return `${main}${josa(main, '이에요', '예요')}${tail ? ` ${tail[1]}` : ''}`;
 }
+/** 음성 안내 문장: 1+1·L.POINT·날짜·층을 풀어 쓴다 (숫자 발음은 speech) */
 const say = (t: string) => t
   .replace(/(\d)\+(\d)/g, (_, a, b) => `${'영원투쓰리포'[+a] ?? a} 플러스 ${'영원투쓰리포'[+b] ?? b}`)
   .replace(/L\.POINT/gi, '엘포인트')
@@ -656,7 +658,10 @@ const say = (t: string) => t
   .replace(/\s+(은|는|이에요|예요)(?=[\s.,])/g, '$1')
   .replace(/\s+([.,])/g, '$1')
   .replace(/\s{2,}/g, ' ')
-  .replace(/·/g, ',');
+  .replace(/·/g, ',')
+  .replace(/([가-힣A-Za-z])\/(?=[가-힣A-Za-z])/g, '$1, ')
+  .replace(/까지이에요/g, '까지예요');
+export const speech = (t: string) => speakNumbers(say(t));
 
 /**
  * 고객 질문에 매장 데이터만으로 답한다. 찾지 못하면 null (서버가 AI에 넘긴다).
@@ -701,5 +706,5 @@ export function answerQuestion(question: string, products: Product[], promotions
     answer = `${topic(promoName)} 이번 주 전단 행사 상품이에요. ${copula(promoLine)}.${periodLine} 진열 위치는 상품 목록에 없어 담당 부서에 확인해 주세요.`;
   }
   answer = answer.replace(/\.\./g, '.').replace(/\s+/g, ' ').trim();
-  return { answer, speech: say(answer), products: ranked.slice(0, 5).map(r => r.p), promotion: promo };
+  return { answer, speech: speech(answer), products: ranked.slice(0, 5).map(r => r.p), promotion: promo };
 }

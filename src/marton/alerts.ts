@@ -1,3 +1,5 @@
+import { speech } from './shared';
+
 // 강력 알림: 알림음·호출음·사이렌, 진동, 시스템 알림, 음성 호출
 
 export interface AlertPrefs {
@@ -148,9 +150,10 @@ async function playChime(tone: 'chime' | 'call' = 'chime') {
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
 }
 
+/** 음성으로 읽기. 숫자·단위는 한글 발음으로 바꿔 읽는다 (4,990원 → 사천구백구십원) */
 export function speak(message: string) {
   if (!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(message);
+  const u = new SpeechSynthesisUtterance(speech(message));
   u.lang = 'ko-KR';
   u.rate = 1.05;
   speechSynthesis.cancel();
