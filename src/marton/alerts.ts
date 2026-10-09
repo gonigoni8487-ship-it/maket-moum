@@ -173,10 +173,9 @@ export function unlockAudio() {
     const session = (navigator as any).audioSession;
     if (session && session.type !== 'playback') session.type = 'playback';
   } catch { /* 지원 안 함 */ }
+  primeSpeech(); // 음성 안내도 첫 터치 때 깨워 둔다 (아이폰·일부 안드로이드)
   if (unlocked) return;
   try {
-    // 음성 안내도 첫 터치 때 한 번 열어 둔다 (아이폰)
-    if ('speechSynthesis' in window && !unlocked) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(' '), { volume: 0 }));
     const { siren: s, chime: c, call: cl, coupon: cp } = players();
     for (const el of [c, cl, cp, s]) {
       el.muted = true;
@@ -254,12 +253,50 @@ export async function celebrateBirthday(message: string): Promise<boolean> {
 }
 
 /** 음성으로 읽기. 숫자·단위는 한글 발음으로 바꿔 읽는다 (4,990원 → 사천구백구십원) */
+// ---- 음성 안내 ----
+// 한국어 음성을 직접 골라 쓰고(기본 음성이 영어면 아무 소리도 안 나는 기기가 있다),
+// 화면을 누를 때 음성 엔진을 미리 깨워 둔다(누른 뒤 한참 지나 말하면 막는 휴대폰이 있다).
+let koVoice: SpeechSynthesisVoice | null = null;
+let speechPrimed = false;
+const voiceListeners = new Set<() => void>();
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return;
+  const voices = speechSynthesis.getVoices();
+  koVoice = voices.find(v => /^ko[-_]KR/i.test(v.lang) && v.localService) ?? voices.find(v => /^ko/i.test(v.lang)) ?? null;
+  voiceListeners.forEach(l => l());
+}
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  pickVoice();
+  speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
+}
+
+/** 음성 안내 상태: 'ok' 한국어 음성 있음 / 'no-korean' 한국어 음성 없음 / 'unsupported' 음성 기능 없음 */
+export function voiceStatus(): 'ok' | 'no-korean' | 'unsupported' {
+  if (!('speechSynthesis' in window)) return 'unsupported';
+  if (koVoice) return 'ok';
+  return speechSynthesis.getVoices().length ? 'no-korean' : 'ok'; // 목록을 아직 못 받았으면 일단 ok
+}
+export function onVoiceChange(l: () => void) { voiceListeners.add(l); return () => { voiceListeners.delete(l); }; }
+
+/** 화면을 누를 때 호출: 소리 없는 짧은 음성으로 엔진을 깨운다 */
+export function primeSpeech() {
+  if (speechPrimed || !('speechSynthesis' in window)) return;
+  speechPrimed = true;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0;
+  if (koVoice) u.voice = koVoice;
+  speechSynthesis.speak(u);
+}
+
 export function speak(message: string) {
   if (!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(speech(message));
   u.lang = 'ko-KR';
+  if (koVoice) u.voice = koVoice;
   u.rate = 1.05;
-  speechSynthesis.cancel();
+  u.volume = 1;
+  if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+  speechSynthesis.resume(); // 크롬에서 엔진이 멈춰 있는 경우
   speechSynthesis.speak(u);
 }
 

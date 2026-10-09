@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic, Coffee } from 'lucide-react';
 import { birthdayMessage, canHandleIncident, COUPON_ARRIVED, expiryCallPhrase, isBirthdayToday, noticeFor, storeTime, noticeSpeech, noticeTarget, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
-import { ALARM_TONES, alert, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
+import { ALARM_TONES, alert, onVoiceChange, voiceStatus, callPhrase, celebrateBirthday, loadPrefs, setAlarmTone, type AlarmTone, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
 import { clearOutbox, flush, onOutboxChange, pendingItems, send } from './outbox';
 import { detachPush, enablePush, pushState, PUSH_LABEL, type PushState } from './push';
@@ -66,6 +66,8 @@ export default function MartOnApp() {
   const [walletOpen, setWalletOpen] = useState(false);
   const [boardSection, setBoardSection] = useState<BoardSection>('notice');
   const [birthday, setBirthday] = useState<string | null>(null);
+  const [voiceOk, setVoiceOk] = useState(voiceStatus);
+  useEffect(() => onVoiceChange(() => setVoiceOk(voiceStatus())), []);
   const [couponArrived, setCouponArrived] = useState<{ count: number; from: string; message?: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefs>(() => { const p = loadPrefs(); setAlarmTone(p.alarm); return p; });
@@ -400,6 +402,13 @@ export default function MartOnApp() {
                 {label}<input type="checkbox" className="size-5 accent-blue-600" checked={prefs[k]} onChange={e => updatePrefs({ ...prefs, [k]: e.target.checked })} />
               </label>
             ))}
+            {voiceOk !== 'ok' && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
+                {voiceOk === 'unsupported'
+                  ? '이 브라우저는 음성 안내를 지원하지 않습니다. Chrome·삼성 인터넷·Safari로 열어 주세요.'
+                  : '이 휴대폰에 한국어 음성이 없어 "○○ 담당님 호출입니다" 같은 음성 안내가 나오지 않습니다. 휴대폰 설정 → 일반(접근성) → 텍스트 음성 변환(TTS)에서 한국어 음성을 내려받아 주세요.'}
+              </p>
+            )}
             <div className="space-y-1.5">
               <span className="text-sm font-semibold">긴급 경보음 <span className="font-normal text-slate-400">(누르면 들려줍니다)</span></span>
               <div className="grid grid-cols-3 gap-2">
