@@ -17,6 +17,7 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   const [title, setTitle] = useState('점장');
   const [pin, setPin] = useState('');
   const [level, setLevel] = useState<string>(last.level ?? '');
+  const [birthday, setBirthday] = useState<string>(last.birthday ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [storeCode, setStoreCode] = useState<string>(last.storeCode || '');
@@ -29,9 +30,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
     setBusy(true);
     setError('');
     try {
-      const { token, staff } = await login({ storeCode, staffId, name, dept, duty, wantManager, managerPin: pin, title, level: level || undefined });
+      const { token, staff } = await login({ storeCode, staffId, name, dept, duty, wantManager, managerPin: pin, title, level: level || undefined, birthday: birthday || undefined });
       session.set(token);
-      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty, storeCode, level })); } catch { /* 무시 */ }
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty, storeCode, level, birthday })); } catch { /* 무시 */ }
       void requestNotificationPermission();
       onLogin(staff);
     } catch (err) {
@@ -91,6 +92,11 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
           {STAFF_LEVELS.map(l => <Chip key={l} active={level === l} onClick={() => setLevel(v => (v === l ? '' : l))}>{l} 담당</Chip>)}
         </div>
       </div>
+
+      <label className="block space-y-1.5">
+        <span className="text-sm font-semibold text-slate-700">생년월일 <span className="font-normal text-slate-400">(선택 · 생일에 축하 메시지를 보내 드려요)</span></span>
+        <input type="date" className={inputCls} value={birthday} onChange={e => setBirthday(e.target.value)} max="2015-12-31" min="1940-01-01" />
+      </label>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
         <label className="flex items-center justify-between">

@@ -34,7 +34,88 @@ export interface Staff {
   title?: string; // 점장, 부점장 등
   /** 시니어 담당 / 주니어 담당 (소통 쿠폰 보낼 때 묶음 선택) */
   level?: StaffLevel;
+  /** 생년월일 (선택, YYYY-MM-DD 또는 MM-DD) — 그날 생일 축하 */
+  birthday?: string;
 }
+
+/** 생일(월-일)이 오늘(매장 기준)인지 */
+export function isBirthdayToday(birthday: string | undefined, now = Date.now()) {
+  const m = /(\d{1,2})-(\d{1,2})$/.exec(birthday ?? '');
+  if (!m) return false;
+  const t = storeTime(now);
+  return Number(m[1]) === t.month && Number(m[2]) === t.date;
+}
+
+export const birthdayMessage = (name: string) => `${name} 담당님 생일 축하드립니다`;
+
+// ---- 첨부 파일 (실적 공유) ----
+export interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  mime: string;
+}
+export const MAX_FILE_BYTES = 1.8 * 1024 * 1024;
+
+// ---- 월 근무계획 ----
+export const SHIFTS = ['1근', '2근', '3근', '휴무', '연차', '반차'] as const;
+export interface ShiftEntry {
+  date: string; // YYYY-MM-DD
+  name: string;
+  dept?: Department;
+  shift: string; // 1근·2근·3근·휴무·연차·반차 (그 밖의 표기는 그대로)
+}
+export interface WorkSchedule {
+  month: string; // YYYY-MM
+  entries: ShiftEntry[];
+  fileName?: string;
+  uploadedBy: Actor;
+  uploadedAt: number;
+}
+
+/** 정기휴무: 매월 둘째·넷째 월요일 (YYYY-MM-DD 목록) */
+export function regularHolidays(year: number, month: number): string[] {
+  const out: string[] = [];
+  let mondays = 0;
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  for (let d = 1; d <= days; d++) {
+    if (new Date(Date.UTC(year, month - 1, d)).getUTCDay() !== 1) continue;
+    mondays++;
+    if (mondays === 2 || mondays === 4) out.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** 근무 표기를 1근·2근·3근·휴무·연차·반차로 맞춘다 */
+export function normalizeShift(raw: unknown): string | null {
+  const v = String(raw ?? '').trim().replace(/\s+/g, '');
+  if (!v) return null;
+  if (/^(1|1근|①|일근|오픈|A)$/i.test(v)) return '1근';
+  if (/^(2|2근|②|이근|중간|B)$/i.test(v)) return '2근';
+  if (/^(3|3근|③|삼근|마감|C)$/i.test(v)) return '3근';
+  if (/^(휴|휴무|off|x|ㅡ|-|\/|비번|정휴|정기휴무)$/i.test(v)) return '휴무';
+  if (/^(연|연차|연가)$/.test(v)) return '연차';
+  if (/^(반|반차|오전반차|오후반차)$/.test(v)) return '반차';
+  return v.slice(0, 6);
+}
+
+// ---- 소비기한 점검 일정 ----
+export interface ExpiryCheck {
+  id: string;
+  at: number; // 점검 시각
+  dept: Department;
+  area: string; // 구역·품목 (예: 유제품 냉장 쇼케이스)
+  assignee?: string; // 담당자 이름
+  note?: string;
+  createdBy: Actor;
+  createdAt: number;
+  calledAt?: number;
+  doneBy?: Actor;
+  doneAt?: number;
+}
+
+export const expiryCallPhrase = (c: Pick<ExpiryCheck, 'dept' | 'area' | 'assignee'>) =>
+  `${c.dept} 담당님 호출입니다. 소비기한 점검 시간입니다. ${c.area}${c.assignee ? `, 담당 ${c.assignee}` : ''}`;
 
 export const STAFF_LEVELS = ['시니어', '주니어'] as const;
 export type StaffLevel = (typeof STAFF_LEVELS)[number];
@@ -112,6 +193,10 @@ export interface Notice {
   byTitle?: string;
   /** 첨부 사진 (실적표 등, 최대 MAX_NOTICE_PHOTOS장) */
   photos?: string[];
+  /** 사진마다 붙는 간단한 설명 (AI 요약 또는 직접 입력) */
+  photoCaptions?: string[];
+  /** 첨부 파일 (엑셀·PDF 등) */
+  files?: Attachment[];
   /** 중회 시각 (10분 전에 다시 알림) */
   meetingAt?: number;
 }
@@ -213,6 +298,10 @@ export interface Bootstrap {
   handovers: Handover[];
   /** 내 소통 쿠폰 보관함 */
   coupons: Coupon[];
+  /** 지난달·이번 달·다음 달 근무계획 */
+  schedules: WorkSchedule[];
+  /** 소비기한 점검 일정 (지난 7일 ~ 앞으로) */
+  expiryChecks: ExpiryCheck[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -226,7 +315,10 @@ export type StreamEvent =
   | { type: 'report'; report: WeeklyReport }
   | { type: 'handover'; handover: Handover }
   | { type: 'presence'; online: Record<string, number> }
-  | { type: 'coupon'; coupons: Coupon[]; action: 'received' | 'used' };
+  | { type: 'coupon'; coupons: Coupon[]; action: 'received' | 'used' }
+  | { type: 'schedule'; schedule: WorkSchedule }
+  | { type: 'expiry'; checks: ExpiryCheck[]; action: 'saved' | 'deleted' | 'call' }
+  | { type: 'birthday'; staffId: string; name: string };
 
 /** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
 export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {
@@ -732,7 +824,7 @@ const say = (t: string) => t
   .replace(/\s+(은|는|이에요|예요)(?=[\s.,])/g, '$1')
   .replace(/\s+([.,])/g, '$1')
   .replace(/\s{2,}/g, ' ')
-  .replace(/·/g, ',')
+  .replace(/\s*·\s*/g, ', ')
   .replace(/([가-힣A-Za-z])\/(?=[가-힣A-Za-z])/g, '$1, ')
   .replace(/까지이에요/g, '까지예요');
 export const speech = (t: string) => speakNumbers(say(t));

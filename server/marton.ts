@@ -3,13 +3,14 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform, onJob } from './platform';
 import { registerSecurity } from './marton-security';
 import { registerPush, pushFor, type PushSub } from './marton-push';
 import { registerCoupons, pruneCoupons } from './marton-coupons';
+import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
 export interface RouteApp {
@@ -72,6 +73,10 @@ export interface Db {
   handovers: Handover[];
   coupons: Coupon[];
   couponBatch?: number;
+  schedules: WorkSchedule[];
+  expiryChecks: ExpiryCheck[];
+  /** 생일 축하를 보낸 해 (직원별) */
+  birthdayDone?: Record<string, number>;
   vapid?: { publicKey: string; privateKey: string };
 }
 
@@ -85,6 +90,8 @@ function parseDb(raw: string | null): Db {
     db.pushSubs ??= [];
     db.handovers ??= [];
     db.coupons ??= [];
+    db.schedules ??= [];
+    db.expiryChecks ??= [];
     // 기본 상품: 새로 생긴 항목(오뎅·갈치 등)과 매대 번호를 기존 데이터에도 채운다
     for (const seed of SEED_PRODUCTS) {
       const have = db.products.find(p => p.id === seed.id);
@@ -93,7 +100,7 @@ function parseDb(raw: string | null): Db {
     }
     return db;
   } catch {
-    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [], coupons: [] };
+    return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [], coupons: [], schedules: [], expiryChecks: [] };
   }
 }
 
@@ -118,6 +125,7 @@ export function save() {
     db.patrols = db.patrols.filter(p => p.at > Date.now() - 90 * 24 * 60 * 60 * 1000);
     db.reports = db.reports.slice(-52);
     pruneCoupons();
+    pruneBoard();
     db.handovers = db.handovers.filter(h => h.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000);
     void platform().saveDb(JSON.stringify(db)).catch(e => console.error('MartON save failed:', e));
   }, platform().saveDelayMs);
@@ -266,7 +274,9 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       role = 'manager';
     }
     const level = STAFF_LEVELS.includes(req.body.level) ? req.body.level as StaffLevel : existing?.level;
-    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, ...(level ? { level } : {}) };
+    const bday = text(req.body.birthday, 10);
+    const birthday = /^(\d{4}-)?\d{2}-\d{2}$/.test(bday) ? bday : req.body.birthday === '' ? undefined : existing?.birthday;
+    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, ...(level ? { level } : {}), ...(birthday ? { birthday } : {}) };
     db.staff[id] = staff;
     const token = newId();
     db.sessions[token] = id;
@@ -277,6 +287,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   registerSecurity(app, genAI, aiEnabled);
   registerPush(app);
   registerCoupons(app);
+  registerBoard(app, genAI, aiEnabled);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
@@ -298,6 +309,8 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       reports: me.role === 'manager' ? db.reports.slice(-12) : [],
       handovers: db.handovers.filter(h => h.createdAt > Date.now() - 3 * 24 * 60 * 60 * 1000 && (me.role === 'manager' || h.dept === me.dept)),
       coupons: db.coupons.filter(c => c.to.id === me.id),
+      schedules: db.schedules.slice(-3),
+      expiryChecks: db.expiryChecks.filter(c => (me.role === 'manager' || c.dept === me.dept) && c.at > Date.now() - 7 * 24 * 60 * 60 * 1000),
       online: onlineCounts(),
       aiEnabled,
     });
@@ -459,10 +472,17 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       if (remindAt > Date.now()) void platform().schedule({ at: remindAt, type: 'meeting-remind', data: { id: notice.id }, key: `meeting-${notice.id}` });
     }
     const photos = await savePhotos(req.body.photos, MAX_NOTICE_PHOTOS);
-    if (photos.length) notice.photos = photos;
+    if (photos.length) {
+      notice.photos = photos;
+      const caps = Array.isArray(req.body.photoCaptions) ? req.body.photoCaptions : [];
+      const captions = photos.map((_, i) => text(caps[i], 300));
+      if (captions.some(Boolean)) notice.photoCaptions = captions;
+    }
+    const files = await saveFiles(req.body.files);
+    if (files.length) notice.files = files;
     db.notices.push(notice);
     // 공지는 최근 300개만 보관 (지난 공지의 사진도 지운다)
-    if (db.notices.length > 300) db.notices.splice(0, db.notices.length - 300).forEach(n => deletePhotos(n.photos));
+    if (db.notices.length > 300) db.notices.splice(0, db.notices.length - 300).forEach(n => { deletePhotos(n.photos); n.files?.forEach(f => FILE_ID.test(f.id) && void platform().photos.remove(f.id).catch(() => {})); });
     save();
     broadcast({ type: 'notice', notice });
     res.json(notice);

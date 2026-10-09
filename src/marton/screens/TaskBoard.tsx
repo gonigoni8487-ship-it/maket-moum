@@ -16,7 +16,7 @@ export async function advance(task: Task, status: TaskStatus, note?: string) {
   return send<Task>(`/tasks/${task.id}/status`, { status, note }, `${task.title} → ${status}`);
 }
 
-const photoUrl = (id: string) => `/api/marton/photos/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
+export const photoUrl = (id: string) => `/api/marton/photos/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
 
 /** 요청에 첨부된 사진 (눌러서 크게 보기) */
 export function TaskPhotos({ ids, size = 'size-20' }: { ids: string[]; size?: string }) {

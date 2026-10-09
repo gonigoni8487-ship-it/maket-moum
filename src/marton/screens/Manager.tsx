@@ -1,8 +1,7 @@
-import { ImagePlus, Mic, MicOff, X } from 'lucide-react';
-import { fileToJpeg } from '../camera';
+import { Mic, MicOff } from 'lucide-react';
 import { useDictation } from '../dictation';
-import { useRef, useState, type FormEvent } from 'react';
-import { BROADCAST_TITLE, DEPARTMENTS, MAX_NOTICE_PHOTOS, meetingTitle, type Department, type Handover, type Notice, type Staff, type Task } from '../shared';
+import { useState, type FormEvent } from 'react';
+import { BROADCAST_TITLE, DEPARTMENTS, meetingTitle, type Department, type Handover, type Notice, type Staff, type Task } from '../shared';
 import { api } from '../api';
 import { TaskCard } from './TaskBoard';
 import { NoticeCard } from './Notices';
@@ -54,17 +53,8 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
   const [urgent, setUrgent] = useState(false);
   const [busy, setBusy] = useState(false);
   // 지시사항 종류: 일반 공지 / 전체 공지 방송 / 금일 중회
-  const [kind, setKind] = useState<'order' | 'broadcast' | 'meeting' | 'share'>('order');
-  const [photos, setPhotos] = useState<string[]>([]);
-  const photoRef = useRef<HTMLInputElement>(null);
-  const addPhotos = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const room = MAX_NOTICE_PHOTOS - photos.length;
-    const list = [...files].filter(f => f.type.startsWith('image/')).slice(0, room);
-    if (files.length > room) onError(`사진은 ${MAX_NOTICE_PHOTOS}장까지 붙일 수 있습니다.`);
-    // 실적표처럼 작은 글씨가 많은 사진이라 크게 저장
-    try { const added = await Promise.all(list.map(f => fileToJpeg(f, 2000))); setPhotos(p => [...p, ...added].slice(0, MAX_NOTICE_PHOTOS)); } catch { onError('사진을 읽지 못했습니다.'); }
-  };
+  const [kind, setKind] = useState<'order' | 'broadcast' | 'meeting'>('order');
+
   const [meetHour, setMeetHour] = useState(() => Math.min(22, new Date().getHours() + 1));
   const [meetMinute, setMeetMinute] = useState(0);
 
@@ -81,13 +71,13 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
     try {
       await api('/notices', {
         scope: kind === 'broadcast' || !targets.length ? 'all' : targets[0], depts: kind === 'broadcast' ? [] : targets,
-        title: kind === 'order' || kind === 'share' ? title.trim() : kind, body, urgent: kind === 'order' && urgent,
-        kind, meetingHour: meetHour, meetingMinute: meetMinute, photos: kind === 'order' || kind === 'share' ? photos : [],
+        title: kind === 'order' ? title.trim() : kind, body, urgent: kind === 'order' && urgent,
+        kind, meetingHour: meetHour, meetingMinute: meetMinute
       });
-      setTitle(''); setBody(''); setUrgent(false); setPhotos([]);
+      setTitle(''); setBody(''); setUrgent(false);
       onToast(kind === 'broadcast' ? '전체 공지 방송을 보냈습니다. 모든 직원 휴대폰에서 음성으로 안내됩니다.'
         : kind === 'meeting' ? `${meetingTitle(meetHour, meetMinute)} — 보냈습니다. 10분 전에 다시 알립니다.`
-        : kind === 'share' ? `${targetLabel}에 실적 공유를 올렸습니다.` : `${targetLabel}에 지시사항을 보냈습니다. 받는 직원 휴대폰에서 음성으로 안내됩니다.`);
+        : `${targetLabel}에 지시사항을 보냈습니다. 받는 직원 휴대폰에서 음성으로 안내됩니다.`);
       setKind('order');
     } catch (err) {
       onError((err as Error).message);
@@ -107,14 +97,16 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
     <div className="space-y-6">
       <Section title="점장·부점장 지시사항">
         <form onSubmit={post} className="space-y-3 rounded-2xl bg-white p-4">
-          <div className="grid grid-cols-2 gap-2 text-sm font-bold">
-            {([['order', '📝 지시사항'], ['broadcast', '📢 전체 공지 방송'], ['meeting', '🕑 금일 중회'], ['share', '📊 실적 공유']] as const).map(([k, label]) => (
+          <div className="grid grid-cols-3 gap-2 text-sm font-bold">
+            {([['order', '📝 지시사항'], ['broadcast', '📢 전체 공지 방송'], ['meeting', '🕑 금일 중회']] as const).map(([k, label]) => (
               <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k}
                 className={cx('rounded-xl border px-2 py-3', kind === k ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-700')}>
                 {label}
               </button>
             ))}
           </div>
+
+          <p className="text-xs text-slate-500">📊 실적 공유 · 📅 근무계획 · ⏰ 소비기한 점검은 <b>공지 탭</b>에서 올립니다.</p>
 
           {kind !== 'broadcast' && (
             <div className="space-y-1.5">
@@ -153,15 +145,6 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
             </>
           )}
 
-          {kind === 'share' && (
-            <>
-              <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목 (예: 10월 판매장인 실적 · 절임배추 사전예약 실적)" maxLength={80} />
-              <DictateButton d={dictation} />
-              <textarea className={cx(inputCls, 'min-h-20')} value={body} onChange={e => setBody(e.target.value)} placeholder="내용 (말하거나 입력, 예: 우리 점 수산 파트 2위, 모두 수고하셨습니다)" maxLength={1000} />
-              <p className="text-xs text-slate-500">실적표 사진은 글씨가 잘 보이도록 크게 저장됩니다. 받는 직원은 눌러서 확대해 볼 수 있습니다.</p>
-            </>
-          )}
-
           {kind === 'order' && (
             <>
               <DictateButton d={dictation} />
@@ -175,29 +158,8 @@ export default function Manager({ me, tasks, notices, handovers, online, onError
           )}
 
 
-          {(kind === 'order' || kind === 'share') && (
-            <div className="space-y-2">
-              {photos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {photos.map((src, i) => (
-                    <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-200">
-                      <img src={src} alt={`첨부 ${i + 1}`} className="size-full object-cover" />
-                      <button type="button" onClick={() => setPhotos(p => p.filter((_, k) => k !== i))} aria-label={`첨부 ${i + 1} 빼기`} className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"><X className="size-4" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {photos.length < MAX_NOTICE_PHOTOS && (
-                <button type="button" onClick={() => photoRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-600 bg-white py-3 text-sm font-bold text-blue-700">
-                  <ImagePlus className="size-5" />{kind === 'share' ? '실적표 사진 첨부' : '사진 첨부'} ({photos.length}/{MAX_NOTICE_PHOTOS})
-                </button>
-              )}
-              <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={e => { void addPhotos(e.target.files); e.target.value = ''; }} />
-            </div>
-          )}
-
-          <button className={primaryBtn} disabled={busy || ((kind === 'order' || kind === 'share') && !title.trim() && !body.trim()) || (kind === 'broadcast' && !body.trim())}>
-            {kind === 'broadcast' ? '전체 공지 방송 보내기' : kind === 'meeting' ? `${targetLabel}에 중회 알리기` : kind === 'share' ? `${targetLabel}에 실적 공유 올리기` : `${targetLabel}에 지시사항 보내기`}
+          <button className={primaryBtn} disabled={busy || (kind === 'order' && !title.trim() && !body.trim()) || (kind === 'broadcast' && !body.trim())}>
+            {kind === 'broadcast' ? '전체 공지 방송 보내기' : kind === 'meeting' ? `${targetLabel}에 중회 알리기` : `${targetLabel}에 지시사항 보내기`}
           </button>
         </form>
       </Section>

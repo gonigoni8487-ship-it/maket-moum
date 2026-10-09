@@ -1,5 +1,8 @@
 import { Megaphone, Siren, Volume2 } from 'lucide-react';
-import { noticeFor, noticeSpeech, noticeTarget, type Notice, type Staff } from '../shared';
+import { noticeFor, noticeSpeech, noticeTarget, type ExpiryCheck, type Notice, type Staff, type WorkSchedule } from '../shared';
+import SharePanel from './SharePanel';
+import ScheduleCalendar from './ScheduleCalendar';
+import ExpiryPanel from './ExpiryPanel';
 import { speak } from '../alerts';
 import { TaskPhotos } from './TaskBoard';
 import { send } from '../outbox';
@@ -29,7 +32,32 @@ export function NoticeCard({ n, me, onError }: { n: Notice; me: Staff; onError: 
   );
 }
 
-export default function Notices({ notices, me, onError }: { notices: Notice[]; me: Staff; onError: (m: string) => void }) {
-  const mine = notices.filter(n => noticeFor(n, me.dept)).sort((a, b) => b.createdAt - a.createdAt);
-  return <div className="space-y-3">{mine.length ? mine.map(n => <NoticeCard key={n.id} n={n} me={me} onError={onError} />) : <Empty>공지가 없습니다.</Empty>}</div>;
+export type BoardSection = 'notice' | 'share' | 'schedule' | 'expiry';
+const SECTIONS: [BoardSection, string][] = [['notice', '공지'], ['share', '실적 공유'], ['schedule', '근무표'], ['expiry', '소비기한']];
+
+/** 공지 탭: 공지 · 실적 공유 · 근무 캘린더 · 소비기한 점검 */
+export default function Notices({ notices, schedules, expiryChecks, me, aiEnabled, section, onSection, onError, onToast }: {
+  notices: Notice[]; schedules: WorkSchedule[]; expiryChecks: ExpiryCheck[]; me: Staff; aiEnabled: boolean;
+  section: BoardSection; onSection: (s: BoardSection) => void; onError: (m: string) => void; onToast: (m: string) => void;
+}) {
+  const mine = notices.filter(n => n.kind !== 'share' && noticeFor(n, me.dept)).sort((a, b) => b.createdAt - a.createdAt);
+  const unreadShare = notices.filter(n => n.kind === 'share' && noticeFor(n, me.dept) && !n.readBy.includes(me.id)).length;
+  const openChecks = expiryChecks.filter(c => !c.doneAt && (c.dept === me.dept || me.role === 'manager') && c.at <= Date.now() + 24 * 3600000).length;
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-200/70 p-1">
+        {SECTIONS.map(([k, label]) => (
+          <button key={k} onClick={() => onSection(k)} className={cx('relative rounded-lg py-2 text-sm font-semibold', section === k ? 'bg-white shadow-sm' : 'text-slate-600')}>
+            {label}
+            {k === 'share' && unreadShare > 0 && <span className="absolute -right-0.5 -top-1 grid min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{unreadShare}</span>}
+            {k === 'expiry' && openChecks > 0 && <span className="absolute -right-0.5 -top-1 grid min-w-4 place-items-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">{openChecks}</span>}
+          </button>
+        ))}
+      </div>
+      {section === 'notice' && (mine.length ? mine.map(n => <NoticeCard key={n.id} n={n} me={me} onError={onError} />) : <Empty>공지가 없습니다.</Empty>)}
+      {section === 'share' && <SharePanel notices={notices} me={me} aiEnabled={aiEnabled} onError={onError} onToast={onToast} />}
+      {section === 'schedule' && <ScheduleCalendar schedules={schedules} me={me} aiEnabled={aiEnabled} onError={onError} onToast={onToast} />}
+      {section === 'expiry' && <ExpiryPanel checks={expiryChecks} me={me} onError={onError} onToast={onToast} />}
+    </div>
+  );
 }

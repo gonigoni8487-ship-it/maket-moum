@@ -172,6 +172,44 @@ async function playChime(tone: 'chime' | 'call' | 'coupon' = 'chime') {
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
 }
 
+// 생일 축하 멜로디: "생일 축하합니다" 한 소절 (오르골 소리, 약 7초)
+const BDAY: [number, number][] = [ // [음 높이(반음, 도=0), 박자]
+  [-5, .75], [-5, .25], [-3, 1], [-5, 1], [0, 1], [-1, 2],
+  [-5, .75], [-5, .25], [-3, 1], [-5, 1], [2, 1], [0, 2],
+  [-5, .75], [-5, .25], [7, 1], [4, 1], [0, 1], [-1, 1], [-3, 2],
+  [5, .75], [5, .25], [4, 1], [0, 1], [2, 1], [0, 2],
+];
+const BEAT = 0.36;
+const BDAY_SECONDS = BDAY.reduce((t, [, b]) => t + b, 0) * BEAT + 0.6;
+const bdaySample = (t: number) => {
+  let start = 0;
+  for (const [semi, beats] of BDAY) {
+    const len = beats * BEAT;
+    if (t < start + len + 0.4 && t >= start) {
+      const f = 523.25 * 2 ** (semi / 12);
+      const l = t - start;
+      return (Math.sin(2 * Math.PI * f * t) + 0.4 * Math.sin(4 * Math.PI * f * t) + 0.15 * Math.sin(6 * Math.PI * f * t)) * Math.exp(-l * 3) * 0.45;
+    }
+    start += len;
+  }
+  return 0;
+};
+let bday: HTMLAudioElement | null = null;
+
+/** 생일 축하: 멜로디가 끝나면 "OO 담당님 생일 축하드립니다"를 읽어 준다. 소리가 막히면 false */
+export async function celebrateBirthday(message: string): Promise<boolean> {
+  bday ??= new Audio(wavUrl(BDAY_SECONDS, bdaySample));
+  bday.currentTime = 0;
+  try {
+    await bday.play();
+    window.setTimeout(() => speak(message), BDAY_SECONDS * 1000);
+    return true;
+  } catch {
+    speak(message);
+    return false;
+  }
+}
+
 /** 음성으로 읽기. 숫자·단위는 한글 발음으로 바꿔 읽는다 (4,990원 → 사천구백구십원) */
 export function speak(message: string) {
   if (!('speechSynthesis' in window)) return;
