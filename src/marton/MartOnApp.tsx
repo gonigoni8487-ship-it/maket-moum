@@ -370,7 +370,7 @@ export default function MartOnApp() {
         {tab === 'tasks' && <TaskBoard tasks={tasks} me={me} onError={onError} />}
         {tab === 'request' && <RequestForm me={me} draft={draft} onError={onError} onVoice={() => setVoiceOpen(true)} onSent={t => { if (t) showToast(`${t.toDept}에 요청을 보냈습니다.`); setTab('tasks'); }} />}
         {tab === 'find' && <ProductFinder products={products} promotions={promotions} onRequest={openRequest} onError={onError} />}
-        {tab === 'photo' && <PhotoAI aiEnabled={aiEnabled} onRequest={openRequest} onError={onError} onToast={showToast} />}
+        {tab === 'photo' && <PhotoAI me={me} aiEnabled={aiEnabled} onRequest={openRequest} onError={onError} onToast={showToast} onSent={t => { if (t) showToast(`${t.toDept}에 사진을 보냈습니다.`); else showToast('연결되면 사진을 자동으로 보냅니다.'); setTab('tasks'); }} />}
         {tab === 'notices' && <Notices notices={notices} me={me} onError={onError} />}
         {tab === 'security' && <Security me={me} incidents={incidents} patrols={patrols} reports={reports} products={products} onError={onError} onToast={showToast} />}
         {tab === 'manager' && me.role === 'manager' && <Manager me={me} tasks={tasks} notices={notices} handovers={handovers} online={online} onError={onError} onToast={showToast} />}

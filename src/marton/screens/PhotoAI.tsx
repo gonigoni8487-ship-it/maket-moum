@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { Camera, CheckCircle2, AlertTriangle, HelpCircle, MapPin, ScanLine, Keyboard, Send } from 'lucide-react';
-import type { Product, Promotion, VisionBarcodeResult, VisionFlyerResult, VisionPriceResult, VisionResult } from '../shared';
+import type { Product, Promotion, Staff, Task, VisionBarcodeResult, VisionFlyerResult, VisionPriceResult, VisionResult } from '../shared';
 import { api } from '../api';
 import { cx, inputCls, primaryBtn, won, type Draft } from '../ui';
 import CameraView from './CameraView';
+import PhotoUpload from './PhotoUpload';
 
 type Mode = VisionResult['mode'];
 const MODES: { mode: Mode; label: string; hint: string; button: string }[] = [
@@ -35,9 +36,10 @@ function ProductCard({ p, onRequest, photo }: { p: Product; onRequest: (d: Draft
   );
 }
 
-export default function PhotoAI({ aiEnabled, onRequest, onError, onToast }: {
-  aiEnabled: boolean; onRequest: (d: Draft) => void; onError: (m: string) => void; onToast: (m: string) => void;
+export default function PhotoAI({ me, aiEnabled, onRequest, onSent, onError, onToast }: {
+  me: Staff; aiEnabled: boolean; onRequest: (d: Draft) => void; onSent: (t: Task | null) => void; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
+  const [upload, setUpload] = useState(true); // 첫 화면: 사진 올리기
   const [mode, setMode] = useState<Mode>('price');
   const [camera, setCamera] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export default function PhotoAI({ aiEnabled, onRequest, onError, onToast }: {
   const [code, setCode] = useState('');
   const info = MODES.find(m => m.mode === mode)!;
 
-  const reset = (m: Mode) => { setMode(m); setResult(null); setPreview(null); setManual(false); };
+  const reset = (m: Mode) => { setUpload(false); setMode(m); setResult(null); setPreview(null); setManual(false); };
 
   const analyze = async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -119,12 +121,21 @@ export default function PhotoAI({ aiEnabled, onRequest, onError, onToast }: {
   return (
     <div className="space-y-4">
       <div className="flex gap-1 rounded-xl bg-slate-200/70 p-1">
+        <button onClick={() => setUpload(true)} className={cx('flex-1 whitespace-nowrap rounded-lg py-2 text-sm font-semibold', upload ? 'bg-white shadow-sm' : 'text-slate-600')}>
+          사진 올리기
+        </button>
         {MODES.map(m => (
-          <button key={m.mode} onClick={() => reset(m.mode)} className={cx('flex-1 rounded-lg py-2 text-sm font-semibold', mode === m.mode ? 'bg-white shadow-sm' : 'text-slate-600')}>
+          <button key={m.mode} onClick={() => reset(m.mode)} className={cx('flex-1 whitespace-nowrap rounded-lg py-2 text-sm font-semibold', !upload && mode === m.mode ? 'bg-white shadow-sm' : 'text-slate-600')}>
             {m.label}
           </button>
         ))}
       </div>
+      {upload ? (
+        <>
+          <p className="text-sm text-slate-500">가격표·바코드·상품 사진을 찍거나 앨범에서 골라 담당 부서에 바로 보냅니다.</p>
+          <PhotoUpload me={me} onSent={onSent} onError={onError} />
+        </>
+      ) : <>
       <p className="text-sm text-slate-500">{info.hint}</p>
       {!aiEnabled && mode === 'price' && (
         <p className="rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">AI 키가 없어 가격 자동 대조는 꺼져 있습니다. 사진을 찍어 해당 부서에 가격 확인을 요청할 수 있습니다.</p>
@@ -215,6 +226,7 @@ export default function PhotoAI({ aiEnabled, onRequest, onError, onToast }: {
           onDamage={mode === 'barcode' ? photo => { setCamera(false); damageReport(photo); } : undefined}
         />
       )}
+      </>}
     </div>
   );
 }
