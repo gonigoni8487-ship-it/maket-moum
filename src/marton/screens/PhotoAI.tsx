@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { Camera, CheckCircle2, AlertTriangle, HelpCircle, MapPin, ScanLine, Keyboard, Send } from 'lucide-react';
-import { bayText, type Product, type Staff, type Task, type VisionBarcodeResult, type VisionPriceResult, type VisionResult } from '../shared';
+import { bayText, promotionFor, type Promotion, type Product, type Staff, type Task, type VisionBarcodeResult, type VisionPriceResult, type VisionResult } from '../shared';
 import { api } from '../api';
 import { cx, inputCls, primaryBtn, won, type Draft } from '../ui';
 import CameraView from './CameraView';
+import { dataUrlToBlob, readBarcode } from '../camera';
 import PhotoUpload from './PhotoUpload';
 import FlyerUpload from './FlyerUpload';
 
@@ -37,8 +38,8 @@ function ProductCard({ p, onRequest, photo }: { p: Product; onRequest: (d: Draft
   );
 }
 
-export default function PhotoAI({ me, aiEnabled, products, onRequest, onSent, onError, onToast }: {
-  me: Staff; aiEnabled: boolean; products: Product[]; onRequest: (d: Draft) => void; onSent: (t: Task | null) => void; onError: (m: string) => void; onToast: (m: string) => void;
+export default function PhotoAI({ me, aiEnabled, products, promotions, onRequest, onSent, onError, onToast }: {
+  me: Staff; aiEnabled: boolean; products: Product[]; promotions: Promotion[]; onRequest: (d: Draft) => void; onSent: (t: Task | null) => void; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   const [upload, setUpload] = useState(true); // 첫 화면: 사진 올리기
   const [mode, setMode] = useState<Mode>('price');
@@ -73,7 +74,19 @@ export default function PhotoAI({ me, aiEnabled, products, onRequest, onSent, on
     else {
       setResult(null);
       if (mode === 'barcode') setManual(true); // AI 판독이 없으면 번호 입력으로
+      if (mode === 'price') void priceByBarcode(photo);
     }
+  };
+
+  // AI 없이 가격표 확인: 가격표(또는 상품)에 붙은 바코드로 상품을 찾아 시스템 가격·행사가를 보여 준다
+  const priceByBarcode = async (photo: string) => {
+    const code = await readBarcode(await createImageBitmap(dataUrlToBlob(photo)));
+    const p = code ? products.find(x => x.barcode === code) : undefined;
+    if (!p) return;
+    const promotion = promotionFor(p, promotions);
+    const expected = promotion?.price ?? p.price;
+    setResult({ mode: 'price', name: p.name, matched: p, promotion, verdict: 'unknown',
+      message: `시스템 가격 ${won(expected)}${promotion?.price ? ' (행사가)' : ''} — 가격표 가격과 같은지 확인해 주세요` });
   };
 
   // 카메라가 바코드를 읽음 → AI 없이 바로 조회
@@ -135,7 +148,7 @@ export default function PhotoAI({ me, aiEnabled, products, onRequest, onSent, on
       ) : <>
       <p className="text-sm text-slate-500">{info.hint}</p>
       {!aiEnabled && mode === 'price' && (
-        <p className="rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">AI 키가 없어 가격 자동 대조는 꺼져 있습니다. 사진을 찍어 해당 부서에 가격 확인을 요청할 수 있습니다.</p>
+        <p className="rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">AI 키가 없어 가격표 글자 자동 인식은 꺼져 있습니다. 가격표나 상품의 바코드가 함께 찍히면 시스템 가격(행사가)을 바로 보여 주고, 사진으로 가격 확인 요청도 보낼 수 있습니다.</p>
       )}
 
       <button onClick={() => setCamera(true)} disabled={busy} className={cx(primaryBtn, 'flex items-center justify-center gap-2 py-5')}>

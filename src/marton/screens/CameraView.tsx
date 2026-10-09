@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Zap, ZapOff, Image as ImageIcon, Keyboard, AlertTriangle, ScanLine } from 'lucide-react';
-import { CAMERA_PROBLEM_TEXT, fileToJpeg, openRearCamera, readBarcode, toJpeg, torchControl, warmUpBarcodeReader, type CameraProblem } from '../camera';
+import { X, Zap, ZapOff, ZoomIn, Image as ImageIcon, Keyboard, AlertTriangle, ScanLine } from 'lucide-react';
+import { CAMERA_PROBLEM_TEXT, fileToJpeg, openRearCamera, readBarcode, sharpenForBarcode, toJpeg, torchControl, zoomControl, warmUpBarcodeReader, type CameraProblem } from '../camera';
 import { cx } from '../ui';
 
 export type CameraMode = 'barcode' | 'price' | 'flyer' | 'photo';
 
 const GUIDE: Record<CameraMode, { title: string; hint: string; frame?: string }> = {
-  barcode: { title: '바코드 스캔', hint: '바코드를 가로로 틀 안에 맞춰 주세요. 자동으로 읽습니다.', frame: 'w-[82%] h-[20%]' },
-  price: { title: '가격표 촬영', hint: '가격표(쇼카드)가 틀 안에 꽉 차게 찍어 주세요.', frame: 'w-[86%] h-[30%]' },
-  flyer: { title: '행사 전단 촬영', hint: '전단 한 면이 모두 보이게 찍어 주세요.', frame: 'w-[88%] h-[62%]' },
+  barcode: { title: '바코드 스캔', hint: '바코드를 가로로 틀 안에 맞춰 주세요. 자동으로 읽습니다.', frame: 'w-[92%] h-[34%]' },
+  price: { title: '가격표 촬영', hint: '가격표(쇼카드)가 틀 안에 꽉 차게 찍어 주세요.', frame: 'w-[92%] h-[46%]' },
+  flyer: { title: '행사 전단 촬영', hint: '전단 한 면이 모두 보이게 찍어 주세요.', frame: 'w-[94%] h-[82%]' },
   photo: { title: '사진 첨부', hint: '상품·가격표·바코드가 잘 보이게 찍어 주세요. 사람 얼굴은 찍지 않습니다.' },
 };
 
@@ -35,9 +35,12 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
   const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState<{ supported: boolean; set: (on: boolean) => Promise<void> } | null>(null);
   const [torchOn, setTorchOn] = useState(false);
+  const [zoom, setZoom] = useState<{ supported: boolean; set: (on: boolean) => Promise<void> } | null>(null);
+  const [zoomOn, setZoomOn] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [flash, setFlash] = useState(false);
   const albumRef = useRef<HTMLInputElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const nativeCamRef = useRef<HTMLInputElement>(null);
   const guide = GUIDE[mode];
 
@@ -53,6 +56,7 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
       if (typeof result === 'string') return setProblem(result);
       streamRef.current = result;
       setTorch(torchControl(result));
+      setZoom(zoomControl(result));
       const video = videoRef.current!;
       video.srcObject = result;
       video.play().then(() => setReady(true), () => setReady(true));
@@ -68,20 +72,46 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
     return toJpeg(v, v.videoWidth, v.videoHeight, maxSide);
   };
 
-  // 바코드 자동 판독
+  // 화면의 노란 틀이 카메라 원본 영상에서 차지하는 영역 (object-cover로 잘린 부분 감안)
+  const frameInVideo = () => {
+    const v = videoRef.current, f = frameRef.current;
+    if (!v || !f || !v.videoWidth) return null;
+    const vr = v.getBoundingClientRect(), fr = f.getBoundingClientRect();
+    const scale = Math.max(vr.width / v.videoWidth, vr.height / v.videoHeight);
+    const offX = (v.videoWidth * scale - vr.width) / 2, offY = (v.videoHeight * scale - vr.height) / 2;
+    const x = Math.max(0, (fr.left - vr.left + offX) / scale), y = Math.max(0, (fr.top - vr.top + offY) / scale);
+    return { x, y, w: Math.min(v.videoWidth - x, fr.width / scale), h: Math.min(v.videoHeight - y, fr.height / scale) };
+  };
+
+  // 바코드 자동 판독: 틀 안을 원본 해상도로(작으면 2배 확대해서) 읽고, 사이사이 전체 화면도 읽는다
   useEffect(() => {
     if (mode !== 'barcode' || !ready || !onBarcode) return;
     let stop = false;
+    let round = 0;
     const started = Date.now();
     const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    const draw = (sx: number, sy: number, sw: number, sh: number, zoom: number) => {
+      const v = videoRef.current!;
+      const cap = 1600 / Math.max(sw, sh);
+      const k = Math.min(zoom, cap);
+      canvas.width = Math.round(sw * k);
+      canvas.height = Math.round(sh * k);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(v, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    };
     const loop = async () => {
       if (stop) return;
       const v = videoRef.current;
       if (v && v.videoWidth) {
-        const scale = Math.min(1, 960 / v.videoWidth);
-        canvas.width = Math.round(v.videoWidth * scale);
-        canvas.height = Math.round(v.videoHeight * scale);
-        canvas.getContext('2d')!.drawImage(v, 0, 0, canvas.width, canvas.height);
+        const box = frameInVideo();
+        const kind = round++ % 3;
+        if (box && kind === 0) draw(box.x, box.y, box.w, box.h, 1);
+        else if (box && kind === 1) {
+          draw(box.x, box.y, box.w, box.h, box.w < 900 ? 2 : 1.5);
+          sharpenForBarcode(ctx, canvas.width, canvas.height); // 흐릿하거나 작은 바코드
+        }
+        else draw(0, 0, v.videoWidth, v.videoHeight, 1);
         const code = await readBarcode(canvas);
         if (stop) return;
         if (code) {
@@ -91,7 +121,7 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
         }
         if (Date.now() - started > HELP_AFTER_MS) setShowHelp(true);
       }
-      setTimeout(loop, 300);
+      setTimeout(loop, 120);
     };
     void loop();
     return () => { stop = true; };
@@ -128,6 +158,11 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
       <div className="flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <button onClick={onClose} aria-label="카메라 닫기" className="rounded-full bg-white/15 p-2"><X className="size-5" /></button>
         <span className="flex-1 text-[15px] font-bold">{guide.title}</span>
+        {zoom?.supported && (
+          <button onClick={async () => { await zoom.set(!zoomOn); setZoomOn(z => !z); }} aria-label={zoomOn ? '확대 끄기' : '2배 확대'} className={cx('flex items-center gap-1 rounded-full px-3 py-2 text-sm font-bold', zoomOn ? 'bg-yellow-300 text-black' : 'bg-white/15')}>
+            <ZoomIn className="size-5" />{zoomOn ? '2배' : '1배'}
+          </button>
+        )}
         {torch?.supported && (
           <button onClick={toggleTorch} aria-label={torchOn ? '손전등 끄기' : '손전등 켜기'} className={cx('rounded-full p-2', torchOn ? 'bg-yellow-300 text-black' : 'bg-white/15')}>
             {torchOn ? <Zap className="size-5" /> : <ZapOff className="size-5" />}
@@ -141,7 +176,7 @@ export default function CameraView({ mode, onCapture, onBarcode, onManual, onDam
 
         {!problem && guide.frame && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className={cx('relative rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]', guide.frame)}>
+            <div ref={frameRef} className={cx('relative rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.22)]', guide.frame)}>
               {(['left-0 top-0 border-l-4 border-t-4 rounded-tl-2xl', 'right-0 top-0 border-r-4 border-t-4 rounded-tr-2xl',
                 'left-0 bottom-0 border-l-4 border-b-4 rounded-bl-2xl', 'right-0 bottom-0 border-r-4 border-b-4 rounded-br-2xl'] as const).map(c => (
                 <span key={c} className={cx('absolute size-7 border-yellow-300', c)} />
