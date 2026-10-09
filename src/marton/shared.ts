@@ -32,7 +32,37 @@ export interface Staff {
   duty: string;
   role: Role;
   title?: string; // 점장, 부점장 등
+  /** 시니어 담당 / 주니어 담당 (소통 쿠폰 보낼 때 묶음 선택) */
+  level?: StaffLevel;
 }
+
+export const STAFF_LEVELS = ['시니어', '주니어'] as const;
+export type StaffLevel = (typeof STAFF_LEVELS)[number];
+
+// ---- 소통 커피쿠폰 ----
+// 점장·부점장이 직원에게 보내는 매장 자체 쿠폰. 매장과 약속된 커피 매장에서 화면을 보여 주고 1장에 커피 1잔.
+export interface Coupon {
+  id: string;
+  /** 쿠폰 번호 (예: 1009-0007-03) — 같은 묶음 안에서 순서대로 */
+  serial: string;
+  /** 묶음 안 순서 (1장부터 차례로 쓰게) */
+  no: number;
+  total: number;
+  batchId: string;
+  to: Actor & { level?: StaffLevel };
+  from: Actor & { title?: string };
+  /** 사용처 (예: 매장 내 이디야커피) */
+  place: string;
+  item: string;
+  message?: string;
+  createdAt: number;
+  expiresAt: number;
+  usedAt?: number;
+}
+
+export const COUPON_COUNTS = [1, 5, 10] as const;
+export const COUPON_VALID_DAYS = 90;
+export const COUPON_ARRIVED = '소통 커피쿠폰이 도착했습니다';
 
 export interface Actor {
   id: string;
@@ -74,24 +104,42 @@ export interface Notice {
   by: Actor;
   createdAt: number;
   readBy: string[];
-  /** broadcast: 전체 공지 방송, meeting: 금일 중회 (둘 다 호출음과 음성으로 알림) */
-  kind?: 'broadcast' | 'meeting';
+  /** broadcast: 전체 공지 방송, meeting: 금일 중회, order: 점장 지시사항 (모두 호출음과 음성으로 알림) */
+  kind?: 'broadcast' | 'meeting' | 'order' | 'share';
+  /** 여러 파트에 보낼 때 받는 부서들 (scope는 그 중 첫 부서) */
+  depts?: Department[];
+  /** 보낸 사람 직책 (점장·부점장) — "점장님 지시사항입니다" */
+  byTitle?: string;
+  /** 첨부 사진 (실적표 등, 최대 MAX_NOTICE_PHOTOS장) */
+  photos?: string[];
   /** 중회 시각 (10분 전에 다시 알림) */
   meetingAt?: number;
 }
 
 export const BROADCAST_TITLE = '전체 공지 방송 안내입니다';
+export const MAX_NOTICE_PHOTOS = 5;
 
 /** "금일 14시 중회 있습니다", "금일 14시 30분 중회 있습니다" */
 export const meetingTitle = (hour: number, minute: number, prefix = '금일') =>
   `${prefix} ${hour}시${minute ? ` ${minute}분` : ''} 중회 있습니다`;
 
 /** 방송·중회 공지를 말로 읽을 문장 (일반 공지는 null) */
-export function noticeSpeech(n: Pick<Notice, 'kind' | 'title' | 'body'>): string | null {
+export function noticeSpeech(n: Pick<Notice, 'kind' | 'title' | 'body' | 'byTitle'>): string | null {
   if (n.kind === 'broadcast') return `${BROADCAST_TITLE}. ${n.body || ''}`.trim();
   if (n.kind === 'meeting') return `${n.title}.${n.body ? ` ${n.body}` : ''}`;
+  if (n.kind === 'share') return `실적 공유가 올라왔습니다. ${n.title}`;
+  if (n.kind === 'order') {
+    const body = n.body && !n.body.startsWith(n.title) ? ` ${n.body}` : '';
+    return `${n.byTitle || '점장'}님 지시사항입니다. ${n.body?.startsWith(n.title) ? n.body : n.title}.${body}`;
+  }
   return null;
 }
+
+/** 이 공지를 받는 부서인지 */
+export const noticeFor = (n: Pick<Notice, 'scope' | 'depts'>, dept: Department) => n.scope === 'all' || n.scope === dept || Boolean(n.depts?.includes(dept));
+
+/** 공지 대상 이름: "전체", "수산", "수산·축산" */
+export const noticeTarget = (n: Pick<Notice, 'scope' | 'depts'>) => (n.scope === 'all' ? '전체' : n.depts?.length ? n.depts.join('·') : n.scope);
 
 export interface Product {
   id: string;
@@ -163,6 +211,8 @@ export interface Bootstrap {
   patrols: PatrolLog[];
   reports: WeeklyReport[];
   handovers: Handover[];
+  /** 내 소통 쿠폰 보관함 */
+  coupons: Coupon[];
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -175,7 +225,8 @@ export type StreamEvent =
   | { type: 'patrol'; patrol: PatrolLog }
   | { type: 'report'; report: WeeklyReport }
   | { type: 'handover'; handover: Handover }
-  | { type: 'presence'; online: Record<string, number> };
+  | { type: 'presence'; online: Record<string, number> }
+  | { type: 'coupon'; coupons: Coupon[]; action: 'received' | 'used' };
 
 /** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
 export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {

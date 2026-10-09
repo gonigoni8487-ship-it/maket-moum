@@ -47,11 +47,16 @@ function wavUrl(seconds: number, sample: (t: number) => number) {
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 
-// 사이렌: 1000Hz ↔ 700Hz를 0.25초마다 오가는 큰 경보음 (반복 재생)
+// 긴급 경보음: "띠-리- 띠-리-" 두 음을 부드럽게 오가는 소리 (반복 재생).
+// 예전 각진 사이렌(1000/700Hz)이 너무 시끄러워, 둥근 음색과 짧은 쉼을 넣어 귀가 덜 피곤하게 했다.
+const ALARM_NOTES = [[0, 0.32, 988], [0.4, 0.72, 740], [1.0, 1.32, 988], [1.4, 1.72, 740]] as const; // 2초 한 바퀴
 const sirenSample = (t: number) => {
-  const f = Math.floor(t / 0.25) % 2 ? 700 : 1000;
-  const x = Math.sin(2 * Math.PI * f * t);
-  return Math.tanh(x * 3) * 0.95; // 각진 파형으로 작은 스피커에서도 잘 들리게
+  const note = ALARM_NOTES.find(([a, b]) => t >= a && t < b);
+  if (!note) return 0;
+  const [a, b, f] = note;
+  const env = Math.min(1, (t - a) / 0.03, (b - t) / 0.06); // 부드럽게 시작·끝
+  const x = Math.sin(2 * Math.PI * f * t) + 0.25 * Math.sin(2 * Math.PI * f * 2 * t);
+  return x * env * 0.6;
 };
 // 일반 알림: 딩-동
 const chimeSample = (t: number) => {
@@ -72,9 +77,25 @@ const callSample = (t: number) => {
 };
 const CALL_SECONDS = 1.6;
 
+// 소통 커피쿠폰 도착음: "띠리리링~" 빠르게 올라가는 맑은 벨소리 + 반짝이는 끝음 (약 1.4초)
+const COUPON_NOTES = [784, 988, 1175, 1568, 1976]; // 솔 시 레 솔 시
+const couponSample = (t: number) => {
+  let v = 0;
+  COUPON_NOTES.forEach((f, i) => {
+    const start = i * 0.09;
+    if (t < start) return;
+    const local = t - start;
+    const decay = Math.exp(-local * (i === COUPON_NOTES.length - 1 ? 2.5 : 5));
+    v += (Math.sin(2 * Math.PI * f * t) + 0.3 * Math.sin(2 * Math.PI * f * 3 * t)) * decay * 0.28;
+  });
+  return v;
+};
+const COUPON_SECONDS = 1.4;
+
 let siren: HTMLAudioElement | null = null;
 let chime: HTMLAudioElement | null = null;
 let call: HTMLAudioElement | null = null;
+let coupon: HTMLAudioElement | null = null;
 let unlocked = false;
 const soundListeners = new Set<(ok: boolean) => void>();
 
@@ -84,8 +105,9 @@ function players() {
     siren.loop = true;
     chime = new Audio(wavUrl(0.6, chimeSample));
     call = new Audio(wavUrl(CALL_SECONDS, callSample));
+    coupon = new Audio(wavUrl(COUPON_SECONDS, couponSample));
   }
-  return { siren, chime: chime!, call: call! };
+  return { siren, chime: chime!, call: call!, coupon: coupon! };
 }
 
 function setUnlocked(ok: boolean) {
@@ -112,8 +134,8 @@ export function unlockAudio() {
   try {
     // 음성 안내도 첫 터치 때 한 번 열어 둔다 (아이폰)
     if ('speechSynthesis' in window && !unlocked) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(' '), { volume: 0 }));
-    const { siren: s, chime: c, call: cl } = players();
-    for (const el of [c, cl, s]) {
+    const { siren: s, chime: c, call: cl, coupon: cp } = players();
+    for (const el of [c, cl, cp, s]) {
       el.muted = true;
       void el.play().then(() => {
         if (el === s && !alarmOn) { el.pause(); el.currentTime = 0; }
@@ -143,9 +165,9 @@ export async function startSiren(): Promise<boolean> {
   }
 }
 
-async function playChime(tone: 'chime' | 'call' = 'chime') {
-  const { chime, call: cl } = players();
-  const c = tone === 'call' ? cl : chime;
+async function playChime(tone: 'chime' | 'call' | 'coupon' = 'chime') {
+  const { chime, call: cl, coupon: cp } = players();
+  const c = tone === 'call' ? cl : tone === 'coupon' ? cp : chime;
   c.currentTime = 0;
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
 }
@@ -185,7 +207,7 @@ async function systemNotify(title: string, body: string, urgent: boolean, tag: s
 export async function alert(opts: {
   title: string; body: string; urgent: boolean; tag: string; prefs: AlertPrefs;
   /** call: 받은 요청 호출음 (긴급이면 무시하고 사이렌) */
-  tone?: 'chime' | 'call';
+  tone?: 'chime' | 'call' | 'coupon';
   /** 호출 음성 (예: "수산 담당님 호출입니다") */
   announce?: string;
 }): Promise<boolean> {
@@ -193,9 +215,9 @@ export async function alert(opts: {
   void systemNotify(title, body, urgent, tag);
   const spoken = announce && prefs.call ? announce : prefs.voice ? `${urgent ? '긴급 요청. ' : ''}${title}. ${body}` : null;
   // 호출음이 끝난 뒤 말한다 (사이렌은 계속 울리므로 바로)
-  if (spoken) window.setTimeout(() => speak(spoken), prefs.sound && !urgent && tone === 'call' ? CALL_SECONDS * 1000 : 0);
+  if (spoken) window.setTimeout(() => speak(spoken), prefs.sound && !urgent && tone === 'call' ? CALL_SECONDS * 1000 : prefs.sound && tone === 'coupon' ? COUPON_SECONDS * 1000 : 0);
 
-  const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'call' ? [250, 100, 250, 100, 250, 100, 600] : [200, 100, 200];
+  const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'call' ? [250, 100, 250, 100, 250, 100, 600] : tone === 'coupon' ? [80, 60, 80, 60, 300] : [200, 100, 200];
   const vibrate = () => { if (prefs.vibrate) navigator.vibrate?.(pattern); };
   vibrate();
   if (urgent) {

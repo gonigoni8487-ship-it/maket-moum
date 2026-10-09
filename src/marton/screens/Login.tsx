@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { DEPARTMENTS, DUTIES, type Department, type Staff } from '../shared';
+import { DEPARTMENTS, DUTIES, STAFF_LEVELS, type Department, type Staff } from '../shared';
 import { api, login, session } from '../api';
 import { unlockAudio, requestNotificationPermission } from '../alerts';
 import { Chip, inputCls, primaryBtn } from '../ui';
@@ -16,6 +16,7 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   const [wantManager, setWantManager] = useState(false);
   const [title, setTitle] = useState('점장');
   const [pin, setPin] = useState('');
+  const [level, setLevel] = useState<string>(last.level ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [storeCode, setStoreCode] = useState<string>(last.storeCode || '');
@@ -28,9 +29,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
     setBusy(true);
     setError('');
     try {
-      const { token, staff } = await login({ storeCode, staffId, name, dept, duty, wantManager, managerPin: pin, title });
+      const { token, staff } = await login({ storeCode, staffId, name, dept, duty, wantManager, managerPin: pin, title, level: level || undefined });
       session.set(token);
-      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty, storeCode })); } catch { /* 무시 */ }
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty, storeCode, level })); } catch { /* 무시 */ }
       void requestNotificationPermission();
       onLogin(staff);
     } catch (err) {
@@ -83,6 +84,13 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
           <input className={inputCls} value={duty} onChange={e => setDuty(e.target.value)} placeholder="직접 입력" />
         </div>
       )}
+
+      <div className="space-y-2">
+        <span className="text-sm font-semibold text-slate-700">담당 구분 <span className="font-normal text-slate-400">(선택 · 소통 쿠폰 받을 때 사용)</span></span>
+        <div className="flex flex-wrap gap-2">
+          {STAFF_LEVELS.map(l => <Chip key={l} active={level === l} onClick={() => setLevel(v => (v === l ? '' : l))}>{l} 담당</Chip>)}
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
         <label className="flex items-center justify-between">
