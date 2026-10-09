@@ -74,6 +74,23 @@ export interface Notice {
   by: Actor;
   createdAt: number;
   readBy: string[];
+  /** broadcast: 전체 공지 방송, meeting: 금일 중회 (둘 다 호출음과 음성으로 알림) */
+  kind?: 'broadcast' | 'meeting';
+  /** 중회 시각 (10분 전에 다시 알림) */
+  meetingAt?: number;
+}
+
+export const BROADCAST_TITLE = '전체 공지 방송 안내입니다';
+
+/** "금일 14시 중회 있습니다", "금일 14시 30분 중회 있습니다" */
+export const meetingTitle = (hour: number, minute: number, prefix = '금일') =>
+  `${prefix} ${hour}시${minute ? ` ${minute}분` : ''} 중회 있습니다`;
+
+/** 방송·중회 공지를 말로 읽을 문장 (일반 공지는 null) */
+export function noticeSpeech(n: Pick<Notice, 'kind' | 'title' | 'body'>): string | null {
+  if (n.kind === 'broadcast') return `${BROADCAST_TITLE}. ${n.body || ''}`.trim();
+  if (n.kind === 'meeting') return `${n.title}.${n.body ? ` ${n.body}` : ''}`;
+  return null;
 }
 
 export interface Product {
@@ -342,6 +359,12 @@ export interface LossInsight {
 let storeOffsetMin = 540;
 export function setStoreUtcOffset(minutes: number) {
   if (Number.isFinite(minutes)) storeOffsetMin = minutes;
+}
+
+/** 매장 기준 오늘 0시 (UTC 밀리초) */
+export function storeDayStart(t: number) {
+  const day = 86400000;
+  return Math.floor((t + storeOffsetMin * 60000) / day) * day - storeOffsetMin * 60000;
 }
 
 /** 매장 기준 연·월·일·요일·시 */

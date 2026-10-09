@@ -1,5 +1,6 @@
-import { Megaphone, Siren } from 'lucide-react';
-import type { Notice, Staff } from '../shared';
+import { Megaphone, Siren, Volume2 } from 'lucide-react';
+import { noticeSpeech, type Notice, type Staff } from '../shared';
+import { speak } from '../alerts';
 import { send } from '../outbox';
 import { clock, cx, Empty } from '../ui';
 
@@ -10,13 +11,16 @@ export function NoticeCard({ n, me, onError }: { n: Notice; me: Staff; onError: 
     <article className={cx('rounded-2xl border bg-white p-4', n.urgent ? 'border-red-300' : 'border-slate-200', !read && 'ring-2 ring-blue-100')}>
       <div className="flex items-center gap-1.5 text-xs">
         {n.urgent ? <Siren className="size-3.5 text-red-600" /> : <Megaphone className="size-3.5 text-blue-600" />}
-        <span className="font-bold text-slate-700">{n.scope === 'all' ? '전체공지' : `${n.scope} 공지`}</span>
+        <span className="font-bold text-slate-700">{n.kind === 'broadcast' ? '전체 공지 방송' : n.kind === 'meeting' ? `중회 · ${n.scope === 'all' ? '전체' : n.scope}` : n.scope === 'all' ? '전체공지' : `${n.scope} 공지`}</span>
         <span className="text-slate-400">{n.by.name} · {new Date(n.createdAt).toLocaleDateString('ko-KR')} {clock(n.createdAt)}</span>
       </div>
       <h3 className="mt-1.5 font-bold text-slate-900">{n.title}</h3>
       {n.body && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{n.body}</p>}
       <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-        <span>읽음 {n.readBy.length}명</span>
+        <span className="flex items-center gap-2">
+          읽음 {n.readBy.length}명
+          {noticeSpeech(n) && <button onClick={() => speak(noticeSpeech(n)!)} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 font-bold text-slate-700"><Volume2 className="size-3.5" />다시 듣기</button>}
+        </span>
         {!read && <button onClick={markRead} className="rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white">확인했습니다</button>}
       </div>
     </article>

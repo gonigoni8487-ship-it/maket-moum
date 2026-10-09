@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList, Send, Search, Camera, Megaphone, LayoutDashboard, Settings, Siren, X, ShieldAlert, Mic } from 'lucide-react';
-import { canHandleIncident, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
+import { canHandleIncident, noticeSpeech, type Bootstrap, type Incident, type Notice, type Staff, type StreamEvent, type Task } from './shared';
 import { api, ApiError, bootstrap, connectStream, session } from './api';
 import { alert, callPhrase, loadPrefs, onSoundReady, registerServiceWorker, savePrefs, soundReady, startSiren, stopAlarm, unlockAudio, type AlertPrefs } from './alerts';
 import { cx, type Draft } from './ui';
@@ -137,7 +137,12 @@ export default function MartOnApp() {
       const relevant = n.scope === 'all' || n.scope === me.dept;
       const isNew = !dataRef.current?.notices.some(x => x.id === n.id);
       if (isNew && relevant && n.by.id !== me.id) {
-        alert({ title: `${n.scope === 'all' ? '전체' : n.scope} 공지`, body: n.title, urgent: n.urgent, tag: `notice-${n.id}`, prefs: p });
+        const announce = noticeSpeech(n);
+        alert({
+          title: n.kind ? n.title : `${n.scope === 'all' ? '전체' : n.scope} 공지`, body: n.kind ? n.body || n.title : n.title,
+          urgent: n.urgent, tag: `notice-${n.id}`, prefs: p,
+          ...(announce ? { tone: 'call' as const, announce } : {}),
+        });
         if (n.urgent) setUrgent({ kind: 'notice', notice: n });
       }
       if (relevant || me.role === 'manager') setData(d => d && { ...d, notices: upsert(d.notices, n) });

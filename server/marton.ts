@@ -3,10 +3,10 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, answerQuestion, bayText, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
-import { platform } from './platform';
+import { platform, onJob } from './platform';
 import { registerSecurity } from './marton-security';
 import { registerPush, pushFor, type PushSub } from './marton-push';
 
@@ -407,15 +407,42 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     res.json(handover);
   });
 
+  // 중회 10분 전: 같은 대상에게 "10분 후 14시 중회 있습니다"를 다시 알린다
+  onJob('meeting-remind', ({ id }: { id: string }) => {
+    const n = db.notices.find(x => x.id === id);
+    if (!n?.meetingAt) return;
+    const t = storeTime(n.meetingAt);
+    const minute = Math.round((n.meetingAt - storeDayStart(n.meetingAt)) / 60000) % 60;
+    const reminder: Notice = {
+      id: newId().slice(0, 8), scope: n.scope, title: meetingTitle(t.hour, minute, '10분 후'), body: n.body, urgent: false,
+      by: n.by, createdAt: Date.now(), readBy: [n.by.id], kind: 'meeting', meetingAt: n.meetingAt,
+    };
+    db.notices.push(reminder);
+    save();
+    broadcast({ type: 'notice', notice: reminder });
+  });
+
   app.post(`${api}/notices`, auth, managerOnly, (req, res) => {
     const me = (req as AuthedRequest).staff;
     const scope = req.body.scope === 'all' ? 'all' : req.body.scope;
     const title = text(req.body.title, 80);
-    if (!title || (scope !== 'all' && !isDept(scope))) return res.status(400).json({ error: '제목과 공지 대상을 확인해 주세요.' });
+    const kind = req.body.kind === 'broadcast' || req.body.kind === 'meeting' ? req.body.kind : undefined;
+    if ((!title && !kind) || (scope !== 'all' && !isDept(scope))) return res.status(400).json({ error: '제목과 공지 대상을 확인해 주세요.' });
+    if (kind === 'broadcast' && !text(req.body.body, 1000)) return res.status(400).json({ error: '방송 내용을 입력해 주세요.' });
     const notice: Notice = {
       id: newId().slice(0, 8), scope, title, body: text(req.body.body, 1000), urgent: Boolean(req.body.urgent),
-      by: actorOf(me), createdAt: Date.now(), readBy: [me.id],
+      by: actorOf(me), createdAt: Date.now(), readBy: [me.id], kind,
     };
+    if (kind === 'broadcast') notice.title = BROADCAST_TITLE;
+    if (kind === 'meeting') {
+      const hour = Number(req.body.meetingHour), minute = Number(req.body.meetingMinute) || 0;
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return res.status(400).json({ error: '중회 시각을 확인해 주세요.' });
+      notice.title = meetingTitle(hour, minute);
+      notice.meetingAt = storeDayStart(Date.now()) + (hour * 60 + minute) * 60000;
+      // 10분 전 다시 알림
+      const remindAt = notice.meetingAt - 10 * 60000;
+      if (remindAt > Date.now()) void platform().schedule({ at: remindAt, type: 'meeting-remind', data: { id: notice.id }, key: `meeting-${notice.id}` });
+    }
     db.notices.push(notice);
     save();
     broadcast({ type: 'notice', notice });

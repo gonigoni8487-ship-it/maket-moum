@@ -114,7 +114,9 @@ export function pushFor(event: StreamEvent) {
   } else if (event.type === 'notice') {
     const n = event.notice;
     if (n.readBy.length > 1) return; // 읽음 표시 갱신은 알리지 않음
-    void sendTo(s => s.id !== n.by.id && (n.scope === 'all' || n.scope === s.dept), { title: `${n.urgent ? '🚨 긴급 ' : ''}${n.scope === 'all' ? '전체' : n.scope} 공지`, body: n.title, urgent: n.urgent, tag: `notice-${n.id}` });
+    const title = n.kind === 'broadcast' ? `📢 ${n.title}` : n.kind === 'meeting' ? `🕑 ${n.title}` : `${n.urgent ? '🚨 긴급 ' : ''}${n.scope === 'all' ? '전체' : n.scope} 공지`;
+    const body = n.kind ? n.body || n.title : n.title;
+    void sendTo(s => s.id !== n.by.id && (n.scope === 'all' || n.scope === s.dept), { title, body, urgent: n.urgent, tag: `notice-${n.id}` });
   } else if (event.type === 'incident') {
     const i = event.incident;
     if (event.action === 'created') {
