@@ -40,6 +40,26 @@ export function ProductRow({ p, promo, onRequest, onShow }: { p: Product; promo?
   );
 }
 
+/** 등록된 행사상품 한 줄 */
+function PromoCard({ p }: { p: Promotion }) {
+  return (
+    <div className="rounded-xl bg-white px-3.5 py-2.5 text-sm">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 font-semibold">{p.name}{p.spec && <span className="ml-1 font-normal text-slate-500">{p.spec}</span>}</span>
+        <span className="shrink-0 text-right">
+          {p.originalPrice && p.originalPrice !== p.price && <s className="mr-1 text-xs text-slate-400">{won(p.originalPrice)}</s>}
+          {p.price ? <b className="text-pink-600">{won(p.price)}</b> : null}
+        </span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+        {p.condition && <span className="rounded bg-pink-100 px-1.5 font-bold text-pink-700">{p.condition}</span>}
+        {p.code && <span className="font-mono">{p.code}</span>}
+        {p.period && <span>{p.period}</span>}
+      </div>
+    </div>
+  );
+}
+
 const speechRecognition = () => (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 /** 듣는 중 화면: 말하는 내용이 바로 보이고, 음성 인식이 안 되는 브라우저면 키보드 마이크를 안내 */
@@ -133,6 +153,14 @@ export default function ProductFinder({ products, promotions, onRequest, onError
   const [showing, setShowing] = useState<Product | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 매장 상품 목록에 없는 전단 상품도 찾을 수 있게 행사상품에서도 찾는다
+  const promoHits = useMemo(() => {
+    const words = q.replace(/(어디|있어요|있나요|있어|위치|알려줘|찾아줘|행사|해요|하나요|\?)/g, ' ').split(/\s+/).map(norm).filter(w => w.length >= 2);
+    const code = q.replace(/\D/g, '');
+    if (!words.length && code.length < 8) return [];
+    return promotions.filter(p => (code.length >= 8 && p.code === code) || words.some(w => norm(p.name).includes(w))).slice(-10).reverse();
+  }, [q, promotions]);
+
   const results = useMemo(() => {
     const n = norm(q);
     if (!n) return [];
@@ -188,27 +216,19 @@ export default function ProductFinder({ products, promotions, onRequest, onError
 
       {q.trim() && (results.length
         ? results.map(p => <ProductRow key={p.id} p={p} promo={promotionFor(p, promotions)} onRequest={onRequest} onShow={() => setShowing(p)} />)
-        : !ai && <Empty>일치하는 상품이 없습니다. AI에게 물어보세요.</Empty>)}
+        : !ai && !promoHits.length && <Empty>일치하는 상품이 없습니다. AI에게 물어보세요.</Empty>)}
+
+      {q.trim() && promoHits.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-bold text-slate-700">이번 행사상품 <span className="font-normal text-slate-400">{promoHits.length}개</span></h3>
+          {promoHits.map(p => <PromoCard key={p.id} p={p} />)}
+        </div>
+      )}
 
       {!q.trim() && promotions.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-bold text-slate-700">등록된 행사상품 <span className="font-normal text-slate-400">{promotions.length}개</span></h3>
-          {promotions.slice(-20).reverse().map(p => (
-            <div key={p.id} className="rounded-xl bg-white px-3.5 py-2.5 text-sm">
-              <div className="flex items-start justify-between gap-2">
-                <span className="min-w-0 font-semibold">{p.name}{p.spec && <span className="ml-1 font-normal text-slate-500">{p.spec}</span>}</span>
-                <span className="shrink-0 text-right">
-                  {p.originalPrice && p.originalPrice !== p.price && <s className="mr-1 text-xs text-slate-400">{won(p.originalPrice)}</s>}
-                  <b className="text-pink-600">{won(p.price)}</b>
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-                {p.condition && <span className="rounded bg-pink-100 px-1.5 font-bold text-pink-700">{p.condition}</span>}
-                {p.code && <span className="font-mono">{p.code}</span>}
-                {p.period && <span>{p.period}</span>}
-              </div>
-            </div>
-          ))}
+          {promotions.slice(-20).reverse().map(p => <PromoCard key={p.id} p={p} />)}
         </div>
       )}
       {listening && <ListenSheet onHeard={heard} onClose={() => setListening(false)} onKeyboard={() => { setListening(false); setTimeout(() => inputRef.current?.focus(), 50); }} />}

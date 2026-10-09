@@ -164,10 +164,13 @@ export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-0.5 text-[11px] font-semibold text-slate-500">판매코드
-                    <input className={cx(field, 'font-mono')} inputMode="numeric" value={r.code ?? ''} onChange={e => edit(r.key, { code: e.target.value.replace(/[^0-9A-Za-z-]/g, '').slice(0, 20) || undefined })} placeholder="8801234567890" />
+                    <input className={cx(field, 'font-mono')} inputMode="numeric" value={r.code ?? ''} onChange={e => edit(r.key, { code: e.target.value.replace(/[^0-9A-Za-z-]/g, '').slice(0, 20) || undefined })} placeholder="전단에 없으면 비워 두기" />
                   </label>
-                  <label className="space-y-0.5 text-[11px] font-semibold text-slate-500">규격·단위
-                    <input className={field} value={r.spec ?? ''} onChange={e => edit(r.key, { spec: e.target.value || undefined })} placeholder="1L, 120g×5입" maxLength={30} />
+                  <label className="space-y-0.5 text-[11px] font-semibold text-slate-500">행사기간
+                    <input className={field} value={r.period ?? ''} onChange={e => edit(r.key, { period: e.target.value || undefined })} placeholder="10/9~10/15" maxLength={40} />
+                  </label>
+                  <label className="col-span-2 space-y-0.5 text-[11px] font-semibold text-slate-500">규격·단위
+                    <input className={field} value={r.spec ?? ''} onChange={e => edit(r.key, { spec: e.target.value || undefined })} placeholder="각 500g/냉장/국산, 120g×5입" maxLength={40} />
                   </label>
                   <label className="space-y-0.5 text-[11px] font-semibold text-slate-500">정상가
                     <input className={field} inputMode="numeric" value={r.originalPrice ? r.originalPrice.toLocaleString() : ''} onChange={e => edit(r.key, { originalPrice: numOrUndef(e.target.value) })} placeholder="원" />
@@ -175,11 +178,8 @@ export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
                   <label className="space-y-0.5 text-[11px] font-semibold text-pink-600">행사가
                     <input className={cx(field, 'font-bold text-pink-700')} inputMode="numeric" value={r.price ? r.price.toLocaleString() : ''} onChange={e => edit(r.key, { price: numOrUndef(e.target.value) })} placeholder="원" />
                   </label>
-                  <label className="space-y-0.5 text-[11px] font-semibold text-slate-500">행사 프로모션
-                    <input className={field} value={r.condition ?? ''} onChange={e => edit(r.key, { condition: e.target.value || undefined })} placeholder="1+1, 30% 할인" maxLength={60} />
-                  </label>
-                  <label className="space-y-0.5 text-[11px] font-semibold text-slate-500">행사기간
-                    <input className={field} value={r.period ?? ''} onChange={e => edit(r.key, { period: e.target.value || undefined })} placeholder="10/9~10/15" maxLength={40} />
+                  <label className="col-span-2 space-y-0.5 text-[11px] font-semibold text-slate-500">행사 프로모션
+                    <textarea rows={2} className={cx(field, 'resize-none')} value={r.condition ?? ''} onChange={e => edit(r.key, { condition: e.target.value || undefined })} placeholder="L.POINT 40% 할인, 1+1, 행사카드 1천원 할인" maxLength={100} />
                   </label>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

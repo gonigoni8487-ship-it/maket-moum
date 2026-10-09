@@ -196,9 +196,10 @@ function parseImage(dataUrl: unknown) {
   return m ? { mimeType: m[1], data: m[2] } : null;
 }
 
-/** 금액: 2980, "2,980원", "2980.0" 모두 숫자로 */
+/** 금액: 2980, "2,980원" 모두 숫자로. "2,950/4,950원"·"69,000~99,000원"처럼 여러 개면 첫 금액 */
 const amount = (v: unknown) => {
-  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(/[^\d.]/g, ''));
+  const first = /\d[\d,]*/.exec(String(v ?? ''))?.[0];
+  const n = typeof v === 'number' ? v : Number(first?.replace(/,/g, '') ?? NaN);
   return Number.isFinite(n) && n > 0 && n < 100_000_000 ? Math.round(n) : undefined;
 };
 
@@ -209,10 +210,10 @@ function cleanFlyerItem(it: any, fallbackPeriod?: string): FlyerItem | null {
   const code = String(it?.code ?? '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 20) || undefined;
   return {
     name, code,
-    spec: text(it?.spec, 30) || undefined,
+    spec: text(it?.spec, 40) || undefined,
     price: amount(it?.price),
     originalPrice: amount(it?.originalPrice),
-    condition: text(it?.condition ?? it?.promo, 60) || undefined,
+    condition: text(it?.condition ?? it?.promo, 100) || undefined,
     period: text(it?.period, 40) || fallbackPeriod || undefined,
   };
 }
@@ -460,10 +461,16 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     let products = searchProducts(keyword || question);
     if (!products.length) products = keyword.split(/\s+/).flatMap(w => searchProducts(w, 3)).slice(0, 5);
 
+    // 매장 상품 목록에 없어도 이번 전단 행사상품이면 행사 내용은 알려 준다
+    const words = keyword.split(/\s+/).filter(w => w.length >= 2);
+    const promo = [...db.promotions].reverse().find(p => words.some(w => p.name.replace(/\s+/g, '').includes(w)));
+    const promoText = (p: Promotion) => `${p.name}${p.spec ? `(${p.spec.split('/')[0]})` : ''} 행사 중${p.price ? ` ${p.price.toLocaleString()}원` : ''}${p.condition ? `, ${p.condition}` : ''}`;
     const fallback = (): AskResult => ({
       answer: products.length
-        ? `${products[0].name}: ${products[0].floor} ${products[0].corner}, ${products[0].shelf}에 있습니다.`
-        : '상품 DB에서 찾지 못했습니다. 해당 부서에 위치 확인 요청을 보내보세요.',
+        ? `${products[0].name}: ${products[0].floor} ${products[0].corner}, ${products[0].shelf}에 있습니다.${promo && promotionFor(products[0]) === promo ? ` ${promoText(promo)}입니다.` : ''}`
+        : promo
+          ? `${promoText(promo)}입니다. 진열 위치는 상품 목록에 없어 담당 부서에 확인해 주세요.`
+          : '상품 DB에서 찾지 못했습니다. 해당 부서에 위치 확인 요청을 보내보세요.',
       products,
     });
     if (!aiEnabled) return res.json(fallback());
@@ -525,14 +532,15 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
 
     const prompts = {
       flyer: [
-        '이 사진은 한국 대형마트의 행사 전단지(또는 행사 POP·쇼카드)입니다. 보이는 행사 상품을 빠짐없이 한 상품당 한 줄로 추출하세요.',
-        '- name: 상품명 (브랜드 포함, 규격·가격은 빼고)',
-        '- code: 판매코드·상품코드·바코드 숫자. 전단에 적혀 있을 때만, 없으면 null',
-        '- spec: 규격·단위 (예: 1L, 500g, 120g×5입, 1팩(10구), 100g당). 없으면 null',
-        '- price: 행사 판매가(원, 숫자만). 100g당 가격이면 그 숫자',
-        '- originalPrice: 정상가(취소선 가격 등, 숫자만). 없으면 null',
-        '- condition: 행사 프로모션 (예: 1+1, 2+1, 30% 할인, 회원 3,000원 할인, 카드 할인, 덤 증정, 2개 이상 구매 시). 없으면 null',
-        '- period: 행사기간 (예: 10/9~10/15). 전단 전체 공통 기간이면 각 상품에 똑같이',
+        '이 사진은 한국 대형마트의 행사 전단지 한 면(또는 행사 POP·쇼카드)입니다. 가격이나 행사 표시가 붙은 상품을 위에서 아래, 왼쪽에서 오른쪽 순서로 빠짐없이 한 상품(묶음)당 한 줄로 추출하세요.',
+        '- name: 전단에 적힌 상품명 그대로 (브랜드 포함, "2종", "17종" 같은 묶음 표기 포함). 괄호 안 규격·원산지는 빼고',
+        '- code: 판매코드·상품코드·바코드 숫자. 전단에 적혀 있을 때만, 없으면 null (지어내지 말 것)',
+        '- spec: 상품명 옆 괄호의 규격·단위·포장·원산지 (예: "각 500g/냉장/원산지 별도표기", "3kg/박스/국산", "각 150g×2봉", "상품별 규격 상이"). 없으면 null',
+        '- price: 고객이 실제로 내는 행사가(원, 숫자). 여러 개면 첫 금액. "2개 이상 구매시 1개당 각 8,450원"이면 8450. 화살표 "16,900원→14,900원"이면 오른쪽 14900. 가격 없이 할인율만 있으면 null',
+        '- originalPrice: 할인 전 가격(숫자). 화살표 왼쪽 가격, 취소선 가격, "비회원가", "1개 구매시" 가격, 행사카드 할인 전 가격. 없으면 null',
+        '- condition: 행사 프로모션을 짧게. 종류를 앞에 쓰기: "L.POINT 40% 할인", "L.POINT 5천원 할인", "행사카드 1천원 할인", "1+1", "2+1", "2개 이상 50% 할인", "2팩 구매 시 9,900원", "가격할인 30%", "3만원 이상 구매 시 사은품 증정". 가격이 여러 개("2,950/4,950원", "69,000~99,000원")면 그대로 덧붙이고, "교차구매 가능", "한정수량", "신상품", "단독"이 있으면 쉼표로 덧붙이기. 행사 표시가 없으면 null',
+        '- period: 그 상품에만 따로 적힌 기간(예: "※기간: 10/9(금)~10/11(일)")이 있으면 "10/9~10/11"처럼. 없으면 null',
+        '전단 위쪽이나 아래쪽의 "전단적용기간"은 period 최상위에 "10/8~10/14"처럼 넣으세요. 하단 작은 글씨 안내문, 카드사 로고, 브랜드 로고만 있는 영역은 상품이 아닙니다.',
         '읽을 수 없거나 확실하지 않은 값은 지어내지 말고 null.',
         'JSON: {"period":"전단 공통 행사기간 또는 null","items":[{"name":"","code":null,"spec":null,"price":0,"originalPrice":null,"condition":null,"period":null}]}',
       ].join('\n'),

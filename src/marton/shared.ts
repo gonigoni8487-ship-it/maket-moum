@@ -122,11 +122,12 @@ export function matchProduct(item: { name: string; code?: string; spec?: string 
   }
   const n = item.name.replace(/\s+/g, '').toLowerCase();
   if (n.length < 2) return undefined;
-  const spec = item.spec?.replace(/\s+/g, '').toLowerCase();
+  // 규격에서 용량만 (예: "각 500g/냉장/국산" → 500g). 용량이 적혀 있으면 매장 상품명에도 같은 용량이 있어야 한다
+  const sizes = (item.spec ?? '').toLowerCase().replace(/\s+/g, '').match(/\d[\d.,]*(kg|g|ml|l|입|매|롤|개|구|봉|팩)/g) ?? [];
   return products.find(p => {
     const k = p.name.replace(/\s+/g, '').toLowerCase();
     const nameHit = k.includes(n) || n.includes(k) || p.aliases.some(a => a.length >= 2 && n.includes(a.replace(/\s+/g, '').toLowerCase()));
-    return nameHit && (!spec || k.includes(spec));
+    return nameHit && (!sizes.length || sizes.some(sz => k.includes(sz)));
   });
 }
 
