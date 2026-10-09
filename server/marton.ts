@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type Product, type Promotion, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Product, type Promotion, matchProduct, promotionFor as sharedPromotionFor, answerQuestion, bayText, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform } from './platform';
@@ -81,6 +81,12 @@ function parseDb(raw: string | null): Db {
     db.reports ??= [];
     db.pushSubs ??= [];
     db.handovers ??= [];
+    // 기본 상품: 새로 생긴 항목(오뎅·갈치 등)과 매대 번호를 기존 데이터에도 채운다
+    for (const seed of SEED_PRODUCTS) {
+      const have = db.products.find(p => p.id === seed.id);
+      if (!have) db.products.push(seed);
+      else if (have.bay === undefined && seed.bay !== undefined && have.shelf === seed.shelf) Object.assign(have, { bay: seed.bay, slot: seed.slot });
+    }
     return db;
   } catch {
     return { staff: {}, sessions: {}, tasks: [], notices: [], products: SEED_PRODUCTS, promotions: [], incidents: [], patrols: [], reports: [], pushSubs: [], handovers: [] };
@@ -180,15 +186,9 @@ function searchProducts(q: string, limit = 8): Product[] {
   return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, limit).map(s => s.p);
 }
 
-function promotionFor(p: Product) {
-  const key = p.name.replace(/\s+/g, '');
-  return db.promotions.find(pr => {
-    const n = pr.name.replace(/\s+/g, '');
-    return key.includes(n) || n.includes(key) || p.aliases.some(a => n.includes(a));
-  });
-}
+const promotionFor = (p: Product) => sharedPromotionFor(p, db.promotions);
 
-const describe = (p: Product) => `${p.name}: ${p.floor} ${p.corner}, ${p.shelf} (${p.dept}, ${p.price.toLocaleString()}원)`;
+const describe = (p: Product) => `${p.name}: ${p.floor} ${p.corner}, ${bayText(p)} (${p.dept}, ${p.price.toLocaleString()}원)`;
 
 export function parseJson<T>(raw: string | undefined): T {
   let t = raw || '{}';
@@ -200,6 +200,28 @@ function parseImage(dataUrl: unknown) {
   if (typeof dataUrl !== 'string') return null;
   const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(dataUrl);
   return m ? { mimeType: m[1], data: m[2] } : null;
+}
+
+/** 금액: 2980, "2,980원" 모두 숫자로. "2,950/4,950원"·"69,000~99,000원"처럼 여러 개면 첫 금액 */
+const amount = (v: unknown) => {
+  const first = /\d[\d,]*/.exec(String(v ?? ''))?.[0];
+  const n = typeof v === 'number' ? v : Number(first?.replace(/,/g, '') ?? NaN);
+  return Number.isFinite(n) && n > 0 && n < 100_000_000 ? Math.round(n) : undefined;
+};
+
+/** 전단 인식·직원 입력을 같은 모양으로 정리 */
+function cleanFlyerItem(it: any, fallbackPeriod?: string): FlyerItem | null {
+  const name = text(it?.name, 60);
+  if (!name) return null;
+  const code = String(it?.code ?? '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 20) || undefined;
+  return {
+    name, code,
+    spec: text(it?.spec, 40) || undefined,
+    price: amount(it?.price),
+    originalPrice: amount(it?.originalPrice),
+    condition: text(it?.condition ?? it?.promo, 100) || undefined,
+    period: text(it?.period, 40) || fallbackPeriod || undefined,
+  };
 }
 
 export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
@@ -414,21 +436,25 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
   app.post(`${api}/promotions`, auth, (req, res) => {
     const me = (req as AuthedRequest).staff;
-    const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 50) : [];
+    const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 100) : [];
     const added: Promotion[] = [];
     for (const it of items) {
-      const name = text(it?.name, 60);
-      if (!name) continue;
+      const item = cleanFlyerItem(it);
+      if (!item) continue;
+      // 같은 상품(판매코드 또는 상품명+규격)이 이미 있으면 새 전단 내용으로 바꾼다
+      const same = db.promotions.findIndex(pr => (item.code && pr.code === item.code) || (pr.name === item.name && (pr.spec ?? '') === (item.spec ?? '')));
       const promotion: Promotion = {
-        id: newId().slice(0, 8), name,
-        price: Number(it.price) || undefined, originalPrice: Number(it.originalPrice) || undefined,
-        period: text(it.period, 40) || undefined, condition: text(it.condition, 60) || undefined,
+        ...item, id: same >= 0 ? db.promotions[same].id : newId().slice(0, 8),
+        productId: matchProduct(item, db.products)?.id,
         createdAt: Date.now(), by: actorOf(me),
       };
-      db.promotions.push(promotion);
+      if (same >= 0) db.promotions[same] = promotion;
+      else db.promotions.push(promotion);
       added.push(promotion);
       broadcast({ type: 'promotion', promotion });
     }
+    // 오래된 행사는 최근 500개만 보관
+    if (db.promotions.length > 500) db.promotions.splice(0, db.promotions.length - 500);
     save();
     res.json(added);
   });
@@ -437,29 +463,23 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   app.post(`${api}/ai/ask`, auth, async (req, res) => {
     const question = text(req.body.question, 200);
     if (!question) return res.status(400).json({ error: '질문을 입력해 주세요.' });
-    const keyword = question.replace(/(어디|있어요|있나요|있어|위치|알려줘|찾아줘|은|는|이|가|\?|요)/g, ' ').trim();
-    let products = searchProducts(keyword || question);
-    if (!products.length) products = keyword.split(/\s+/).flatMap(w => searchProducts(w, 3)).slice(0, 5);
+    // 매장 데이터로 답할 수 있으면 바로 답한다 (항상 같은 말투: "오뎅은 … 12번 매대 3번째 칸에 있어요")
+    const direct = answerQuestion(question, db.products, db.promotions);
+    if (direct) return res.json(direct);
 
-    const fallback = (): AskResult => ({
-      answer: products.length
-        ? `${products[0].name}은(는) ${products[0].floor} ${products[0].corner} ${products[0].shelf}에 있습니다.`
-        : '상품 DB에서 찾지 못했습니다. 해당 부서에 위치 확인 요청을 보내보세요.',
-      products,
-    });
-    if (!aiEnabled) return res.json(fallback());
-
+    const notFound: AskResult = { answer: '상품 목록과 이번 주 행사에서 찾지 못했어요. 담당 부서에 위치 확인 요청을 보내 주세요.', products: [] };
+    if (!aiEnabled) return res.json(notFound);
     try {
-      const catalog = (products.length ? products : db.products).map(describe).join('\n');
-      const promos = db.promotions.slice(-30).map(p => `${p.name} ${p.price ?? ''}원 ${p.period ?? ''} ${p.condition ?? ''}`).join('\n');
+      const catalog = db.products.map(describe).join('\n');
+      const promos = db.promotions.slice(-50).map(p => `${p.name} ${p.spec ?? ''} ${p.price ?? ''}원 ${p.condition ?? ''} ${p.period ?? ''}`).join('\n');
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
-        contents: [{ parts: [{ text: `당신은 대형마트 직원용 안내 AI입니다. 아래 상품 위치 데이터만 근거로, 직원이 고객에게 바로 말해줄 수 있게 한국어 존댓말 1~2문장으로 답하세요. 데이터에 없으면 모른다고 하고 어느 부서에 물어볼지 제안하세요. 행사 정보가 있으면 덧붙이세요.\n\n[상품 위치]\n${catalog}\n\n[진행 중 행사]\n${promos || '없음'}\n\n[질문]\n${question}` }] }],
+        contents: [{ parts: [{ text: `당신은 대형마트 직원용 안내 AI입니다. 아래 상품 위치·행사 데이터만 근거로, 직원이 고객에게 바로 말해 줄 수 있게 한국어 존댓말 1~2문장으로 답하세요. 위치는 "N번 매대 N번째 칸" 형식을 쓰세요. 데이터에 없으면 모른다고 하고 어느 부서에 물어볼지 제안하세요.\n\n[상품 위치]\n${catalog}\n\n[이번 주 행사]\n${promos || '없음'}\n\n[질문]\n${question}` }] }],
       });
-      res.json({ answer: response.text?.trim() || fallback().answer, products });
+      res.json({ answer: response.text?.trim() || notFound.answer, products: [] } satisfies AskResult);
     } catch (error) {
       console.error('MartON ask error:', error);
-      res.json(fallback());
+      res.json(notFound);
     }
   });
 
@@ -505,7 +525,19 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
     if (!aiEnabled) return res.status(503).json({ error: 'AI 키(GEMINI_API_KEY)가 설정되지 않아 사진 분석을 할 수 없습니다.' });
 
     const prompts = {
-      flyer: '이 마트 행사 전단 사진에서 행사 상품을 모두 추출하세요. JSON: {"items":[{"name":"상품명","price":행사가숫자,"originalPrice":정상가숫자또는null,"period":"행사기간","condition":"1+1, 카드할인 등 조건"}]}',
+      flyer: [
+        '이 사진은 한국 대형마트의 행사 전단지 한 면(또는 행사 POP·쇼카드)입니다. 가격이나 행사 표시가 붙은 상품을 위에서 아래, 왼쪽에서 오른쪽 순서로 빠짐없이 한 상품(묶음)당 한 줄로 추출하세요.',
+        '- name: 전단에 적힌 상품명 그대로 (브랜드 포함, "2종", "17종" 같은 묶음 표기 포함). 괄호 안 규격·원산지는 빼고',
+        '- code: 판매코드·상품코드·바코드 숫자. 전단에 적혀 있을 때만, 없으면 null (지어내지 말 것)',
+        '- spec: 상품명 옆 괄호의 규격·단위·포장·원산지 (예: "각 500g/냉장/원산지 별도표기", "3kg/박스/국산", "각 150g×2봉", "상품별 규격 상이"). 없으면 null',
+        '- price: 고객이 실제로 내는 행사가(원, 숫자). 여러 개면 첫 금액. "2개 이상 구매시 1개당 각 8,450원"이면 8450. 화살표 "16,900원→14,900원"이면 오른쪽 14900. 가격 없이 할인율만 있으면 null',
+        '- originalPrice: 할인 전 가격(숫자). 화살표 왼쪽 가격, 취소선 가격, "비회원가", "1개 구매시" 가격, 행사카드 할인 전 가격. 없으면 null',
+        '- condition: 행사 프로모션을 짧게. 종류를 앞에 쓰기: "L.POINT 40% 할인", "L.POINT 5천원 할인", "행사카드 1천원 할인", "1+1", "2+1", "2개 이상 50% 할인", "2팩 구매 시 9,900원", "가격할인 30%", "3만원 이상 구매 시 사은품 증정". 가격이 여러 개("2,950/4,950원", "69,000~99,000원")면 그대로 덧붙이고, "교차구매 가능", "한정수량", "신상품", "단독"이 있으면 쉼표로 덧붙이기. 행사 표시가 없으면 null',
+        '- period: 그 상품에만 따로 적힌 기간(예: "※기간: 10/9(금)~10/11(일)")이 있으면 "10/9~10/11"처럼. 없으면 null',
+        '전단 위쪽이나 아래쪽의 "전단적용기간"은 period 최상위에 "10/8~10/14"처럼 넣으세요. 하단 작은 글씨 안내문, 카드사 로고, 브랜드 로고만 있는 영역은 상품이 아닙니다.',
+        '읽을 수 없거나 확실하지 않은 값은 지어내지 말고 null.',
+        'JSON: {"period":"전단 공통 행사기간 또는 null","items":[{"name":"","code":null,"spec":null,"price":0,"originalPrice":null,"condition":null,"period":null}]}',
+      ].join('\n'),
       price: '이 가격표(쇼카드/전자가격표) 사진에서 상품명과 표시 가격을 읽으세요. JSON: {"name":"상품명","price":숫자}',
       barcode: '이 사진에서 바코드 아래 숫자(EAN/UPC)와 상품명을 읽으세요. JSON: {"barcode":"숫자만","name":"보이는 상품명 또는 null"}',
     } as const;
@@ -520,7 +552,12 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
       const raw = parseJson<Record<string, any>>(response.text);
 
       if (mode === 'flyer') {
-        return res.json({ mode, items: Array.isArray(raw.items) ? raw.items : [] } satisfies VisionResult);
+        const period = text(raw.period, 40) || undefined;
+        const items = (Array.isArray(raw.items) ? raw.items : []).slice(0, 100)
+          .map((it: unknown) => cleanFlyerItem(it, period))
+          .filter((it: FlyerItem | null): it is FlyerItem => Boolean(it))
+          .map((it: FlyerItem) => ({ ...it, productId: matchProduct(it, db.products)?.id }));
+        return res.json({ mode, items } satisfies VisionResult);
       }
       if (mode === 'price') {
         const name = raw.name as string | undefined;

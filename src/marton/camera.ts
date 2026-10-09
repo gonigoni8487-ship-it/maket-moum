@@ -37,6 +37,49 @@ export async function readBarcode(source: ImageBitmapSource): Promise<string | n
   }
 }
 
+/**
+ * 흐릿하거나 작은 바코드용 보정: 흑백 → 명암 늘리기(위아래 2% 버림) → 선명하게(언샤프 마스크).
+ * 휴대폰에서 거리가 있거나 초점이 살짝 나간 바코드가 이 보정으로 읽히는 경우가 많다.
+ */
+export function sharpenForBarcode(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+  const lum = new Float32Array(n);
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) {
+    const l = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) / 1000;
+    lum[i] = l;
+    hist[l | 0]++;
+  }
+  let lo = 0, hi = 255, acc = 0;
+  while (lo < 255 && (acc += hist[lo]) < n * 0.02) lo++;
+  acc = 0;
+  while (hi > 0 && (acc += hist[hi]) < n * 0.02) hi--;
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < n; i++) lum[i] = Math.min(255, Math.max(0, ((lum[i] - lo) * 255) / span));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      // 3×3 평균으로 흐린 값과의 차이를 키운다
+      let sum = 0, cnt = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          sum += lum[yy * w + xx];
+          cnt++;
+        }
+      }
+      const v = Math.min(255, Math.max(0, lum[i] + 2 * (lum[i] - sum / cnt)));
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 /** 카메라 판독기를 미리 불러 둔다 (첫 스캔 지연 줄이기) */
 export const warmUpBarcodeReader = () => { void getDetector(); };
 
@@ -79,10 +122,15 @@ export async function openRearCamera(): Promise<MediaStream | CameraProblem> {
   if (!window.isSecureContext) return 'insecure';
   if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
   try {
-    return await navigator.mediaDevices.getUserMedia({
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
     });
+    // 가까이 댄 바코드·가격표에 초점이 계속 맞도록 (지원하는 기기만)
+    const track = stream.getVideoTracks()[0];
+    const caps = (track?.getCapabilities?.() ?? {}) as { focusMode?: string[] };
+    if (caps.focusMode?.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => {});
+    return stream;
   } catch (e) {
     const name = (e as DOMException).name;
     if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
@@ -98,5 +146,17 @@ export function torchControl(stream: MediaStream) {
   return {
     supported: Boolean(caps.torch),
     set: (on: boolean) => track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] }).catch(() => {}),
+  };
+}
+
+/** 확대(줌) 지원 여부와 1배 ↔ 2배 전환 (멀리 있는 작은 바코드용) */
+export function zoomControl(stream: MediaStream) {
+  const track = stream.getVideoTracks()[0];
+  const caps = (track?.getCapabilities?.() ?? {}) as { zoom?: { min: number; max: number } };
+  const z = caps.zoom;
+  const zoomed = z ? Math.min(2, z.max) : 1;
+  return {
+    supported: Boolean(z && z.max >= 1.5),
+    set: (on: boolean) => track.applyConstraints({ advanced: [{ zoom: on ? zoomed : Math.max(1, z?.min ?? 1) } as MediaTrackConstraintSet] }).catch(() => {}),
   };
 }

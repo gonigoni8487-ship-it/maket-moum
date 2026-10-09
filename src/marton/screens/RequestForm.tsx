@@ -86,19 +86,21 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
 
       <div className="space-y-2">
         <span className="text-sm font-semibold text-slate-700">사진 첨부 <span className="font-normal text-slate-400">(가격표·바코드·상품, 최대 {MAX_TASK_PHOTOS}장)</span></span>
-        <div className="flex flex-wrap gap-2">
-          {photos.map((src, i) => (
-            <div key={i} className="relative size-20 overflow-hidden rounded-xl bg-slate-200">
-              <img src={src} alt={`첨부 사진 ${i + 1}`} className="size-full object-cover" />
-              <button type="button" onClick={() => setPhotos(p => p.filter((_, k) => k !== i))} aria-label="사진 빼기" className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white"><X className="size-3.5" /></button>
-            </div>
-          ))}
-          {photos.length < MAX_TASK_PHOTOS && (
-            <button type="button" onClick={() => setCamera(true)} className="flex size-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-500">
-              <Camera className="size-5" />사진 추가
-            </button>
-          )}
-        </div>
+        {photos.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((src, i) => (
+              <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-200">
+                <img src={src} alt={`첨부 사진 ${i + 1}`} className="size-full object-cover" />
+                <button type="button" onClick={() => setPhotos(p => p.filter((_, k) => k !== i))} aria-label="사진 빼기" className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"><X className="size-4" /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        {photos.length < MAX_TASK_PHOTOS && (
+          <button type="button" onClick={() => setCamera(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-600 bg-white py-3.5 text-[15px] font-bold text-blue-700 active:bg-blue-50">
+            <Camera className="size-5" />사진 찍기 · 앨범에서 고르기 ({photos.length}/{MAX_TASK_PHOTOS})
+          </button>
+        )}
       </div>
 
       <button

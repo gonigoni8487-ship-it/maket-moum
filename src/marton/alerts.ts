@@ -1,13 +1,18 @@
-// 강력 알림: 알림음(WebAudio), 진동, 시스템 알림, 음성 안내
+import { speech } from './shared';
+
+// 강력 알림: 알림음·호출음·사이렌, 진동, 시스템 알림, 음성 호출
 
 export interface AlertPrefs {
   sound: boolean;
   vibrate: boolean;
+  /** 받은 요청을 "수산 담당님 호출입니다"처럼 말로 알림 */
+  call: boolean;
+  /** 모든 알림 내용을 읽어 줌 (베타) */
   voice: boolean;
 }
 
 const PREFS_KEY = 'marton-alert-prefs';
-export const defaultPrefs: AlertPrefs = { sound: true, vibrate: true, voice: false };
+export const defaultPrefs: AlertPrefs = { sound: true, vibrate: true, call: true, voice: false };
 
 export function loadPrefs(): AlertPrefs {
   try { return { ...defaultPrefs, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return defaultPrefs; }
@@ -55,17 +60,21 @@ const chimeSample = (t: number) => {
   return Math.sin(2 * Math.PI * f * t) * Math.exp(-local * 9) * 0.8;
 };
 
-// 경보음: 삐삐삐 — 삐삐삐 (바코드 훼손·가격 오류처럼 계산대가 멈추는 요청, 약 2.4초)
-const beepSample = (t: number) => {
-  const inGroup = t % 1.2;
-  const on = inGroup < 0.75 && inGroup % 0.25 < 0.17;
-  if (!on) return 0;
-  return Math.tanh(Math.sin(2 * Math.PI * 1500 * t) * 3) * 0.95;
+// 호출음: 매장 안내방송처럼 "띵-동-댕-동" 올라가는 4음 (받은 요청, 약 1.6초)
+const CALL_NOTES = [523.25, 659.25, 783.99, 1046.5]; // 도 미 솔 (높은)도
+const callSample = (t: number) => {
+  const i = Math.min(Math.floor(t / 0.3), CALL_NOTES.length - 1);
+  const local = t - i * 0.3;
+  const f = CALL_NOTES[i];
+  const decay = Math.exp(-local * (i === CALL_NOTES.length - 1 ? 2.2 : 4));
+  // 배음을 섞어 차임벨처럼 또렷하게
+  return (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(2 * Math.PI * f * 2 * t) + 0.15 * Math.sin(2 * Math.PI * f * 3 * t)) * decay * 0.62;
 };
+const CALL_SECONDS = 1.6;
 
 let siren: HTMLAudioElement | null = null;
 let chime: HTMLAudioElement | null = null;
-let beep: HTMLAudioElement | null = null;
+let call: HTMLAudioElement | null = null;
 let unlocked = false;
 const soundListeners = new Set<(ok: boolean) => void>();
 
@@ -74,9 +83,9 @@ function players() {
     siren = new Audio(wavUrl(2, sirenSample));
     siren.loop = true;
     chime = new Audio(wavUrl(0.6, chimeSample));
-    beep = new Audio(wavUrl(2.4, beepSample));
+    call = new Audio(wavUrl(CALL_SECONDS, callSample));
   }
-  return { siren, chime: chime!, beep: beep! };
+  return { siren, chime: chime!, call: call! };
 }
 
 function setUnlocked(ok: boolean) {
@@ -101,8 +110,10 @@ export function unlockAudio() {
   } catch { /* 지원 안 함 */ }
   if (unlocked) return;
   try {
-    const { siren: s, chime: c, beep: bp } = players();
-    for (const el of [c, bp, s]) {
+    // 음성 안내도 첫 터치 때 한 번 열어 둔다 (아이폰)
+    if ('speechSynthesis' in window && !unlocked) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(' '), { volume: 0 }));
+    const { siren: s, chime: c, call: cl } = players();
+    for (const el of [c, cl, s]) {
       el.muted = true;
       void el.play().then(() => {
         if (el === s && !alarmOn) { el.pause(); el.currentTime = 0; }
@@ -132,16 +143,17 @@ export async function startSiren(): Promise<boolean> {
   }
 }
 
-async function playChime(tone: 'chime' | 'alarm' = 'chime') {
-  const { chime, beep: bp } = players();
-  const c = tone === 'alarm' ? bp : chime;
+async function playChime(tone: 'chime' | 'call' = 'chime') {
+  const { chime, call: cl } = players();
+  const c = tone === 'call' ? cl : chime;
   c.currentTime = 0;
   try { await c.play(); setUnlocked(true); } catch { setUnlocked(false); }
 }
 
+/** 음성으로 읽기. 숫자·단위는 한글 발음으로 바꿔 읽는다 (4,990원 → 사천구백구십원) */
 export function speak(message: string) {
   if (!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(message);
+  const u = new SpeechSynthesisUtterance(speech(message));
   u.lang = 'ko-KR';
   u.rate = 1.05;
   speechSynthesis.cancel();
@@ -170,12 +182,20 @@ async function systemNotify(title: string, body: string, urgent: boolean, tag: s
  * 새 업무/공지 알림. 긴급이면 확인(stopAlarm)할 때까지 사이렌(반복)과 진동이 계속된다.
  * 돌려주는 값: 소리가 실제로 났는지 (막혔으면 화면에 "눌러서 사이렌 켜기"를 보여준다)
  */
-export async function alert(opts: { title: string; body: string; urgent: boolean; tag: string; prefs: AlertPrefs; tone?: 'chime' | 'alarm' }): Promise<boolean> {
-  const { title, body, urgent, tag, prefs, tone } = opts;
+export async function alert(opts: {
+  title: string; body: string; urgent: boolean; tag: string; prefs: AlertPrefs;
+  /** call: 받은 요청 호출음 (긴급이면 무시하고 사이렌) */
+  tone?: 'chime' | 'call';
+  /** 호출 음성 (예: "수산 담당님 호출입니다") */
+  announce?: string;
+}): Promise<boolean> {
+  const { title, body, urgent, tag, prefs, tone, announce } = opts;
   void systemNotify(title, body, urgent, tag);
-  if (prefs.voice) speak(`${urgent ? '긴급 요청. ' : ''}${title}. ${body}`);
+  const spoken = announce && prefs.call ? announce : prefs.voice ? `${urgent ? '긴급 요청. ' : ''}${title}. ${body}` : null;
+  // 호출음이 끝난 뒤 말한다 (사이렌은 계속 울리므로 바로)
+  if (spoken) window.setTimeout(() => speak(spoken), prefs.sound && !urgent && tone === 'call' ? CALL_SECONDS * 1000 : 0);
 
-  const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'alarm' ? [300, 100, 300, 100, 300, 400, 300, 100, 300, 100, 300] : [200, 100, 200];
+  const pattern = urgent ? [500, 200, 500, 200, 500] : tone === 'call' ? [250, 100, 250, 100, 250, 100, 600] : [200, 100, 200];
   const vibrate = () => { if (prefs.vibrate) navigator.vibrate?.(pattern); };
   vibrate();
   if (urgent) {
@@ -188,8 +208,9 @@ export async function alert(opts: { title: string; body: string; urgent: boolean
   return unlocked;
 }
 
-/** 바코드 훼손·가격 오류 요청은 일반 알림보다 강한 경보음으로 알린다 */
-export const ALARM_CATEGORIES: readonly string[] = ['바코드 훼손/미인식', '가격 오류'];
+/** 받은 요청의 호출 음성 */
+export const callPhrase = (dept: string, category: string, location?: string, urgent?: boolean) =>
+  `${urgent ? '긴급 호출. ' : ''}${dept} 담당님 호출입니다. ${category}${location ? `, ${location}` : ''}`;
 
 export function stopAlarm() {
   alarmOn = false;
