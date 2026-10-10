@@ -13,6 +13,8 @@ import { registerCoupons, pruneCoupons } from './marton-coupons';
 import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
 import { registerCare, pruneCare } from './marton-care';
 import { registerGuard } from './marton-guard';
+import { registerKpi, kpiAllowed } from './marton-kpi';
+import type { KpiRecord } from '../src/marton/kpi';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
 export interface RouteApp {
@@ -94,7 +96,7 @@ const storeCode = () => platform().env('MARTON_STORE_CODE') || ''; // 매장 공
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
-export interface SecurityLogEntry { at: number; type: 'pin-fail' | 'store-fail' | 'locked' | 'manager-login' | 'manager-blocked' | 'logout-all' | 'pin-setup' | 'pin-change'; detail: string }
+export interface SecurityLogEntry { at: number; type: 'pin-fail' | 'store-fail' | 'locked' | 'manager-login' | 'manager-blocked' | 'logout-all' | 'pin-setup' | 'pin-change' | 'kpi-access'; detail: string }
 export const SESSION_MAX_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** 보안 기록 남기기 */
@@ -138,6 +140,10 @@ export interface Db {
   emergencies?: Emergency[];
   complaints?: Complaint[];
   bells?: CustomerBell[];
+  /** 실적 지표 (영업기밀) */
+  kpi?: KpiRecord[];
+  /** 실적 지표를 볼 수 있게 허락받은 시니어 담당 사번 */
+  kpiAccess?: string[];
   /** 생일 축하를 보낸 해 (직원별) */
   birthdayDone?: Record<string, number>;
   vapid?: { publicKey: string; privateKey: string };
@@ -402,6 +408,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   registerBoard(app, genAI, aiEnabled);
   registerCare(app);
   registerGuard(app);
+  registerKpi(app, genAI, aiEnabled);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
@@ -427,6 +434,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       sounds: db.sounds ?? [],
       emergencies: (db.emergencies ?? []).filter(e => !e.clearedAt || e.createdAt > Date.now() - 7 * 24 * 60 * 60 * 1000),
       complaints: (db.complaints ?? []).slice(-100),
+      kpi: kpiAllowed(me),
       bells: (db.bells ?? []).filter(b => !b.answeredAt || b.answeredAt > Date.now() - 12 * 60 * 60 * 1000),
       expiryChecks: db.expiryChecks.filter(c => (me.role === 'manager' || c.dept === me.dept) && c.at > Date.now() - 7 * 24 * 60 * 60 * 1000),
       online: onlineCounts(),
