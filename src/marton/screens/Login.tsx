@@ -106,9 +106,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
         {wantManager && (
           <div className="grid grid-cols-2 gap-3">
             <select className={inputCls} value={title} onChange={e => setTitle(e.target.value)}>
-              <option>점장</option><option>부점장</option><option>파트장</option>
+              <option>점장</option><option>영업부점장</option><option>지원부점장</option>
             </select>
-            <input className={inputCls} type="password" inputMode="numeric" value={pin} onChange={e => setPin(e.target.value)} placeholder="관리자 PIN" />
+            <input className={inputCls} type="password" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={pin} onChange={e => setPin(e.target.value)} placeholder="관리자 비밀번호 (영문·숫자·기호)" />
           </div>
         )}
       </div>
