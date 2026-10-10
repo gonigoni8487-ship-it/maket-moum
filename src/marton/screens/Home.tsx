@@ -99,7 +99,7 @@ export default function Home({ me, counts, schedules, emergencies, onGo, onEmerg
         <Tile icon={<TrendingUp className={ic} />} color="bg-violet-600" label="실적 공유" badge={counts.share} onClick={() => onGo('share')} />
         <Tile icon={<CalendarDays className={ic} />} color="bg-teal-600" label="근무표" hint="1근·2근·3근·휴무" onClick={() => onGo('schedule')} />
         <Tile icon={<TimerReset className={ic} />} color="bg-amber-600" label="소비기한 점검" badge={counts.expiry} onClick={() => onGo('expiry')} />
-        <Tile icon={<Sunrise className={ic} />} color="bg-yellow-500" label="오늘의 명언" hint="아침 카드뉴스 50초" onClick={() => onGo('morning')} />
+        <Tile icon={<Sunrise className={ic} />} color="bg-yellow-500" label="오늘의 명언" hint="명언 카드뉴스 50초" onClick={() => onGo('morning')} />
         <Tile icon={<Coffee className={ic} />} color="bg-[#4a2c1d]" label="커피쿠폰함" hint={counts.coupons ? `${counts.coupons}장 보관 중` : '받은 쿠폰'} onClick={() => onGo('wallet')} />
       </Group>
 

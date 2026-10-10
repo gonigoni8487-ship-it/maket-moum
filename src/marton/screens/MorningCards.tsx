@@ -18,19 +18,19 @@ const SKIES = [
   'radial-gradient(120% 90% at 50% 100%, #fde68a 0%, #d97706 20%, #7c2d12 45%, #1c1008 85%)',
 ];
 
-/** 오늘 아침 카드뉴스를 이미 봤는지 (매장 날짜 기준) */
-export const MORNING_KEY = 'marton-morning-seen';
-export function shouldShowMorning(now = Date.now()) {
-  const h = storeTime(now).hour;
-  if (h < 4 || h >= 12) return false; // 새벽 4시 ~ 낮 12시 첫 실행
-  try { return localStorage.getItem(MORNING_KEY) !== String(storeDayStart(now)); } catch { return false; }
+/** 앱을 열 때마다 오늘의 명언을 먼저 보여 준다 (앱 안에서 화면을 옮길 때는 다시 뜨지 않음) */
+export const MORNING_KEY = 'marton-quotes-shown';
+export function shouldShowMorning() {
+  try { return sessionStorage.getItem(MORNING_KEY) !== '1'; } catch { return true; }
 }
-export function markMorningSeen(now = Date.now()) {
-  try { localStorage.setItem(MORNING_KEY, String(storeDayStart(now))); } catch { /* 저장 불가 */ }
+export function markMorningSeen() {
+  try { sessionStorage.setItem(MORNING_KEY, '1'); } catch { /* 저장 불가 */ }
 }
+/** 시간대 인사 */
+const greeting = (hour: number) => (hour < 11 ? '좋은 아침입니다' : hour < 17 ? '오늘도 힘내세요' : '오늘 하루도 수고 많으셨습니다');
 
 /** 아침 명언 5장: 배경음악과 함께 10초씩 넘어가는 카드뉴스 */
-export default function MorningCards({ name, onClose }: { name: string; onClose: () => void }) {
+export default function MorningCards({ name, onClose }: { name?: string; onClose: () => void }) {
   const t = storeTime(Date.now());
   const quotes = todaysQuotes(Math.floor(storeDayStart(Date.now()) / DAY));
   const [started, setStarted] = useState(false);
@@ -101,7 +101,7 @@ export default function MorningCards({ name, onClose }: { name: string; onClose:
           ))}
         </div>
         <div className="mt-3 flex items-center gap-2 text-sm">
-          <span className="font-bold text-white/90">☀️ 마트ON 아침 한 문장</span>
+          <span className="font-bold text-white/90">☀️ 마트ON 오늘의 명언</span>
           <span className="text-white/60">{t.month}월 {t.date}일</span>
           <span className="ml-auto flex gap-1">
             {started && <button onClick={() => setReadAloud(r => !r)} aria-label={readAloud ? '읽어 주기 끄기' : '읽어 주기'} className="rounded-full bg-white/10 p-2">{readAloud ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</button>}
@@ -128,7 +128,7 @@ export default function MorningCards({ name, onClose }: { name: string; onClose:
 
         {!started ? (
           <div className="space-y-3 text-center">
-            <p className="text-lg font-bold">좋은 아침입니다, {name}님 ☀️</p>
+            <p className="text-lg font-bold">{greeting(t.hour)}{name ? `, ${name}님` : ''} ☀️</p>
             <p className="text-sm text-white/70">오늘의 명언 5가지 · 배경음악과 함께 50초</p>
             <button onClick={start} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-300 py-4 text-lg font-black text-slate-900 active:bg-yellow-400"><Play className="size-5" />음악과 함께 보기</button>
             <button onClick={close} className="w-full py-2 text-sm text-white/60">건너뛰기</button>
