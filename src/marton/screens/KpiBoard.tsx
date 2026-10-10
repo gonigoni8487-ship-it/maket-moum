@@ -90,7 +90,7 @@ function Stats({ records }: { records: KpiRecord[] }) {
     <div className="space-y-3">
       <PeriodPicker period={period} setPeriod={setPeriod} value={key} setValue={setKey} />
       <p className="text-xs text-slate-500">{periodLabel(period, key)} · {period === 'day' ? '그날 입력값' : period === 'month' ? '월 입력값이 없으면 일 실적 합계' : '년 입력값이 없으면 월 실적 합계'}</p>
-      {!table.length ? <Empty>{periodLabel(period, key)} 실적이 아직 없습니다. 「입력」에서 넣어 주세요.</Empty> : (
+      {!table.length ? <Empty>{periodLabel(period, key)} 실적이 아직 없습니다. 「입력」에서 넣어 주세요.</Empty> : (<>
         <p className="-mb-1 text-right text-[11px] text-slate-400">표를 옆으로 밀면 더 보입니다 · 부서를 누르면 상세</p>
         <div className="overflow-x-auto rounded-2xl bg-white">
           <table className="w-full min-w-[640px] text-sm tabular-nums">
@@ -107,7 +107,7 @@ function Stats({ records }: { records: KpiRecord[] }) {
             </tbody>
           </table>
         </div>
-      )}
+      </>)}
       {open && (() => {
         const r = table.find(x => x.dept === open);
         if (!r) return null;
