@@ -312,7 +312,9 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     if (!id || !name || !isDept(dept) || !duty) return res.status(400).json({ error: '사번, 이름, 부서, 담당업무를 모두 입력해 주세요.' });
     const store = text(req.body.store, 20);
     const rank = text(req.body.rank, 10);
-    const phone = normalizePhone(req.body.phone);
+    // 전화번호: 새로 넣으면 바꾸고, 비워 두면 등록된 번호를 그대로 쓴다
+    const given = text(req.body.phone, 20);
+    const phone = given ? normalizePhone(given) : db.staff[id]?.phone ?? null;
     if (!store || !rank) return res.status(400).json({ error: '점명과 직급을 입력해 주세요.' });
     if (!phone) return res.status(400).json({ error: '전화번호를 010-0000-0000 형식으로 입력해 주세요.' });
 

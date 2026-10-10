@@ -11,7 +11,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   const last = (() => { try { return JSON.parse(localStorage.getItem(LAST_KEY) || '{}'); } catch { return {}; } })();
   const [store, setStore] = useState<string>(last.store || '');
   const [rank, setRank] = useState<string>(last.rank || '');
-  const [phone, setPhone] = useState<string>(last.phone || '');
+  const [phone, setPhone] = useState('');
+  // 전화번호·생년월일·매장 코드는 휴대폰에 저장하지 않는다 (등록했다는 표시만)
+  const phoneSaved = Boolean(last.hasPhone);
   const [staffId, setStaffId] = useState<string>(last.staffId || '');
   const [name, setName] = useState<string>(last.name || '');
   const [dept, setDept] = useState<Department | ''>(last.dept || '');
@@ -20,10 +22,11 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   const [title, setTitle] = useState('점장');
   const [pin, setPin] = useState('');
   const [level, setLevel] = useState<string>(last.level ?? '');
-  const [birthday, setBirthday] = useState<string>(last.birthday ?? '');
+  const [birthday, setBirthday] = useState('');
+  const birthdaySaved = Boolean(last.hasBirthday);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [storeCode, setStoreCode] = useState<string>(last.storeCode || '');
+  const [storeCode, setStoreCode] = useState('');
   const [needCode, setNeedCode] = useState(false);
   useEffect(() => { api<{ storeCodeRequired: boolean }>('/config').then(c => setNeedCode(c.storeCodeRequired), () => {}); }, []);
 
@@ -33,9 +36,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
     setBusy(true);
     setError('');
     try {
-      const { token, staff } = await login({ storeCode, store, staffId, rank, name, phone, dept, duty, wantManager, managerPin: pin, title, level: level || undefined, birthday: birthday || undefined });
+      const { token, staff } = await login({ storeCode, store, staffId, rank, name, phone: phone || undefined, dept, duty, wantManager, managerPin: pin, title, level: level || undefined, birthday: birthday || undefined });
       session.set(token);
-      try { localStorage.setItem(LAST_KEY, JSON.stringify({ store, staffId, rank, name, phone, dept, duty, storeCode, level, birthday })); } catch { /* 무시 */ }
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ store, staffId, rank, name, dept, duty, level, hasPhone: Boolean(staff.phone), hasBirthday: Boolean(staff.birthday) })); } catch { /* 무시 */ }
       void requestNotificationPermission();
       onLogin(staff);
     } catch (err) {
@@ -85,8 +88,8 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
         </label>
         <label className="block space-y-1.5">
           <span className="text-sm font-semibold text-slate-700">전화번호</span>
-          <input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} onBlur={() => setPhone(p => normalizePhone(p) ?? p)} placeholder="예: 010-1234-5678" required />
-          <span className="block text-xs text-slate-400">본인과 점장·부점장만 볼 수 있습니다.</span>
+          <input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} onBlur={() => setPhone(p => normalizePhone(p) ?? p)} placeholder={phoneSaved ? '등록됨 · 바꿀 때만 입력' : '예: 010-1234-5678'} required={!phoneSaved} />
+          <span className="block text-xs text-slate-400">본인과 점장·부점장만 볼 수 있고, 이 휴대폰에는 저장하지 않습니다.</span>
         </label>
       </fieldset>
 
@@ -117,7 +120,7 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
       </div>
 
       <label className="block space-y-1.5">
-        <span className="text-sm font-semibold text-slate-700">생년월일 <span className="font-normal text-slate-400">(선택 · 생일에 축하 메시지를 보내 드려요)</span></span>
+        <span className="text-sm font-semibold text-slate-700">생년월일 <span className="font-normal text-slate-400">({birthdaySaved ? '등록됨 · 바꿀 때만 입력' : '선택 · 생일에 축하 메시지를 보내 드려요'})</span></span>
         <input type="date" className={inputCls} value={birthday} onChange={e => setBirthday(e.target.value)} max="2015-12-31" min="1940-01-01" />
       </label>
 
@@ -137,7 +140,7 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
       </div>
 
       {error && <p className="rounded-xl bg-red-50 px-3.5 py-3 text-sm font-medium text-red-700">{error}</p>}
-      <button className={primaryBtn} disabled={busy || !store.trim() || !staffId || !rank.trim() || !name || !phone || !dept || !duty}>
+      <button className={primaryBtn} disabled={busy || !store.trim() || !staffId || !rank.trim() || !name || (!phone && !phoneSaved) || !dept || !duty}>
         {busy ? '로그인 중…' : '출근 · 로그인'}
       </button>
       <p className="text-center text-xs text-slate-400">로그인하면 알림 권한을 요청합니다. 업무요청 알림을 받으려면 허용해 주세요.</p>
