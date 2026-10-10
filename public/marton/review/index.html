@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>마트ON 검토</title>
+<link rel="icon" type="image/png" href="/marton/favicon-48.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 근무 하루를 따라가는 투어 — 왼쪽 실제 휴대폰 화면, 오른쪽 장면 목록 (좁으면 위아래로) */
+:root {
+  --bg: #eef2f8;          /* 매장 형광등 아래 푸른 기가 도는 바닥 */
+  --surface: #ffffff;
+  --ink: #0f1a33;
+  --ink-soft: #4a5875;
+  --line: #d6deeb;
+  --brand: #1d4ed8;       /* 마트ON 파랑 */
+  --brand-ink: #ffffff;
+  --signal: #fde047;      /* ON 노랑 */
+  --frame: #0f172a;
+  --chip: #e3e9f4;
+  --staff: #1d4ed8; --security: #c2410c; --manager: #047857;
+  --font-display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1222; --surface: #131c31; --ink: #e8eefb; --ink-soft: #9fb0cf; --line: #24304a;
+    --brand: #5b8cff; --brand-ink: #0b1222; --signal: #fde047; --frame: #000000; --chip: #1c2740;
+    --staff: #7ea6ff; --security: #fb923c; --manager: #34d399;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1222; --surface: #131c31; --ink: #e8eefb; --ink-soft: #9fb0cf; --line: #24304a;
+  --brand: #5b8cff; --brand-ink: #0b1222; --signal: #fde047; --frame: #000000; --chip: #1c2740;
+  --staff: #7ea6ff; --security: #fb923c; --manager: #34d399;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; display: grid; gap: 28px; }
+
+header { display: grid; gap: 10px; }
+.brand { font-family: var(--font-display); font-size: clamp(34px, 7vw, 48px); line-height: 1; letter-spacing: -0.01em; margin: 0; }
+.brand b { color: var(--brand); font-weight: 400; }
+.brand i { font-style: normal; background: var(--brand); color: var(--signal); padding: 0 .18em; border-radius: 6px; margin-left: .06em; }
+.tagline { margin: 0; color: var(--ink-soft); font-size: 16px; text-wrap: balance; max-width: 60ch; }
+.note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.filters button {
+  font: 600 14px var(--font-body); color: var(--ink); background: var(--chip); border: 1px solid transparent;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+}
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.filters button:focus-visible, .nav button:focus-visible, .steps button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 760px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+
+.device { display: grid; gap: 14px; justify-items: center; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 760px) { .device { position: static; } }
+.phone {
+  width: min(100%, 320px); aspect-ratio: 390 / 844; max-width: 100%;
+  background: var(--frame); border-radius: 44px; padding: 10px; box-shadow: 0 24px 50px -24px rgba(15, 26, 51, .55);
+  touch-action: pan-y;
+}
+.phone img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 34px; background: #f1f5f9; }
+.nav { display: flex; align-items: center; gap: 12px; }
+.nav button {
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font-size: 20px; cursor: pointer; display: grid; place-items: center;
+}
+.nav button:disabled { opacity: .35; cursor: default; }
+.counter { font-family: var(--font-mono); font-size: 14px; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
+
+.detail { display: grid; gap: 18px; min-width: 0; }
+.now { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 8px; }
+.now h2 { margin: 0; font-size: 22px; line-height: 1.35; text-wrap: balance; }
+.now p { margin: 0; color: var(--ink-soft); }
+.role { justify-self: start; font-size: 12px; font-weight: 700; letter-spacing: .04em; padding: 3px 10px; border-radius: 999px; color: var(--surface); }
+.role.staff { background: var(--staff); } .role.security { background: var(--security); } .role.manager { background: var(--manager); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: s; }
+.steps li { min-width: 0; }
+.steps button {
+  width: 100%; text-align: left; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  font: inherit; color: var(--ink); background: transparent; border: 0; border-radius: 12px; padding: 9px 10px; cursor: pointer;
+}
+.steps button:hover { background: var(--chip); }
+.steps button[aria-current="step"] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.steps .num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.steps .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.staff { background: var(--staff); } .dot.security { background: var(--security); } .dot.manager { background: var(--manager); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+footer { border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+footer code { font-family: var(--font-mono); font-size: 12px; background: var(--chip); padding: 1px 6px; border-radius: 6px; color: var(--ink); }
+
+@media (prefers-reduced-motion: no-preference) { .phone img { transition: opacity .18s ease; } .phone img.swap { opacity: .25; } }
+.sounds { display: grid; gap: 8px; }
+.sounds h3 { margin: 0; font-size: 15px; }
+.sounds p { margin: 0; font-size: 13px; opacity: .75; }
+.sound-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sound-row button.coupon { color: #8a5a3c; }
+.sound-row button.bday { color: #e11d48; }
+.voice-note { font-size: 12.5px; line-height: 1.5; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, #f59e0b 16%, transparent); opacity: 1 !important; }
+.sound-row button { font: inherit; font-weight: 700; font-size: 14px; padding: 10px 6px; border-radius: 12px; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; display: grid; gap: 2px; }
+.sound-row button small { font-weight: 500; font-size: 11.5px; opacity: .75; }
+.sound-row button.alarm { color: var(--brand); }
+.sound-row button.siren { color: #dc2626; }
+.sound-row button[aria-pressed="true"] { outline: 3px solid currentColor; outline-offset: 1px; }
+.try { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+.try a { display: inline-flex; align-items: center; gap: 8px; background: var(--brand); color: #fff; font-weight: 700; font-size: 17px; text-decoration: none; padding: 14px 22px; border-radius: 14px; }
+.try a:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
+.try p { margin: 0; flex: 1 1 260px; min-width: 0; font-size: 14px; color: var(--ink-soft); }
+html, body { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="brand"><b>마트</b><i>ON</i> 검토</h1>
+    <p class="tagline">말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI. 한 매장의 근무 하루를 따라 실제 앱 화면을 넘겨 보세요.</p>
+    <p class="note">화면은 실제 마트ON을 데모 데이터로 실행해 찍은 것입니다. 이름·건수는 예시입니다.</p>
+  </header>
+  <div class="try">
+    <a href="/marton/">📱 마트ON 직접 써 보기</a>
+    <p>누르면 실제 앱이 열립니다. 사번·이름·부서를 넣고 「출근 · 로그인」 하면 바로 써 볼 수 있습니다. 점장 화면은 「점장/부점장으로 로그인」에서 관리자 PIN을 넣습니다 (PIN은 담당자에게 받아 주세요).</p>
+  </div>
+
+  <div class="filters" role="group" aria-label="역할별 보기">
+    <button type="button" data-role="all" aria-pressed="true" id="all-btn">전체</button>
+    <button type="button" data-role="staff" aria-pressed="false">현장 직원</button>
+    <button type="button" data-role="security" aria-pressed="false">보안(MS)</button>
+    <button type="button" data-role="manager" aria-pressed="false">점장·부점장</button>
+  </div>
+
+  <section class="stage">
+    <div class="device">
+      <div class="phone" id="phone"><img id="shot" alt="" width="390" height="844"></div>
+      <div class="nav">
+        <button type="button" id="prev" aria-label="이전 화면">‹</button>
+        <span class="counter" id="counter" aria-live="polite"></span>
+        <button type="button" id="next" aria-label="다음 화면">›</button>
+      </div>
+    </div>
+
+    <div class="detail">
+      <article class="now" aria-live="polite">
+        <span class="role" id="role"></span>
+        <h2 id="title"></h2>
+        <p id="desc"></p>
+      </article>
+      <section class="sounds" aria-label="소리 들어보기">
+        <h3>소리 들어보기</h3>
+        <p>앱에서 나는 소리와 같은 소리입니다. 음량을 확인하고 누르세요. 음성 안내는 소리가 끝난 뒤 나옵니다.</p>
+        <p id="voice-note" class="voice-note" hidden></p>
+        <div class="sound-row">
+          <button type="button" data-tone="coupon" class="coupon">☕ 커피쿠폰 도착<small>띠리리링 + "소통 커피쿠폰이 도착했습니다"</small></button>
+          <button type="button" data-tone="bellcall" class="coupon">🔔 고객 호출벨<small>딩동 딩동 + "지하1층 게이트 고객님 호출벨이 울렸습니다"</small></button>
+          <button type="button" data-tone="emergency" class="siren">🚨 비상 사이렌<small>화재·사고·재난 때만 (매장 경보음)</small></button>
+          <button type="button" data-tone="morning" class="bday">☀️ 아침 명언 배경음악<small>잔잔한 피아노 56초</small></button>
+          <button type="button" data-tone="bday" class="bday">🎂 생일 축하<small>「생일 축하해」 + "이수산 담당님 생일 축하드립니다"</small></button>
+          <button type="button" data-tone="call" class="alarm">호출<small>받은 요청 + 음성</small></button>
+          <button type="button" data-tone="digital" class="siren">사이렌 다른 소리: 디지털 알람<small>삐삐삐삐</small></button>
+          <button type="button" data-tone="bell" class="siren">사이렌 다른 소리: 전자 벨<small>따르르릉</small></button>
+          <button type="button" data-tone="workchime" class="siren">사이렌 다른 소리: 업무 차임<small>띵동 띵동</small></button>
+          <button type="button" data-tone="chime">딩동<small>처리 상태 · 공지</small></button>
+        </div>
+      </section>
+      <div class="legend">
+        <span><i class="dot staff"></i>현장 직원</span>
+        <span><i class="dot security"></i>보안(MS)</span>
+        <span><i class="dot manager"></i>점장·부점장</span>
+      </div>
+      <ol class="steps" id="steps"></ol>
+    </div>
+  </section>
+
+  <footer>
+    <p>휴대폰에서 이 주소를 연 뒤 「마트ON 직접 써 보기」를 누르고 홈 화면에 추가하면 앱처럼 쓸 수 있습니다.</p>
+    <p>← → 키나 화면을 좌우로 밀어서 넘길 수 있습니다.</p>
+  </footer>
+</div>
+
+<script>
+const ROLE = { staff: '현장 직원', security: '보안(MS)', manager: '점장·부점장' };
+const SCENES = [
+  ['home', 'staff', '🆕 새 홈 화면', '맨 위 빨간 「비상 알림」 아래에 자주 쓰는 기능, 고객 응대, 매장 소통, 안전·설정이 큰 버튼으로 묶여 있습니다. 확인할 일이 있으면 버튼에 빨간 숫자가 붙고, 아래 메뉴는 홈·받은 업무·요청하기·상품 찾기·공지 5개입니다.'],
+  ['home-2', 'staff', '🆕 홈 아래쪽: 매장 소통 · 안전', '공지, 실적 공유, 근무표, 소비기한 점검, 오늘의 명언, 커피쿠폰함과 고객 호출벨, 보안 신고, 알림 설정이 이어집니다.'],
+  ['emergency-sheet', 'staff', '🆕 비상 알림: 화재·사고·재난', '누구나 홈의 「비상 알림」에서 상황을 고르고 위치를 적어 보낼 수 있습니다. 사이렌은 이때만 울립니다.'],
+  ['emergency', 'staff', '🆕 전 직원 휴대폰에 사이렌 + 행동 요령', '"화재 발생. 화재 발생. 위치 지하 일층 수산 코너. 고객을 가까운 비상구로 대피 유도해 주세요."를 사이렌을 줄이고 읽어 줍니다. 점장·부점장, 보안(MS), 알린 분이 「상황 해제」를 누르면 모두에게 해제가 알려집니다.'],
+  ['urgent-call', 'staff', '🆕 긴급 요청은 사이렌 대신 호출음 반복', '긴급 요청·긴급 공지·보안 신고는 주황 화면과 함께 호출음이 15초마다 다시 울리고 "긴급 호출. 수산 담당님 호출입니다…"라고 알립니다. 확인하면 멈춥니다.'],
+  ['bell-alert', 'staff', '🆕 고객 호출벨', '"딩동 딩동" 소리와 "지하1층 게이트 고객님 호출벨이 울렸습니다"가 12초마다 반복됩니다. 아무 부서나 한 명이 「제가 응대하겠습니다」를 누르면 모든 휴대폰에서 꺼집니다.'],
+  ['bell-kiosk', 'staff', '🆕 게이트 태블릿용 호출벨 화면', '홈 → 고객 호출벨 → 「이 기기를 호출벨 화면으로」. 게이트에 둔 태블릿·공용 휴대폰에서 고객님이 「직원 호출」을 누릅니다.'],
+  ['bell-kiosk-answered', 'staff', '🆕 응대하면 "직원이 가고 있습니다"', '직원이 응대를 누르면 호출벨 화면이 바로 바뀌어 고객님이 기다리실 수 있습니다.'],
+  ['complaint-form', 'staff', '🆕 도와드리겠습니다: 컴플레인 접수', '사진 첨부 / 해당 내용 / 처리 내용 / 보상 내용 / 담당자 / 전달 부서 순서로 적습니다. 내용은 말로 입력할 수 있습니다.'],
+  ['complaints', 'staff', '🆕 접수건 공유와 처리 기록', '전달 부서 휴대폰에 "축산 담당님, 도와드리겠습니다 컴플레인 접수건이 전달되었습니다"가 울리고, 처리 내용·보상 내용을 채워 접수 → 처리중 → 처리완료로 바꿉니다.'],
+  ['morning-start', 'staff', '🆕 아침 명언 카드뉴스', '아침 4시~12시에 그날 처음 앱을 켜면 열립니다. 「음악과 함께 보기」를 누르면 시작합니다.'],
+  ['morning-1', 'staff', '🆕 출처가 있는 명언 5장, 50초', '10초마다 넘어가고, 명언·출처와 함께 "오늘의 실천" 한 줄이 나옵니다. 🔊를 누르면 읽어 줍니다. 홈의 「오늘의 명언」에서 다시 볼 수 있습니다.'],
+  ['morning-5', 'staff', '🆕 마지막 장: 오늘 하루 시작하기', '명언은 35개 중에서 매일 5개씩 바뀝니다. 배경음악은 관리 화면에서 직접 만든 음원으로 바꿀 수 있습니다.'],
+  ['01-login', 'staff', '출근: 사번·이름·부서로 로그인', '오늘 근무 부서와 담당 업무를 고르면 끝입니다. 점장·부점장은 관리자 PIN으로 들어오고, 매장 접속 코드를 설정하면 외부인은 들어올 수 없습니다.'],
+  ['02-tasks', 'staff', '이전 근무자의 인수인계부터 확인', '맨 위에 앞 근무자가 남긴 메모와 미처리 업무 요약이 뜹니다. "인수 확인"을 누르면 점장 화면에 확인한 사람이 기록됩니다. 아래는 우리 부서가 받은 요청입니다.'],
+  ['03-voice', 'staff', '말로 요청하기', '"수산에 고객응대 요청해 주세요, 고객센터 앞, 급해요"라고 말하면 받는 부서·유형·위치·긴급 여부를 알아서 채웁니다. 확인하고 한 번 누르면 전송됩니다.'],
+  ['04-siren', 'staff', '받는 부서 휴대폰에 긴급 사이렌', '(이전 화면) 지금은 사이렌이 화재·사고·재난 비상 알림에만 울리고, 긴급 요청은 주황 화면과 호출음 반복으로 바뀌었습니다. 푸시를 켜 두면 앱을 닫아도 1분 간격으로 최대 3번 다시 알립니다.'],
+  ['siren-blocked', 'staff', '소리가 막혀 있으면 한 번 눌러서 켜기', '휴대폰은 앱을 다시 연 뒤 화면을 한 번도 누르지 않으면 소리를 막습니다. 그때는 긴급 화면에 이 버튼이 뜨고, 누르는 순간 사이렌이 울립니다. 아이폰 무음 스위치가 켜져 있어도 울리도록 설정했습니다.'],
+  ['05-request', 'staff', '원터치 업무요청', '고객센터에서 자주 쓰는 요청은 버튼 하나로 채워집니다. 부서·유형을 고르고 위치와 내용을 적어 보내면 접수 → 확인 → 처리중 → 완료가 처리자 이름과 함께 기록됩니다.'],
+  ['06-find', 'staff', '"연어 어디 있어요?" 상품 찾기', '상품명이나 바코드, 음성 질문으로 층·코너·진열 위치를 바로 안내합니다. 행사 중이면 행사가도 함께 보이고, 위치가 다르면 해당 부서에 확인 요청을 보낼 수 있습니다.'],
+  ['find-listening', 'staff', '말로 상품 찾기: 고객 질문을 그대로', '상품찾기 맨 위의 빨간 "말로 상품 찾기" 버튼을 누르고 "연어 어디 있어요?"라고 말하면, 듣는 말이 화면에 바로 보이고 위치를 찾아 말로도 알려 줍니다.'],
+  ['find-customer', 'staff', '고객에게 크게 보여주기', '찾은 상품에서 "고객에게 크게 보여주기"를 누르면 층·코너·진열 위치와 가격(행사가)이 큰 글씨로 꽉 차게 나옵니다. 화면을 누르면 닫힙니다.'],
+  ['ask-odeng', 'staff', '"오뎅은 어디로 가면 살 수 있어요?"', '고객 말을 그대로 하면 "오뎅은 B1 냉장 가공, 12번 매대 3번째 칸에 있어요."처럼 매대 번호와 몇 번째 칸까지 글자와 음성으로 알려 줍니다. "다시 듣기"로 한 번 더 들려줄 수 있습니다.'],
+  ['ask-odeng-card', 'staff', '매대 번호를 크게', '"고객에게 크게 보여주기"를 누르면 층·코너, 매대 번호, 몇 번째 칸이 화면 가득 나옵니다.'],
+  ['ask-galchi', 'staff', '"이번 주 갈치 얼마야?"', '전단 행사상품이면 행사가와 정상가, 행사카드·L.POINT 할인(제외 카드 포함), 행사 기간, 진열 위치를 한 번에 글자와 음성으로 안내합니다.'],
+  ['find-unsupported', 'staff', '음성 인식이 안 되는 브라우저일 때', '네이버·카카오톡 앱 안 브라우저처럼 음성 인식이 안 되는 곳에서는 이유와 방법을 알려 주고, "키보드로 입력"을 누르면 검색칸이 열려 키보드의 마이크로 말할 수 있습니다.'],
+  ['upload-empty', 'staff', '사진 올리기: 바코드 창 없이 바로', '촬영AI 탭을 열면 첫 화면이 "사진 올리기"입니다. 카메라로 찍거나 앨범에서 여러 장을 한 번에 골라 최대 3장까지 올립니다.'],
+  ['upload-filled', 'staff', '무슨 일인지·부서·위치만 고르면 끝', '바코드 훼손, 가격 오류, 진열·보충, 행사 확인, 기타 중에서 고르고 받는 부서와 위치를 넣어 보냅니다. 급하면 "긴급으로 보내기"를 켭니다.'],
+  ['upload-received', 'staff', '받는 부서는 사진 3장을 바로 확인', '받는 부서 휴대폰에서 경보음이 울리고, 요청 카드를 펼치면 올린 사진이 모두 보입니다. 눌러서 크게 볼 수 있습니다.'],
+  ['flyer-reading', 'staff', '행사 전단: 사진 여러 장 올리기', '촬영AI → 행사 전단에서 전단을 찍거나 앨범에서 앞·뒷면 등 최대 4장을 고릅니다. 한 장씩 차례로 자동 인식합니다.'],
+  ['flyer-result', 'staff', '상품명·판매코드·규격·금액·행사까지 자동 인식', '상품마다 상품명, 판매코드, 규격·단위, 정상가, 행사가, 행사 프로모션, 행사기간을 읽어 칸에 채웁니다. 할인율과 매장 진열 위치도 함께 보여 주고, 틀린 칸은 눌러서 고친 뒤 등록합니다. (AI 키를 설정했을 때의 결과 예시)'],
+  ['flyer-list', 'staff', '등록하면 전 직원에게 바로 공유', '등록한 행사상품은 모든 직원의 상품찾기에 바로 뜨고, 상품을 검색하면 행사가가 표시됩니다. 가격표 확인도 이 행사가로 비교합니다.'],
+  ['cam-price', 'staff', '가격표 촬영: 앱 안 카메라', '촬영AI 탭에서 카메라 창이 바로 열립니다. 노란 틀에 가격표를 맞추고 찍으면 됩니다. 어두우면 손전등을 켜고, 앨범 사진도 고를 수 있습니다.'],
+  ['price-mismatch', 'staff', '가격이 다르면 사진째 요청', 'AI가 가격표를 읽어 시스템 가격(행사가 포함)과 비교합니다. 다르면 버튼 하나로 담당 부서에 사진이 첨부된 가격 오류 요청이 갑니다. (AI 키를 설정했을 때의 결과 예시)'],
+  ['price-noai', 'staff', 'AI 없이도 사진으로 가격 확인 요청', 'AI 키를 넣지 않은 매장에서도 가격표를 찍어 "이 사진으로 가격 확인 요청"을 보낼 수 있습니다. 받는 부서는 사진을 보고 바로 확인합니다.'],
+  ['cam-barcode-live', 'staff', '바코드 스캔: 비추기만 하면 자동으로', '빨간 선이 지나가는 틀에 바코드를 맞추면 셔터를 누르지 않아도 자동으로 읽습니다. 안드로이드와 아이폰 모두 AI 키 없이 동작합니다.'],
+  ['barcode-result', 'staff', '읽히면 상품·위치·가격 바로 표시', '바코드를 읽는 즉시 상품명, 층·코너·진열 위치, 가격이 나옵니다. 재고가 비었으면 그 자리에서 담당 부서에 확인 요청을 보냅니다.'],
+  ['barcode-help', 'staff', '바코드가 안 읽힐 때', '6초 안에 못 읽으면 대처 방법이 뜹니다. 숫자가 보이면 번호 입력, 사진으로 판독, 아예 훼손됐으면 훼손 신고를 누릅니다.'],
+  ['damage-form', 'staff', '훼손 신고: 사진이 자동으로 붙음', '"바코드 훼손/미인식" 요청이 사진과 함께 채워집니다. 받는 부서만 고르고 보내면 됩니다. 일반 요청에도 사진을 최대 3장까지 붙일 수 있습니다.'],
+  ['task-photo', 'staff', '받는 부서는 사진부터 확인', '요청 카드에 "사진 1" 표시가 붙고, 펼치면 사진이 보입니다. 눌러서 크게 볼 수 있습니다. 사진은 로그인한 직원만 볼 수 있습니다.'],
+  ['alarm-barcode', 'staff', '"수산 담당님 호출입니다"', '요청이 오면 받는 부서 휴대폰에서 안내방송처럼 "띵동댕동" 호출음이 울리고, 이어서 "수산 담당님 호출입니다. 바코드 훼손, 계산대 3번"처럼 말로 알려 줍니다. 긴급 경보음은 긴급 요청에만 울립니다. 오른쪽 "소리 들어보기"에서 직접 들어 보세요.'],
+  ['sound-test', 'staff', '설정에서 소리 미리 확인', '톱니바퀴 → 알림음 · 호출음 · 사이렌(3초) 테스트를 눌러 이 휴대폰에서 소리가 잘 나는지 출근할 때 확인합니다. "부서 호출 음성"을 끄면 호출음만 울립니다.'],
+  ['07-report', 'staff', '보안 신고: 상황만 기록', '유형, 위치, 발생 시각, 상품, CCTV 카메라 번호만 남깁니다. 인상착의 입력란은 없고, 직원은 직접 제지하지 않습니다. 진행 중이면 보안 담당에게 바로 사이렌이 갑니다.'],
+  ['08-security', 'security', '보안 담당의 신고 현황', '진행 중인 신고와 센서 경보가 위에 모입니다. 확인 → 현장 대응 → 종결 순서로 처리하고, 종결할 때 결과(도난 확인, 상품 회수, 오인 등)와 손실 수량을 남깁니다.'],
+  ['09-patrol', 'security', '오늘 순찰 추천', '최근 4주 신고를 시간대와 구역별로 분석해 오늘 돌 시간과 구역을 정해 줍니다. 돌고 나서 "순찰 완료"를 누르면 주간 리포트에 순찰 횟수가 들어갑니다.'],
+  ['order-voice', 'manager', '점장 지시사항: 말로 입력해서 파트별로', '관리 탭 맨 위 "점장·부점장 지시사항"에서 "말로 입력"을 누르고 말하면 글자로 들어갑니다. 받는 파트를 여러 개 골라 보내면 그 파트 직원 휴대폰에서 "점장님 지시사항입니다. …"를 음성으로 읽어 줍니다.'],
+  ['order-broadcast', 'manager', '📢 전체 공지 방송', '방송 내용을 말하거나 적어 보내면 모든 직원 휴대폰에서 호출음 뒤에 "전체 공지 방송 안내입니다. …"를 읽어 줍니다.'],
+  ['order-meeting', 'manager', '🕑 금일 중회', '시·분을 고르면 "금일 14시 30분 중회 있습니다"를 바로 알리고, 중회 10분 전에 한 번 더 알립니다.'],
+  ['share-compose', 'manager', '📊 실적 공유: 사진·파일 + AI 요약', '공지 탭 → 실적 공유에서 실적표 사진과 엑셀·PDF 파일을 올립니다. 사진을 넣으면 AI가 "우리 점 종합 10위, 수산 1위"처럼 핵심을 정리해 사진 밑에 설명으로 붙이고, 고쳐서 올릴 수 있습니다. (AI 키를 설정했을 때)'],
+  ['share-view', 'staff', '실적 공유 보기', '직원은 사진을 크게 보고, 사진마다 아래 설명을 읽고, 첨부 파일을 내려받습니다. "듣기"를 누르면 요약을 읽어 줍니다.'],
+  ['schedule-cal', 'staff', '📅 월 근무 캘린더', '점장이 근무계획표(엑셀·CSV, AI 키가 있으면 사진도)를 올리면 날짜마다 1근·2근·3근 인원과 "나 1근"처럼 내 근무가 보이고, 매월 둘째·넷째 월요일은 정기휴무로 표시됩니다. 날짜를 누르면 근무자 명단이 나옵니다.'],
+  ['expiry-list', 'staff', '⏰ 소비기한 점검 일정', '점검표(엑셀·CSV)를 올리거나 직접 추가하면 파트별로 보입니다. 우리 파트 일정만 보이고, 끝나면 "점검 완료"를 누릅니다.'],
+  ['expiry-called', 'staff', '시간이 되면 파트 호출', '점검 시각이 되면 해당 파트 휴대폰에서 호출음과 함께 "수산 담당님 호출입니다. 소비기한 점검 시간입니다. 선어 매대…"라고 알립니다.'],
+  ['birthday', 'staff', '🎂 생일 축하', '등록할 때 생년월일(선택)을 넣으면 생일날 「생일 축하해」 노래(30초)와 함께 "이수산 담당님 생일 축하드립니다"라고 축하해 줍니다.'],
+  ['coupon-send', 'manager', '☕ 소통 커피쿠폰 보내기', '시니어·주니어 담당이나 파트로 골라 "모두 선택"으로 30명 남짓에게 한 번에, 한 명당 1·5·10장씩 보냅니다. 사용처(예: 매장 내 이디야커피)와 한마디를 적을 수 있고, 아래에서 사람별 사용 현황을 봅니다.'],
+  ['coupon-arrived', 'staff', '"소통 커피쿠폰이 도착했습니다"', '받는 직원 휴대폰에서 전용 쿠폰 도착음("띠리리링~")과 함께 음성·글자로 알리고, 앱을 닫아 두어도 푸시가 갑니다.'],
+  ['coupon-wallet', 'staff', '나만의 커피쿠폰 보관함', '위쪽 ☕ 아이콘을 누르면 보관함이 열립니다. 쿠폰은 이미지로 1번부터 차례로 쌓이고, 앞 번호부터 쓰게 되어 있습니다.'],
+  ['coupon-used', 'staff', '커피 매장에 보여 주고 사용 완료', '쿠폰을 열면 실시간으로 움직이는 시계가 함께 나와 캡처 사진과 구별됩니다. 커피를 받으면 "사용 완료"를 두 번 눌러 처리하고 도장이 찍힙니다. 이미지로 저장도 됩니다.'],
+  ['10-manager', 'manager', '점장 대시보드', '미처리·긴급 요청 수, 오늘 완료 건수, 평균 확인 시간을 한눈에 봅니다. 부서별로 접속 인원과 처리 속도가 표로 나옵니다.'],
+  ['11-analytics', 'manager', '손실 분석과 예방 조치 추천', '신고 건수, 손실 확인, 추정 손실액, 오인 비율을 기간별로 보고, 버튼 하나로 다발 구역·시간대·상품에 맞춘 예방 조치를 추천받습니다.'],
+  ['12-charts', 'manager', '언제, 어디서 많이 생기나', '시간대별·요일별 발생 그래프와 구역별 신고 수입니다. 어느 시간에 어느 코너를 지켜야 하는지가 숫자로 보입니다.'],
+  ['13-report', 'manager', '주간 손실방지 리포트', '매주 월요일 08시에 지난주 리포트가 자동으로 만들어지고 점장에게 알림이 갑니다. 지난주 대비 증감과 다음 주 조치 제안이 들어 있고, 복사해서 메신저나 메일에 붙이면 됩니다.'],
+  ['14-invite', 'manager', '직원 초대 QR', '안내문을 인쇄해 조회실에 붙이면 직원은 QR을 찍고 "앱 설치"(아이폰은 홈 화면에 추가)만 하면 됩니다. 앱스토어를 거치지 않습니다.'],
+  ['15-handover', 'staff', '퇴근: 인수인계 남기기', '로그아웃을 누르면 우리 부서의 미처리 업무와 보안 이슈가 자동으로 요약됩니다. 메모를 붙여 남기면 다음 근무자에게 푸시가 가고, 2번 화면처럼 맨 위에 뜹니다.'],
+];
+
+// 앱(alerts.ts)과 같은 방식으로 기기에서 소리를 만든다
+function wavUrl(seconds, sample) {
+  const rate = 22050, n = Math.floor(seconds * rate), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample(i / rate))) * 32767, true);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+const TONES = {
+  chime: [0.6, t => { const f = t < 0.2 ? 880 : 1320, l = t < 0.2 ? t : t - 0.2; return Math.sin(2 * Math.PI * f * t) * Math.exp(-l * 9) * 0.8; }],
+  call: [1.6, t => { const N = [523.25, 659.25, 783.99, 1046.5], i = Math.min(Math.floor(t / 0.3), 3), l = t - i * 0.3, f = N[i], d = Math.exp(-l * (i === 3 ? 2.2 : 4)); return (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(4 * Math.PI * f * t) + 0.15 * Math.sin(6 * Math.PI * f * t)) * d * 0.62; }],
+  digital: [3, t => { const g = t % 1, i = Math.floor(g / .12); if (i > 3) return 0; const a = i * .12, b = a + .075; if (g > b) return 0; const e = Math.max(0, Math.min(1, (g - a) / .005, (b - g) / .01)); return (Math.sin(2 * Math.PI * 2093 * t) + .3 * Math.sin(6 * Math.PI * 2093 * t)) * e * .5; }],
+  bell: [3, t => { const g = t % 1; if (g > .9) return 0; const tr = .55 + .45 * Math.sign(Math.sin(2 * Math.PI * 22 * t)); const x = Math.sin(2 * Math.PI * 1318 * t) + .6 * Math.sin(2 * Math.PI * 1760 * t) + .25 * Math.sin(2 * Math.PI * 2637 * t); return x * tr * Math.max(0, Math.min(1, g / .01, (.9 - g) / .08)) * .32; }],
+  workchime: [3, t => { const tt = t % 2; let v = 0; for (const [s0, f] of [[0, 1319], [.3, 1047], [1, 1319], [1.3, 1047]]) { if (tt < s0) continue; v += (Math.sin(2 * Math.PI * f * t) + .35 * Math.sin(8 * Math.PI * f * t)) * Math.exp(-(tt - s0) * 4.5) * .45; } return v; }],
+  bday: [4.3, (() => {
+    // 빵빠레 디지털 팡파레 (앱과 같은 소리)
+    const M = [[0, .09, -5], [.1, .09, 0], [.2, .09, 4], [.3, .34, 7], [.7, .09, 4], [.8, .45, 7], [1.4, .14, 9], [1.6, .14, 9], [1.8, .14, 11], [2, 1.1, 12], [3.2, .8, 12], [3.2, .8, 16], [3.2, .8, 19]];
+    const BS = [[0, .6, -24], [.7, .6, -17], [1.4, .5, -15], [2, 1.1, -12], [3.2, .8, -24]];
+    const DR = [0, .7, 1.4, 1.6, 1.8, 2, 3.2];
+    const sq = (f, t) => ((f * t) % 1 < .25 ? 1 : -1);
+    return t => {
+      let v = 0;
+      for (const [a, len, semi] of M) { if (t < a || t > a + len + .05) continue; const l = t - a; const vib = l > .4 ? 1 + .006 * Math.sin(2 * Math.PI * 6 * l) : 1; const e = Math.min(1, l / .008) * (t > a + len ? Math.max(0, 1 - (t - a - len) / .05) : 1) * (len > .5 ? Math.exp(-l * .8) : 1); v += sq(523.25 * 2 ** (semi / 12) * vib, t) * e * .12; }
+      for (const [a, len, semi] of BS) { if (t < a || t > a + len) continue; const f = 523.25 * 2 ** (semi / 12); v += (Math.abs(((f * t) % 1) * 4 - 2) - 1) * Math.min(1, (a + len - t) / .03) * .22; }
+      for (const d of DR) { const l = t - d; if (l >= 0 && l < .08) v += (Math.random() * 2 - 1) * Math.exp(-l * 60) * .25; }
+      return Math.max(-1, Math.min(1, v));
+    };
+  })()],
+  coupon: [1.4, t => { let v = 0; [784, 988, 1175, 1568, 1976].forEach((f, i) => { const s0 = i * .09; if (t < s0) return; const l = t - s0; v += (Math.sin(2 * Math.PI * f * t) + .3 * Math.sin(6 * Math.PI * f * t)) * Math.exp(-l * (i === 4 ? 2.5 : 5)) * .28; }); return v; }],
+};
+// 음원 파일로 된 소리: [주소, 최대 재생 초]
+const FILES = { emergency: ['/marton/sounds/alarm.mp3', 6], bday: ['/marton/sounds/birthday.mp3', 30], morning: ['/marton/sounds/morning.mp3', 60], bellcall: ['/marton/sounds/bell-preview.mp3', 6] };
+const audio = {};
+let playing = null;
+document.querySelectorAll('[data-tone]').forEach(btn => {
+  btn.setAttribute('aria-pressed', 'false');
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.tone;
+    if (playing) { playing.pause(); playing.currentTime = 0; }
+    document.querySelectorAll('[data-tone]').forEach(o => o.setAttribute('aria-pressed', 'false'));
+    if (!audio[k]) { audio[k] = new Audio(FILES[k] ? FILES[k][0] : wavUrl(...TONES[k])); audio[k].addEventListener('ended', () => btn.setAttribute('aria-pressed', 'false')); }
+    playing = audio[k];
+    btn.setAttribute('aria-pressed', 'true');
+    audio[k].play().catch(() => btn.setAttribute('aria-pressed', 'false'));
+    if (FILES[k]) { clearTimeout(stopTimer); const a = audio[k]; stopTimer = setTimeout(() => { a.pause(); a.currentTime = 0; btn.setAttribute('aria-pressed', 'false'); }, FILES[k][1] * 1000); }
+    const SAY = { call: [1600, '수산 담당님 호출입니다. 바코드 훼손, 계산대 삼번'], coupon: [1400, '소통 커피쿠폰이 도착했습니다'], bday: [30000, '이수산 담당님 생일 축하드립니다'], bellcall: [2400, '지하 일층 게이트 고객님 호출벨이 울렸습니다'], emergency: [2000, '화재 발생. 화재 발생. 위치 지하 일층 수산 코너. 고객을 가까운 비상구로 대피 유도해 주세요.'] }[k];
+    clearTimeout(sayTimer);
+    if (!('speechSynthesis' in window)) { if (SAY) showVoiceNote('이 브라우저는 음성 안내를 지원하지 않습니다.'); return; }
+    try { speechSynthesis.cancel(); } catch {}
+    if (!SAY) return;
+    // 누른 순간에 음성 엔진을 깨워 두어야 1~9초 뒤에 말할 수 있는 휴대폰이 있다
+    try { const w = new SpeechSynthesisUtterance(' '); w.volume = 0; if (koVoice) w.voice = koVoice; speechSynthesis.speak(w); } catch {}
+    sayTimer = setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(SAY[1]); u.lang = 'ko-KR'; u.rate = 1.05; if (koVoice) u.voice = koVoice;
+      u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') showVoiceNote(`음성 안내가 막혔습니다 (${e.error}). 버튼을 다시 눌러 주세요.`); };
+      try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch {}
+      if (!koVoice && speechSynthesis.getVoices().length) showVoiceNote('이 기기에 한국어 음성이 없어 음성 안내가 안 들릴 수 있습니다. 휴대폰 설정 → 텍스트 음성 변환(TTS)에서 한국어를 내려받아 주세요.');
+    }, SAY[0]);
+  });
+});
+let sayTimer = 0, stopTimer = 0;
+let koVoice = null;
+const pickVoice = () => { try { const v = speechSynthesis.getVoices(); koVoice = v.find(x => /^ko[-_]KR/i.test(x.lang) && x.localService) || v.find(x => /^ko/i.test(x.lang)) || null; } catch {} };
+if ('speechSynthesis' in window) { pickVoice(); if (speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', pickVoice); }
+function showVoiceNote(msg) { const n = document.getElementById('voice-note'); if (n) { n.textContent = msg; n.hidden = false; } }
+
+
+const $ = id => document.getElementById(id);
+const shot = $('shot'), stepsEl = $('steps');
+let filter = 'all', index = 0;
+
+const visible = () => SCENES.map((s, i) => ({ s, i })).filter(({ s }) => filter === 'all' || s[1] === filter);
+
+function render(focusStep = false) {
+  const list = visible();
+  if (!list.some(x => x.i === index)) index = list[0].i;
+  const pos = list.findIndex(x => x.i === index);
+  const [file, role, title, desc] = SCENES[index];
+
+  shot.classList.add('swap');
+  const next = new Image();
+  next.onload = next.onerror = () => { shot.src = next.src; shot.alt = title; shot.classList.remove('swap'); };
+  next.src = `shots/${file}.jpg`;
+
+  $('role').textContent = ROLE[role];
+  $('role').className = `role ${role}`;
+  $('title').textContent = title;
+  $('desc').textContent = desc;
+  $('counter').textContent = `${String(pos + 1).padStart(2, '0')} / ${String(list.length).padStart(2, '0')}`;
+  $('prev').disabled = pos === 0;
+  $('next').disabled = pos === list.length - 1;
+
+  stepsEl.replaceChildren(...list.map(({ s, i }) => {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (i === index) b.setAttribute('aria-current', 'step');
+    b.innerHTML = `<span class="num">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><i class="dot ${s[1]}" aria-hidden="true"></i>`;
+    b.querySelector('.t').textContent = s[2];
+    b.addEventListener('click', () => { index = i; render(true); });
+    li.appendChild(b);
+    return li;
+  }));
+  if (focusStep) stepsEl.querySelector('[aria-current]')?.focus({ preventScroll: true });
+  try { history.replaceState(null, '', `#s${index + 1}`); } catch {}
+}
+
+function move(d) {
+  const list = visible();
+  const pos = list.findIndex(x => x.i === index) + d;
+  if (pos >= 0 && pos < list.length) { index = list[pos].i; render(); }
+}
+
+$('prev').addEventListener('click', () => move(-1));
+$('next').addEventListener('click', () => move(1));
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') move(1);
+  if (e.key === 'ArrowLeft') move(-1);
+});
+let x0 = null;
+$('phone').addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+$('phone').addEventListener('touchend', e => {
+  if (x0 === null) return;
+  const dx = e.changedTouches[0].clientX - x0;
+  if (Math.abs(dx) > 40) move(dx < 0 ? 1 : -1);
+  x0 = null;
+});
+document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => {
+  filter = b.dataset.role;
+  document.querySelectorAll('.filters button').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+  render();
+}));
+
+$('all-btn').textContent = `전체 ${SCENES.length}장`;
+const fromHash = /^#s(\d+)$/.exec(location.hash);
+if (fromHash) index = Math.min(Math.max(Number(fromHash[1]) - 1, 0), SCENES.length - 1);
+render();
+// 다음 화면 미리 받아 두기
+SCENES.forEach(([f]) => { const i = new Image(); i.src = `shots/${f}.jpg`; });
+</script>
+</body>
+</html>
