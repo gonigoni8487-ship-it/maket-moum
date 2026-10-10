@@ -57,11 +57,44 @@ export function deletePhotos(ids: string[] = []) {
 
 /** 운영 모드에서는 PIN이 없으면 관리자 로그인을 막는다 */
 const managerPin = () => platform().env('MARTON_MANAGER_PIN') || (platform().production ? '' : '0000');
+
+// ---- 관리자 비밀번호: Cloudflare 비밀(MARTON_MANAGER_PIN)이 있으면 그것, 없으면 앱에서 처음 만든 비밀번호(해시 저장) ----
+const PIN_ITER = 100_000;
+const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+async function pinHash(pin: string, salt: string) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: PIN_ITER }, key, 256));
+}
+/** 관리자 비밀번호가 정해져 있는지 */
+export const managerPinSet = () => Boolean(managerPin() || db.managerPin);
+/** 어디에 정해져 있나: Cloudflare 비밀 / 앱에서 만든 비밀번호 */
+export const managerPinSource = (): 'env' | 'app' | 'none' => (managerPin() ? 'env' : db.managerPin ? 'app' : 'none');
+/** 관리자 비밀번호 확인 */
+export async function checkManagerPin(given: unknown) {
+  if (managerPin()) return safeEqual(given, managerPin());
+  if (!db.managerPin || typeof given !== 'string' || !given) return false;
+  return safeEqual(await pinHash(given, db.managerPin.salt), db.managerPin.hash);
+}
+/** 앱에서 관리자 비밀번호 저장 (해시만 저장) */
+export async function storeManagerPin(pin: string) {
+  const salt = newId();
+  db.managerPin = { salt, hash: await pinHash(pin, salt), strength: pinStrength(pin), setAt: Date.now() };
+  save();
+}
+/** 비밀번호 강도: 8자 이상 + 영문·숫자·기호 3가지면 강함 */
+export function pinStrength(pin: string): 'none' | 'weak' | 'fair' | 'strong' {
+  if (!pin) return 'none';
+  const kinds = [/[a-z]/i, /\d/, /[^a-z\d]/i].filter(r => r.test(pin)).length;
+  if (pin.length >= 8 && kinds >= 3) return 'strong';
+  if (pin.length >= 6 && kinds >= 2) return 'fair';
+  return 'weak';
+}
+export const MIN_PIN_LENGTH = 6;
 const storeCode = () => platform().env('MARTON_STORE_CODE') || ''; // 매장 공용 접속 코드 (설정 시 로그인에 필요)
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
-export interface SecurityLogEntry { at: number; type: 'pin-fail' | 'store-fail' | 'locked' | 'manager-login' | 'manager-blocked' | 'logout-all'; detail: string }
+export interface SecurityLogEntry { at: number; type: 'pin-fail' | 'store-fail' | 'locked' | 'manager-login' | 'manager-blocked' | 'logout-all' | 'pin-setup' | 'pin-change'; detail: string }
 export const SESSION_MAX_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** 보안 기록 남기기 */
@@ -84,6 +117,8 @@ export interface Db {
   sessions: Record<string, string>; // token -> staffId
   /** 로그인 시각 (token -> ms). 30일이 지나면 다시 로그인 */
   sessionAt?: Record<string, number>;
+  /** 앱에서 만든 관리자 비밀번호 (PBKDF2 해시만, Cloudflare 비밀이 있으면 그쪽이 우선) */
+  managerPin?: { salt: string; hash: string; strength: 'none' | 'weak' | 'fair' | 'strong'; setAt: number };
   /** 보안 기록: 로그인 실패·관리자 로그인·전체 로그아웃 (최근 300건) */
   securityLog?: SecurityLogEntry[];
   tasks: Task[];
@@ -291,9 +326,21 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   const tooMany = (ip: string) => (failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS).length >= 20;
   const fail = (ip: string) => failures.set(ip, [...(failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS), Date.now()]);
 
-  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()) }));
+  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()), managerPinSet: managerPinSet() }));
 
-  app.post(`${api}/login`, (req, res) => {
+  // 관리자 비밀번호가 아직 없을 때 한 번만: 처음 로그인하는 점장·부점장이 앱에서 만든다
+  app.post(`${api}/manager-pin/setup`, async (req, res) => {
+    const ip = req.ip || 'unknown';
+    if (managerPinSet()) return res.status(409).json({ error: '관리자 비밀번호가 이미 정해져 있습니다. 그 비밀번호로 로그인해 주세요.' });
+    if (storeCode() && !safeEqual(req.body.storeCode, storeCode())) return res.status(403).json({ error: '매장 접속 코드가 올바르지 않습니다.' });
+    const pin = typeof req.body.pin === 'string' ? req.body.pin : '';
+    if (pin.length < MIN_PIN_LENGTH || pin.length > 64) return res.status(400).json({ error: `관리자 비밀번호는 ${MIN_PIN_LENGTH}자 이상으로 정해 주세요.` });
+    await storeManagerPin(pin);
+    securityLog('pin-setup', `${text(req.body.name, 20)}(${text(req.body.staffId, 20)}) · IP ${ip} — 관리자 비밀번호를 처음 만듦`);
+    res.json({ ok: true });
+  });
+
+  app.post(`${api}/login`, async (req, res) => {
     const ip = req.ip || 'unknown';
     if (tooMany(ip)) {
       securityLog('locked', `IP ${ip} — 로그인 실패가 많아 10분 차단`);
@@ -323,7 +370,8 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
     let role: Staff['role'] = 'staff';
     if (wantManager) {
-      if (!safeEqual(req.body.managerPin, managerPin())) {
+      if (!managerPinSet()) return res.status(409).json({ error: '관리자 비밀번호가 아직 없습니다. 「관리자 비밀번호 처음 만들기」로 먼저 만들어 주세요.', code: 'pin-unset' });
+      if (!(await checkManagerPin(req.body.managerPin))) {
         fail(ip);
         securityLog('pin-fail', `${name}(${id}) · IP ${ip} — 관리자 비밀번호 틀림`);
         return res.status(403).json({ error: '관리자 PIN이 올바르지 않습니다.' });

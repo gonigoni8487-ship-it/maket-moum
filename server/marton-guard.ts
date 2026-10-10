@@ -1,22 +1,15 @@
 // 마트ON 보안 점검: 관리자 화면의 "보안 점검" — 설정 상태, 로그인 실패 기록, 모든 기기 로그아웃
-import { db, save, auth, managerOnly, securityLog, SESSION_MAX_MS, type AuthedRequest, type RouteApp } from './marton';
+import { db, save, auth, managerOnly, securityLog, SESSION_MAX_MS, pinStrength, managerPinSource, checkManagerPin, storeManagerPin, MIN_PIN_LENGTH, type AuthedRequest, type RouteApp } from './marton';
 import { platform } from './platform';
 
 const DAY = 24 * 60 * 60 * 1000;
-
-/** 관리자 비밀번호 강도: 8자 이상 + 영문·숫자·기호 중 3가지면 강함 */
-function pinStrength(pin: string): 'none' | 'weak' | 'fair' | 'strong' {
-  if (!pin) return 'none';
-  const kinds = [/[a-z]/i, /\d/, /[^a-z\d]/i].filter(r => r.test(pin)).length;
-  if (pin.length >= 8 && kinds >= 3) return 'strong';
-  if (pin.length >= 6 && kinds >= 2) return 'fair';
-  return 'weak';
-}
 
 export interface SecurityStatus {
   checkedAt: number;
   storeCodeSet: boolean;
   pin: 'none' | 'weak' | 'fair' | 'strong';
+  /** env: Cloudflare 비밀, app: 앱에서 만든 비밀번호 */
+  pinSource: 'env' | 'app' | 'none';
   pushKeys: boolean;
   integrationKeySet: boolean;
   /** 로그인되어 있는 기기 수 */
@@ -38,7 +31,8 @@ export function registerGuard(app: RouteApp) {
     const status: SecurityStatus = {
       checkedAt: Date.now(),
       storeCodeSet: Boolean(platform().env('MARTON_STORE_CODE')),
-      pin: pinStrength(platform().env('MARTON_MANAGER_PIN') || ''),
+      pin: managerPinSource() === 'app' ? db.managerPin!.strength : pinStrength(platform().env('MARTON_MANAGER_PIN') || ''),
+      pinSource: managerPinSource(),
       pushKeys: Boolean(db.vapid),
       integrationKeySet: Boolean(platform().env('MARTON_INTEGRATION_KEY')),
       sessions: Object.keys(db.sessions).length,
@@ -48,6 +42,21 @@ export function registerGuard(app: RouteApp) {
       sessionDays: SESSION_MAX_MS / DAY,
     };
     res.json(status);
+  });
+
+  // 관리자 비밀번호 바꾸기 (앱에서 만든 비밀번호일 때만 — Cloudflare 비밀이 있으면 그쪽에서 바꾼다)
+  app.post(`${api}/security/pin`, auth, managerOnly, async (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    if (managerPinSource() === 'env') return res.status(409).json({ error: '관리자 비밀번호가 Cloudflare 설정(MARTON_MANAGER_PIN)에 있습니다. Cloudflare에서 바꿔 주세요.' });
+    if (!(await checkManagerPin(req.body.current))) {
+      securityLog('pin-fail', `${me.name}(${me.id}) — 비밀번호 바꾸기: 지금 비밀번호 틀림`);
+      return res.status(403).json({ error: '지금 비밀번호가 맞지 않습니다.' });
+    }
+    const next = typeof req.body.next === 'string' ? req.body.next : '';
+    if (next.length < MIN_PIN_LENGTH || next.length > 64) return res.status(400).json({ error: `새 비밀번호는 ${MIN_PIN_LENGTH}자 이상으로 정해 주세요.` });
+    await storeManagerPin(next);
+    securityLog('pin-change', `${me.title ?? ''} ${me.name} — 관리자 비밀번호 바꿈`);
+    res.json({ ok: true, strength: db.managerPin!.strength });
   });
 
   // 휴대폰을 잃어버렸거나 의심스러운 로그인이 있을 때: 내 기기만 남기고 모두 로그아웃
