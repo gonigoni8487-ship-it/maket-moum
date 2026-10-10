@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type CustomerBell, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type CustomerBell, type StaffLevel, STAFF_LEVELS, normalizePhone, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform, onJob } from './platform';
@@ -302,6 +302,11 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     const { dept, wantManager } = req.body;
     const duty = text(req.body.duty, 30);
     if (!id || !name || !isDept(dept) || !duty) return res.status(400).json({ error: '사번, 이름, 부서, 담당업무를 모두 입력해 주세요.' });
+    const store = text(req.body.store, 20);
+    const rank = text(req.body.rank, 10);
+    const phone = normalizePhone(req.body.phone);
+    if (!store || !rank) return res.status(400).json({ error: '점명과 직급을 입력해 주세요.' });
+    if (!phone) return res.status(400).json({ error: '전화번호를 010-0000-0000 형식으로 입력해 주세요.' });
 
     const existing = db.staff[id];
     if (existing && existing.name !== name) return res.status(409).json({ error: '이미 다른 이름으로 등록된 사번입니다. 관리자에게 문의하세요.' });
@@ -324,7 +329,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     const level = STAFF_LEVELS.includes(req.body.level) ? req.body.level as StaffLevel : existing?.level;
     const bday = text(req.body.birthday, 10);
     const birthday = /^(\d{4}-)?\d{2}-\d{2}$/.test(bday) ? bday : req.body.birthday === '' ? undefined : existing?.birthday;
-    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, ...(level ? { level } : {}), ...(birthday ? { birthday } : {}) };
+    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, store, rank, phone, ...(level ? { level } : {}), ...(birthday ? { birthday } : {}) };
     db.staff[id] = staff;
     const token = newId();
     db.sessions[token] = id;

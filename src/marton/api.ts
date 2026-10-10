@@ -26,7 +26,7 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
-export const login = (input: { storeCode?: string; staffId: string; name: string; dept: string; duty: string; wantManager: boolean; managerPin?: string; title?: string; level?: string; birthday?: string }) =>
+export const login = (input: { storeCode?: string; store?: string; rank?: string; phone?: string; staffId: string; name: string; dept: string; duty: string; wantManager: boolean; managerPin?: string; title?: string; level?: string; birthday?: string }) =>
   api<{ token: string; staff: Staff }>('/login', input);
 
 export const bootstrap = () => api<Bootstrap>('/bootstrap');

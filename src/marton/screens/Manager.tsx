@@ -10,7 +10,7 @@ import InviteQR from './InviteQR';
 import CouponSend from './CouponSend';
 import SoundSettings from './SoundSettings';
 import SecurityCheck from './SecurityCheck';
-import { Chip, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
+import { Chip, Examples, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const fmt = (ms: number | null) => (ms === null ? '-' : elapsed(0, ms));
@@ -29,7 +29,7 @@ function deptStats(tasks: Task[], dept: Department) {
 }
 
 /** 말로 입력 버튼: 누르고 말하면 내용 칸에 글자로 들어간다 */
-export function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
+export function DictateButton({ d, examples }: { d: ReturnType<typeof useDictation>; examples?: string[] }) {
   return (
     <div className="space-y-1.5">
       <button type="button" onClick={d.listening ? d.stop : d.start}
@@ -38,6 +38,7 @@ export function DictateButton({ d }: { d: ReturnType<typeof useDictation> }) {
       </button>
       {d.interim && <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{d.interim}</p>}
       {d.problem && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{d.problem}</p>}
+      {examples && !d.listening && <Examples items={examples} />}
     </div>
   );
 }
@@ -123,7 +124,7 @@ export default function Manager({ me, tasks, notices, handovers, online, sounds,
           {kind === 'broadcast' && (
             <>
               <p className="rounded-xl bg-blue-50 px-3.5 py-2.5 text-sm font-bold text-blue-800">📢 {BROADCAST_TITLE}</p>
-              <DictateButton d={dictation} />
+              <DictateButton d={dictation} examples={['15시부터 우천으로 입구 매트 교체 바랍니다', '오후 2시 고객 집중 시간입니다. 계산대 지원 바랍니다', '폐점 30분 전입니다. 냉장 쇼케이스 마감 준비 바랍니다']} />
               <textarea className={cx(inputCls, 'min-h-24')} value={body} onChange={e => setBody(e.target.value)} placeholder="방송 내용 (말하거나 입력, 예: 15시부터 우천으로 입구 매트 교체 바랍니다)" maxLength={1000} />
               <p className="text-xs text-slate-500">모든 직원 휴대폰에서 호출음 뒤에 "{BROADCAST_TITLE}. (내용)"을 음성으로 읽어 줍니다.</p>
             </>
@@ -149,7 +150,7 @@ export default function Manager({ me, tasks, notices, handovers, online, sounds,
 
           {kind === 'order' && (
             <>
-              <DictateButton d={dictation} />
+              <DictateButton d={dictation} examples={['오후 3시까지 행사 매대 가격표 교체 완료 바랍니다', '주말 행사 상품 진열 오늘 중 완료 바랍니다', '소비기한 임박 상품 점검 후 결과 보고 바랍니다']} />
               <textarea className={cx(inputCls, 'min-h-28')} value={body} onChange={e => setBody(e.target.value)} placeholder="지시사항 (말하거나 입력, 예: 오후 3시까지 행사 매대 가격표 교체 완료 바랍니다)" maxLength={1000} />
               <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목 (선택 · 비우면 내용 앞부분)" maxLength={80} />
               <p className="text-xs text-slate-500">받는 파트 직원 휴대폰에서 호출음 뒤에 "{me.title || '점장'}님 지시사항입니다. (내용)"을 음성으로 읽어 줍니다.</p>

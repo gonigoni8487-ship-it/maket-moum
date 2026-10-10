@@ -8,7 +8,7 @@ import { api } from '../api';
 import { send } from '../outbox';
 import { fileToJpeg } from '../camera';
 import { useDictation } from '../dictation';
-import { Chip, clock, cx, Empty, inputCls, primaryBtn } from '../ui';
+import { Chip, Examples, clock, cx, Empty, inputCls, primaryBtn } from '../ui';
 import { TaskPhotos } from './TaskBoard';
 import { DictateButton } from './Manager';
 import CameraView from './CameraView';
@@ -91,14 +91,14 @@ function ComplaintForm({ me, initial, existingPhotos = 0, onSubmit, onCancel, on
       </div>
       <div className="space-y-2">
         <Label n={2}>해당 내용</Label>
-        <DictateButton d={contentDictation} />
+        <DictateButton d={contentDictation} examples={['구매한 딸기 일부가 물러 있어 교환을 요청하셨습니다', '행사 가격표와 계산 금액이 달라 불편해하셨습니다', '계산 대기가 길어 불만을 말씀하셨습니다']} />
         <textarea className={cx(inputCls, 'min-h-24')} value={f.content} onChange={e => setF({ ...f, content: e.target.value })} maxLength={1000}
           placeholder="고객이 불편했던 점 (예: 구매한 딸기 일부가 물러 있어 교환 요청)" />
         <p className="text-xs text-slate-400">고객 이름·전화번호 같은 개인정보는 적지 마세요.</p>
       </div>
       <div className="space-y-2">
         <Label n={3} hint="(나중에 채워도 됩니다)">처리 내용</Label>
-        <DictateButton d={actionDictation} />
+        <DictateButton d={actionDictation} examples={['사과드리고 새 상품으로 교환해 드렸습니다', '차액을 환불해 드리고 가격표를 바로 고쳤습니다', '계산대 추가 지원을 요청하고 사과드렸습니다']} />
         <textarea className={cx(inputCls, 'min-h-20')} value={f.action} onChange={e => setF({ ...f, action: e.target.value })} maxLength={1000}
           placeholder="어떻게 처리했는지 (예: 사과드리고 새 상품으로 교환, 진열 상품 전체 점검)" />
       </div>

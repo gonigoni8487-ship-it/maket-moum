@@ -36,6 +36,20 @@ export interface Staff {
   level?: StaffLevel;
   /** 생년월일 (선택, YYYY-MM-DD 또는 MM-DD) — 그날 생일 축하 */
   birthday?: string;
+  /** 점명 (예: 화명점) */
+  store?: string;
+  /** 직급 (사원·주임·대리…) */
+  rank?: string;
+  /** 전화번호 010-0000-0000 — 본인과 관리자만 */
+  phone?: string;
+}
+
+export const STAFF_RANKS = ['사원', '주임', '대리', '과장', '차장', '부장'] as const;
+/** 휴대폰 번호 정리: 01012345678 → 010-1234-5678 (형식이 틀리면 null) */
+export function normalizePhone(v: unknown): string | null {
+  const d = typeof v === 'string' ? v.replace(/\D/g, '') : '';
+  if (!/^01[016789]\d{7,8}$/.test(d)) return null;
+  return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
 /** 생일(월-일)이 오늘(매장 기준)인지 */

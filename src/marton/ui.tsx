@@ -66,3 +66,19 @@ export interface Draft {
 
 export const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 export const primaryBtn = 'w-full rounded-xl bg-blue-600 py-3.5 text-[15px] font-bold text-white active:bg-blue-700 disabled:opacity-50';
+
+/** 예시 문구: 말하기·요청하기 버튼 밑에 "이렇게 말해 보세요". onPick을 주면 눌러서 바로 채운다 */
+export function Examples({ items, title = '예시) 이렇게 말해 보세요', onPick }: { items: string[]; title?: string; onPick?: (s: string) => void }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-left">
+      <p className="text-xs font-bold text-slate-500">{title}{onPick && <span className="font-normal"> · 누르면 채워집니다</span>}</p>
+      <ul className="mt-1 space-y-0.5 text-[13px] leading-relaxed text-slate-600">
+        {items.map(x => (
+          <li key={x}>{onPick
+            ? <button type="button" onClick={() => onPick(x)} className="text-left underline decoration-slate-300 underline-offset-2 active:text-blue-700">“{x}”</button>
+            : <>“{x}”</>}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}

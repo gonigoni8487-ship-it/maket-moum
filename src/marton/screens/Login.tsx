@@ -1,14 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { DEPARTMENTS, DUTIES, STAFF_LEVELS, type Department, type Staff } from '../shared';
+import { DEPARTMENTS, DUTIES, STAFF_LEVELS, STAFF_RANKS, normalizePhone, type Department, type Staff } from '../shared';
 import { api, login, session } from '../api';
 import { unlockAudio, requestNotificationPermission } from '../alerts';
-import { Chip, inputCls, primaryBtn } from '../ui';
+import { Chip, cx, inputCls, primaryBtn } from '../ui';
 
 const LAST_KEY = 'marton-last-login';
 
 export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) {
   const last = (() => { try { return JSON.parse(localStorage.getItem(LAST_KEY) || '{}'); } catch { return {}; } })();
+  const [store, setStore] = useState<string>(last.store || '');
+  const [rank, setRank] = useState<string>(last.rank || '');
+  const [phone, setPhone] = useState<string>(last.phone || '');
   const [staffId, setStaffId] = useState<string>(last.staffId || '');
   const [name, setName] = useState<string>(last.name || '');
   const [dept, setDept] = useState<Department | ''>(last.dept || '');
@@ -30,9 +33,9 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
     setBusy(true);
     setError('');
     try {
-      const { token, staff } = await login({ storeCode, staffId, name, dept, duty, wantManager, managerPin: pin, title, level: level || undefined, birthday: birthday || undefined });
+      const { token, staff } = await login({ storeCode, store, staffId, rank, name, phone, dept, duty, wantManager, managerPin: pin, title, level: level || undefined, birthday: birthday || undefined });
       session.set(token);
-      try { localStorage.setItem(LAST_KEY, JSON.stringify({ staffId, name, dept, duty, storeCode, level, birthday })); } catch { /* 무시 */ }
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ store, staffId, rank, name, phone, dept, duty, storeCode, level, birthday })); } catch { /* 무시 */ }
       void requestNotificationPermission();
       onLogin(staff);
     } catch (err) {
@@ -56,16 +59,36 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
         </label>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="space-y-1.5">
-          <span className="text-sm font-semibold text-slate-700">사번</span>
-          <input className={inputCls} inputMode="numeric" value={staffId} onChange={e => setStaffId(e.target.value)} placeholder="예: 24017" required />
+      <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <legend className="px-1 text-sm font-bold text-slate-800">회원 정보</legend>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-semibold text-slate-700">점명</span>
+          <input className={inputCls} value={store} onChange={e => setStore(e.target.value)} placeholder="예: 화명점" maxLength={20} required />
         </label>
-        <label className="space-y-1.5">
-          <span className="text-sm font-semibold text-slate-700">이름</span>
-          <input className={inputCls} value={name} onChange={e => setName(e.target.value)} placeholder="홍길동" required />
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1.5">
+            <span className="text-sm font-semibold text-slate-700">사번</span>
+            <input className={inputCls} inputMode="numeric" value={staffId} onChange={e => setStaffId(e.target.value)} placeholder="예: 24017" required />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-sm font-semibold text-slate-700">직급</span>
+            <input className={inputCls} list="marton-ranks" value={rank} onChange={e => setRank(e.target.value)} placeholder="예: 주임" maxLength={10} required />
+            <datalist id="marton-ranks">{STAFF_RANKS.map(r => <option key={r} value={r} />)}</datalist>
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {STAFF_RANKS.map(r => <button key={r} type="button" onClick={() => setRank(r)} aria-pressed={rank === r} className={cx('rounded-full border px-3 py-1 text-xs font-semibold', rank === r ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 text-slate-600')}>{r}</button>)}
+        </div>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-semibold text-slate-700">성명</span>
+          <input className={inputCls} value={name} onChange={e => setName(e.target.value)} placeholder="예: 홍길동" required />
         </label>
-      </div>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-semibold text-slate-700">전화번호</span>
+          <input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} onBlur={() => setPhone(p => normalizePhone(p) ?? p)} placeholder="예: 010-1234-5678" required />
+          <span className="block text-xs text-slate-400">본인과 점장·부점장만 볼 수 있습니다.</span>
+        </label>
+      </fieldset>
 
       <div className="space-y-2">
         <span className="text-sm font-semibold text-slate-700">오늘 근무 부서</span>
@@ -114,7 +137,7 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
       </div>
 
       {error && <p className="rounded-xl bg-red-50 px-3.5 py-3 text-sm font-medium text-red-700">{error}</p>}
-      <button className={primaryBtn} disabled={busy || !staffId || !name || !dept || !duty}>
+      <button className={primaryBtn} disabled={busy || !store.trim() || !staffId || !rank.trim() || !name || !phone || !dept || !duty}>
         {busy ? '로그인 중…' : '출근 · 로그인'}
       </button>
       <p className="text-center text-xs text-slate-400">로그인하면 알림 권한을 요청합니다. 업무요청 알림을 받으려면 허용해 주세요.</p>

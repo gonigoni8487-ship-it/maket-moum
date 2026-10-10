@@ -6,7 +6,7 @@ import { send } from '../outbox';
 import { speak } from '../alerts';
 import { fileToJpeg } from '../camera';
 import { useDictation } from '../dictation';
-import { Chip, clock, cx, Empty, inputCls, primaryBtn } from '../ui';
+import { Chip, Examples, clock, cx, Empty, inputCls, primaryBtn } from '../ui';
 import { photoUrl } from './TaskBoard';
 
 const fileUrl = (id: string) => `/api/marton/files/${encodeURIComponent(id)}?token=${encodeURIComponent(session.token ?? '')}`;
@@ -91,6 +91,7 @@ function ShareComposer({ me, aiEnabled, onError, onToast }: { me: Staff; aiEnabl
         {dictation.listening ? <><MicOff className="size-4" />말하는 중… 끝나면 눌러 주세요</> : <><Mic className="size-4" />내용 말로 입력</>}
       </button>
       {dictation.problem && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{dictation.problem}</p>}
+      {!dictation.listening && <Examples items={['우리 점 수산 파트 이번 달 매출 1위입니다. 모두 수고하셨습니다', '절임배추 사전예약 목표 대비 120% 달성했습니다', '다음 주 행사 준비 잘 부탁드립니다']} />}
       <textarea className={cx(inputCls, 'min-h-20')} value={body} onChange={e => setBody(e.target.value)} placeholder="내용 (예: 우리 점 수산 파트 1위! 모두 수고하셨습니다)" maxLength={1000} />
 
       {pics.map((p, i) => (
