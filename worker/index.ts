@@ -6,7 +6,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { GoogleGenAI } from '@google/genai';
 import { registerMartOn, initStore } from '../server/marton';
 import { setPlatform } from '../server/platform';
-import { martonHtml, isMartonPage, assetLinks } from '../server/web';
+import { martonHtml, isMartonPage, assetLinks, SECURITY_HEADERS } from '../server/web';
 import { setStoreUtcOffset } from '../src/marton/shared';
 import { Router } from './router';
 import { workerPlatform, runDueJobs } from './platform-worker';
@@ -42,32 +42,44 @@ export class MartOnStore extends DurableObject<Env> {
   }
 }
 
+/** 응답마다 보안 헤더를 붙인다 (이미 있는 값은 그대로) */
+function secure(res: Response): Response {
+  if (res.status === 101) return res;
+  const out = new Response(res.body, res);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!out.headers.has(k)) out.headers.set(k, v);
+  return out;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-
-    if (url.pathname === '/api/health') return Response.json({ status: 'ok' });
-    if (url.pathname.startsWith('/api/marton/')) {
-      // 매장 하나 = Durable Object 하나
-      return env.MARTON.get(env.MARTON.idFromName('store')).fetch(request);
-    }
-
-    if (url.pathname === '/.well-known/assetlinks.json') {
-      const links = assetLinks(str(env.MARTON_ANDROID_PACKAGE), str(env.MARTON_ANDROID_SHA256));
-      return Response.json(links ?? [], { status: links ? 200 : 404 });
-    }
-
-    if (url.pathname === '/' && str(env.MARTON_HOME_REDIRECT) === '1') {
-      return Response.redirect(new URL('/marton/', url).toString(), 302);
-    }
-
-    if (isMartonPage(url.pathname)) {
-      const index = await env.ASSETS.fetch(new URL('/', url));
-      return new Response(martonHtml(await index.text()), {
-        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
-      });
-    }
-
-    return env.ASSETS.fetch(request);
+    return secure(await handle(request, env));
   },
 } satisfies ExportedHandler<Env>;
+
+async function handle(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+
+  if (url.pathname === '/api/health') return Response.json({ status: 'ok' });
+  if (url.pathname.startsWith('/api/marton/')) {
+    // 매장 하나 = Durable Object 하나
+    return env.MARTON.get(env.MARTON.idFromName('store')).fetch(request);
+  }
+
+  if (url.pathname === '/.well-known/assetlinks.json') {
+    const links = assetLinks(str(env.MARTON_ANDROID_PACKAGE), str(env.MARTON_ANDROID_SHA256));
+    return Response.json(links ?? [], { status: links ? 200 : 404 });
+  }
+
+  if (url.pathname === '/' && str(env.MARTON_HOME_REDIRECT) === '1') {
+    return Response.redirect(new URL('/marton/', url).toString(), 302);
+  }
+
+  if (isMartonPage(url.pathname)) {
+    const index = await env.ASSETS.fetch(new URL('/', url));
+    return new Response(martonHtml(await index.text()), {
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+    });
+  }
+
+  return env.ASSETS.fetch(request);
+}

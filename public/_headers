@@ -1,0 +1,8 @@
+# 정적 파일(앱 화면·사진·소리)에도 보안 헤더 — 서버(worker)를 거치는 주소는 worker/index.ts에서 붙인다
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: same-origin
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000
+  Cross-Origin-Opener-Policy: same-origin

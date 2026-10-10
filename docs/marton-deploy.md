@@ -21,7 +21,7 @@
 
    | 이름 | 필수 | 예시 / 설명 |
    | --- | --- | --- |
-   | `MARTON_MANAGER_PIN` | 필수 | 6자리 이상. 없으면 점장 로그인이 막힙니다 |
+   | `MARTON_MANAGER_PIN` | 필수 | 6자 이상 (영문·숫자·기호 가능). 없으면 점장 로그인이 막힙니다 |
    | `MARTON_STORE_CODE` | 권장 | 매장 공용 접속 코드 (외부인 차단) |
    | `MARTON_VAPID_SUBJECT` | 권장 | `mailto:담당자@회사메일` (푸시 발신자) |
    | `GEMINI_API_KEY` | 선택 | 사진 AI·AI 답변 |
@@ -46,7 +46,7 @@
 
    | 값 | 예시 | 설명 |
    | --- | --- | --- |
-   | `MARTON_MANAGER_PIN` | 6자리 이상 숫자 | 점장/부점장 로그인 PIN |
+   | `MARTON_MANAGER_PIN` | 6자 이상 (영문·숫자·기호 가능) | 점장·영업부점장·지원부점장 로그인 비밀번호 |
    | `MARTON_STORE_CODE` | `lotte-jamsil-24` | 매장 공용 접속 코드 (조회실에만 게시) |
    | `MARTON_VAPID_SUBJECT` | `mailto:담당자@회사메일` | 푸시 알림 발신자 표시 |
    | `GEMINI_API_KEY` | (선택) | 사진 AI·AI 답변 |

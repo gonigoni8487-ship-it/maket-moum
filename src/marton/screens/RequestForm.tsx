@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Siren, Send, Mic, Camera, X } from 'lucide-react';
 import { DEPARTMENTS, MAX_TASK_PHOTOS, TASK_CATEGORIES, type Department, type Staff, type Task, type TaskCategory } from '../shared';
 import { send } from '../outbox';
-import { Chip, cx, inputCls, primaryBtn, type Draft } from '../ui';
+import { Chip, Examples, cx, inputCls, primaryBtn, type Draft } from '../ui';
+import { REQUEST_EXAMPLES } from './VoiceRequest';
 import CameraView from './CameraView';
 
 // 고객센터에서 가장 많이 쓰는 요청을 원터치로
@@ -57,6 +58,7 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
       <button type="button" onClick={onVoice} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 py-4 text-[16px] font-black text-white active:bg-red-700">
         <Mic className="size-5" />말로 요청하기
       </button>
+      <Examples items={REQUEST_EXAMPLES} title="예시) 받는 부서 · 할 일 · 위치 순서로 말해 보세요" />
 
       <div className="grid grid-cols-2 gap-2">
         {QUICK.map(q => (
@@ -83,6 +85,7 @@ export default function RequestForm({ me, draft, onSent, onError, onVoice }: { m
       <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목 (예: 수산 고객응대 요청)" maxLength={60} />
       <input className={inputCls} value={location} onChange={e => setLocation(e.target.value)} placeholder="위치 (예: 고객센터 앞, 3번 계산대)" maxLength={60} />
       <textarea className={cx(inputCls, 'min-h-24')} value={detail} onChange={e => setDetail(e.target.value)} placeholder="내용 (예: 고객님이 회 손질 문의하십니다)" maxLength={500} />
+      <Examples title="예시) 내용은 이렇게 적어 보세요" onPick={x => setDetail(x)} items={['고객님이 회 손질 문의하십니다. 5분 안에 와 주세요', '가격표는 3,990원인데 계산은 4,990원으로 나옵니다', '진열대가 비어 있습니다. 창고 재고 확인 부탁드립니다']} />
 
       <div className="space-y-2">
         <span className="text-sm font-semibold text-slate-700">사진 첨부 <span className="font-normal text-slate-400">(가격표·바코드·상품, 최대 {MAX_TASK_PHOTOS}장)</span></span>

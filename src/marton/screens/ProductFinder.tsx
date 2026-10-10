@@ -3,7 +3,7 @@ import { Mic, Search, Sparkles, MapPin, Send, X, Keyboard, Maximize2, Volume2 } 
 import { bayText, floorText, promotionFor, questionKeywords, type AskResult, type Product, type Promotion } from '../shared';
 import { api } from '../api';
 import { speak } from '../alerts';
-import { cx, Empty, inputCls, won, type Draft } from '../ui';
+import { cx, Examples, Empty, inputCls, won, type Draft } from '../ui';
 
 const norm = (s: string) => s.replace(/\s+/g, '').toLowerCase();
 
@@ -113,7 +113,7 @@ function ListenSheet({ onHeard, onClose, onKeyboard }: { onHeard: (text: string)
           <div className="flex flex-col items-center gap-4 py-2 text-center">
             <span className="grid size-24 place-items-center rounded-full bg-red-600 text-white shadow-[0_0_0_12px_rgba(220,38,38,0.15)] motion-safe:animate-pulse"><Mic className="size-11" /></span>
             <p className="min-h-14 text-2xl font-bold text-slate-900">{interim || '듣고 있어요…'}</p>
-            <p className="text-sm text-slate-500">고객 질문을 그대로 말해 주세요. 예: "연어 어디 있어요?", "라면 코너"</p>
+            <div className="w-full"><Examples title="예시) 고객 질문을 그대로 말해 보세요" items={["오뎅은 어디 있어요?", "이번 주 갈치 얼마예요?", "고등어 행사해요?", "라면 코너 어디예요?"]} /></div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -203,6 +203,7 @@ export default function ProductFinder({ products, promotions, onRequest, onError
       <button type="button" onClick={() => setListening(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 py-4 text-[16px] font-black text-white active:bg-red-700">
         <Mic className="size-5" />말로 상품 찾기 (고객 응대)
       </button>
+      <Examples title="예시) 고객 질문을 그대로 말해 보세요" items={["오뎅은 어디 있어요?", "이번 주 갈치 얼마예요?", "고등어 행사해요?", "라면 코너 어디예요?"]} />
 
       <form onSubmit={e => { e.preventDefault(); void ask(); }} className="flex gap-2">
         <div className="relative flex-1">

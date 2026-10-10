@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import { registerMartOn, initStore } from "./server/marton";
 import { setPlatform } from "./server/platform";
 import { nodePlatform } from "./server/platform-node";
-import { martonHtml, assetLinks } from "./server/web";
+import { martonHtml, assetLinks, SECURITY_HEADERS } from "./server/web";
 import { setStoreUtcOffset } from "./src/marton/shared";
 
 dotenv.config();
@@ -20,6 +20,8 @@ async function startServer() {
   const trustProxy = process.env.TRUST_PROXY ?? (process.env.NODE_ENV === "production" ? "1" : "");
   if (trustProxy) app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => { for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v); next(); });
   app.use(express.json({ limit: "8mb" }));
 
   // Initialize Gemini

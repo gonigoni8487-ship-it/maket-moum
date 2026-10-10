@@ -481,7 +481,7 @@ export default function MartOnApp() {
           <div className="text-xl font-black tracking-tight">마트<span className="text-yellow-300">ON</span></div>
           <span className={cx('size-2 rounded-full', connected && netOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse')} title={connected && netOnline ? '실시간 연결됨' : '연결 끊김'} />
           <div className="ml-auto text-right text-xs leading-tight">
-            <div className="font-bold">{me.name} {me.title ?? ''}</div>
+            <div className="font-bold">{me.name} {me.title ?? me.rank ?? ''}</div>
             <div className="text-blue-200">{me.dept} · {me.duty}</div>
           </div>
           <button onClick={() => setWalletOpen(true)} aria-label="소통 커피쿠폰 보관함" className="relative rounded-lg p-1.5 active:bg-blue-800">

@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { GoogleGenAI } from '@google/genai';
 import {
   DEPARTMENTS, TASK_CATEGORIES, TASK_STATUSES, SEED_PRODUCTS, MAX_TASK_PHOTOS, type TaskCategory,
-  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type CustomerBell, type StaffLevel, STAFF_LEVELS, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
+  type Actor, type Department, type Notice, type FlyerItem, type Coupon, type WorkSchedule, type ExpiryCheck, type StoreSound, type Emergency, type Complaint, type CustomerBell, type StaffLevel, STAFF_LEVELS, normalizePhone, type Product, type Promotion, matchProduct, noticeFor, MAX_NOTICE_PHOTOS, promotionFor as sharedPromotionFor, answerQuestion, bayText, BROADCAST_TITLE, meetingTitle, storeDayStart, storeTime, type Staff,
   type StreamEvent, type Task, type TaskStatus, type VisionResult, type AskResult, type Incident, type PatrolLog, type WeeklyReport, type Handover, canSeeIncident, canHandleIncident,
 } from '../src/marton/shared';
 import { platform, onJob } from './platform';
@@ -12,6 +12,7 @@ import { registerPush, pushFor, type PushSub } from './marton-push';
 import { registerCoupons, pruneCoupons } from './marton-coupons';
 import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
 import { registerCare, pruneCare } from './marton-care';
+import { registerGuard } from './marton-guard';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
 export interface RouteApp {
@@ -60,9 +61,31 @@ const storeCode = () => platform().env('MARTON_STORE_CODE') || ''; // 매장 공
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
+export interface SecurityLogEntry { at: number; type: 'pin-fail' | 'store-fail' | 'locked' | 'manager-login' | 'manager-blocked' | 'logout-all'; detail: string }
+export const SESSION_MAX_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** 보안 기록 남기기 */
+export function securityLog(type: SecurityLogEntry['type'], detail: string) {
+  (db.securityLog ??= []).push({ at: Date.now(), type, detail: detail.slice(0, 120) });
+  if (db.securityLog.length > 300) db.securityLog = db.securityLog.slice(-300);
+  save();
+}
+
+/** 비밀번호 비교: 길이와 관계없이 끝까지 비교해 응답 시간으로 비밀번호를 추측하지 못하게 */
+export function safeEqual(given: unknown, expected: string) {
+  const a = typeof given === 'string' ? given : '';
+  let diff = a.length ^ expected.length;
+  for (let i = 0; i < Math.max(a.length, expected.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (expected.charCodeAt(i) || 0);
+  return diff === 0 && expected.length > 0;
+}
+
 export interface Db {
   staff: Record<string, Staff>;
   sessions: Record<string, string>; // token -> staffId
+  /** 로그인 시각 (token -> ms). 30일이 지나면 다시 로그인 */
+  sessionAt?: Record<string, number>;
+  /** 보안 기록: 로그인 실패·관리자 로그인·전체 로그아웃 (최근 300건) */
+  securityLog?: SecurityLogEntry[];
   tasks: Task[];
   notices: Notice[];
   products: Product[];
@@ -133,6 +156,10 @@ export function save() {
     pruneBoard();
     pruneCare();
     db.handovers = db.handovers.filter(h => h.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // 30일 지난 로그인 정리
+    for (const [t, at] of Object.entries(db.sessionAt ?? {})) {
+      if (Date.now() - at > SESSION_MAX_MS) { delete db.sessions[t]; delete db.sessionAt![t]; }
+    }
     void platform().saveDb(JSON.stringify(db)).catch(e => console.error('MartON save failed:', e));
   }, platform().saveDelayMs);
 }
@@ -164,9 +191,20 @@ export function broadcast(event: StreamEvent, who?: (s: Staff) => boolean) {
 // ---- 인증 ----
 export type AuthedRequest = Request & { staff: Staff };
 
+/** 로그인 토큰은 crypto.randomUUID() 형식만 받는다 (__proto__ 같은 값으로 내부 데이터를 건드리지 못하게) */
+const TOKEN_FORMAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const validToken = (t: unknown): t is string => typeof t === 'string' && TOKEN_FORMAT.test(t);
+/** 사번은 영문·숫자·하이픈만 */
+const STAFF_ID_FORMAT = /^[A-Za-z0-9-]{1,20}$/;
+
 function staffFromToken(token: string | undefined) {
-  const id = token ? db.sessions[token] : undefined;
-  return id ? db.staff[id] : undefined;
+  if (!validToken(token) || !Object.hasOwn(db.sessions, token)) return undefined;
+  const id = db.sessions[token];
+  if (!id || !Object.hasOwn(db.staff, id)) return undefined;
+  const at = (db.sessionAt ??= {})[token];
+  if (at === undefined) { db.sessionAt[token] = Date.now(); save(); } // 예전 로그인: 지금부터 30일
+  else if (Date.now() - at > SESSION_MAX_MS) { delete db.sessions[token]; delete db.sessionAt[token]; save(); return undefined; }
+  return db.staff[id];
 }
 
 export function auth(req: Request, res: Response, next: NextFunction) {
@@ -257,35 +295,55 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
   app.post(`${api}/login`, (req, res) => {
     const ip = req.ip || 'unknown';
-    if (tooMany(ip)) return res.status(429).json({ error: '로그인 실패가 많아 10분간 제한됩니다. 잠시 후 다시 시도해 주세요.' });
-    if (storeCode() && req.body.storeCode !== storeCode()) {
+    if (tooMany(ip)) {
+      securityLog('locked', `IP ${ip} — 로그인 실패가 많아 10분 차단`);
+      return res.status(429).json({ error: '로그인 실패가 많아 10분간 제한됩니다. 잠시 후 다시 시도해 주세요.' });
+    }
+    if (storeCode() && !safeEqual(req.body.storeCode, storeCode())) {
       fail(ip);
+      securityLog('store-fail', `IP ${ip} — 매장 접속 코드 틀림`);
       return res.status(403).json({ error: '매장 접속 코드가 올바르지 않습니다.' });
     }
     const id = text(req.body.staffId, 20);
+    if (id && !STAFF_ID_FORMAT.test(id)) return res.status(400).json({ error: '사번은 숫자(또는 영문·숫자)로 입력해 주세요.' });
     const name = text(req.body.name, 20);
     const { dept, wantManager } = req.body;
     const duty = text(req.body.duty, 30);
     if (!id || !name || !isDept(dept) || !duty) return res.status(400).json({ error: '사번, 이름, 부서, 담당업무를 모두 입력해 주세요.' });
+    const store = text(req.body.store, 20);
+    const rank = text(req.body.rank, 10);
+    // 전화번호: 새로 넣으면 바꾸고, 비워 두면 등록된 번호를 그대로 쓴다
+    const given = text(req.body.phone, 20);
+    const phone = given ? normalizePhone(given) : db.staff[id]?.phone ?? null;
+    if (!store || !rank) return res.status(400).json({ error: '점명과 직급을 입력해 주세요.' });
+    if (!phone) return res.status(400).json({ error: '전화번호를 010-0000-0000 형식으로 입력해 주세요.' });
 
     const existing = db.staff[id];
     if (existing && existing.name !== name) return res.status(409).json({ error: '이미 다른 이름으로 등록된 사번입니다. 관리자에게 문의하세요.' });
 
     let role: Staff['role'] = 'staff';
     if (wantManager) {
-      if (!managerPin() || req.body.managerPin !== managerPin()) {
+      if (!safeEqual(req.body.managerPin, managerPin())) {
         fail(ip);
+        securityLog('pin-fail', `${name}(${id}) · IP ${ip} — 관리자 비밀번호 틀림`);
         return res.status(403).json({ error: '관리자 PIN이 올바르지 않습니다.' });
       }
       role = 'manager';
+      securityLog('manager-login', `${text(req.body.title, 10) || '점장'} ${name}(${id}) · IP ${ip}`);
+    } else if (existing?.role === 'manager') {
+      // 관리자 사번으로 비밀번호 없이 들어와 관리자 권한을 빼앗거나 흉내 내지 못하게
+      fail(ip);
+      securityLog('manager-blocked', `${name}(${id}) · IP ${ip} — 관리자 사번으로 일반 로그인 시도`);
+      return res.status(403).json({ error: '관리자로 등록된 사번입니다. 「점장/부점장으로 로그인」을 켜고 관리자 비밀번호를 넣어 주세요.' });
     }
     const level = STAFF_LEVELS.includes(req.body.level) ? req.body.level as StaffLevel : existing?.level;
     const bday = text(req.body.birthday, 10);
     const birthday = /^(\d{4}-)?\d{2}-\d{2}$/.test(bday) ? bday : req.body.birthday === '' ? undefined : existing?.birthday;
-    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, ...(level ? { level } : {}), ...(birthday ? { birthday } : {}) };
+    const staff: Staff = { id, name, dept, duty, role, title: role === 'manager' ? text(req.body.title, 10) || '점장' : undefined, store, rank, phone, ...(level ? { level } : {}), ...(birthday ? { birthday } : {}) };
     db.staff[id] = staff;
     const token = newId();
     db.sessions[token] = id;
+    (db.sessionAt ??= {})[token] = Date.now();
     save();
     res.json({ token, staff });
   });
@@ -295,10 +353,11 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   registerCoupons(app);
   registerBoard(app, genAI, aiEnabled);
   registerCare(app);
+  registerGuard(app);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
-    if (token) delete db.sessions[token];
+    if (validToken(token)) { delete db.sessions[token]; delete db.sessionAt?.[token]; }
     save();
     res.json({ ok: true });
   });

@@ -4,11 +4,12 @@ import { DEPARTMENTS, TASK_CATEGORIES, parseRequestText, type Department, type P
 import { api } from '../api';
 import { send as sendOrQueue } from '../outbox';
 import { speak } from '../alerts';
-import { Chip, cx, inputCls, type Draft } from '../ui';
+import { Chip, cx, Examples, inputCls, type Draft } from '../ui';
 
 type Phase = 'listening' | 'thinking' | 'review' | 'typing';
 
-const EXAMPLES = ['수산에 고객응대 요청, 고객센터 앞', '3번 계산대 가격 오류 가공', '화장지 품절이에요 보충 부탁', '보안 지금 바로 출입구 앞으로'];
+export const REQUEST_EXAMPLES = ['수산에 고객응대 요청해 주세요, 고객센터 앞', '3번 계산대 바코드가 안 읽혀요, 가공 확인 부탁해요', '농산 바나나 진열 보충 부탁해요, 급해요', '축산 한우 행사 가격표가 달라요, 정육 코너'];
+const EXAMPLES = REQUEST_EXAMPLES;
 
 function recognizer() {
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -131,7 +132,7 @@ export default function VoiceRequest({ products, aiEnabled, voice, onSent, onEdi
               <Mic className="size-10" />
             </button>
             <p className="min-h-6 text-lg font-bold text-slate-900">{interim || (phase === 'thinking' ? said : '듣고 있어요…')}</p>
-            <p className="text-sm text-slate-500">{phase === 'thinking' ? '요청 내용을 정리하는 중…' : '예) "수산에 고객응대 요청, 고객센터 앞"'}</p>
+            {phase === 'thinking' ? <p className="text-sm text-slate-500">요청 내용을 정리하는 중…</p> : <div className="w-full"><Examples items={REQUEST_EXAMPLES} title="예시) 받는 부서 · 할 일 · 위치 순서로 말해 보세요" /></div>}
             {phase === 'listening' && (
               <button onClick={() => { recRef.current?.abort?.(); setPhase('typing'); }} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500">
                 <Keyboard className="size-4" />글로 입력
