@@ -21,7 +21,7 @@ import Home, { type HomeGo } from './screens/Home';
 import Complaints from './screens/Complaints';
 import { EmergencyDetail, EmergencySheet } from './screens/Emergency';
 import { BellKiosk, BellSheet } from './screens/Bell';
-import MorningCards, { markMorningSeen, shouldShowMorning } from './screens/MorningCards';
+import MorningCards, { REOPEN_AFTER_MS } from './screens/MorningCards';
 
 const CACHE_KEY = 'marton-cache';
 
@@ -69,6 +69,8 @@ export default function MartOnApp() {
   });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [urgent, setUrgent] = useState<Urgent | null>(null);
+  const urgentRef = useRef(urgent);
+  urgentRef.current = urgent;
   const [walletOpen, setWalletOpen] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [bellSheet, setBellSheet] = useState(false);
@@ -148,11 +150,19 @@ export default function MartOnApp() {
 
   useEffect(() => { if (session.token) void load(); }, [load]);
 
-  // 앱을 열면 오늘의 명언 카드뉴스부터 (로그인 전에도, 게이트 호출벨 화면 기기는 제외)
+  // 앱을 열면 오늘의 명언 카드뉴스부터 (로그인 전에도, 게이트 호출벨 화면 기기는 제외).
+  // 휴대폰은 앱을 닫아도 뒤에 살아 있다가 그대로 다시 열리므로, 5분 넘게 다른 화면에 있다 돌아와도 다시 연 것으로 본다.
   useEffect(() => {
-    if (kioskRef.current || !shouldShowMorning()) return;
-    markMorningSeen();
-    setMorningOpen(true);
+    if (!kioskRef.current) setMorningOpen(true);
+    let hiddenAt = 0;
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      // 긴급·호출벨 알림을 보러 들어온 경우에는 띄우지 않는다
+      if (hiddenAt && Date.now() - hiddenAt >= REOPEN_AFTER_MS && !kioskRef.current && !urgentRef.current) setMorningOpen(true);
+      hiddenAt = 0;
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   // 생일인 날 처음 앱을 열면 축하 (해마다 한 번)

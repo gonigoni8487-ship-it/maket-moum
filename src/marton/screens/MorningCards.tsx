@@ -18,14 +18,8 @@ const SKIES = [
   'radial-gradient(120% 90% at 50% 100%, #fde68a 0%, #d97706 20%, #7c2d12 45%, #1c1008 85%)',
 ];
 
-/** 앱을 열 때마다 오늘의 명언을 먼저 보여 준다 (앱 안에서 화면을 옮길 때는 다시 뜨지 않음) */
-export const MORNING_KEY = 'marton-quotes-shown';
-export function shouldShowMorning() {
-  try { return sessionStorage.getItem(MORNING_KEY) !== '1'; } catch { return true; }
-}
-export function markMorningSeen() {
-  try { sessionStorage.setItem(MORNING_KEY, '1'); } catch { /* 저장 불가 */ }
-}
+/** 앱을 다시 열었다고 보는 시간: 이만큼 다른 앱에 가 있다 돌아오면 명언을 다시 보여 준다 */
+export const REOPEN_AFTER_MS = 5 * 60 * 1000;
 /** 시간대 인사 */
 const greeting = (hour: number) => (hour < 11 ? '좋은 아침입니다' : hour < 17 ? '오늘도 힘내세요' : '오늘 하루도 수고 많으셨습니다');
 
