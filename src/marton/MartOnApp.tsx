@@ -148,13 +148,12 @@ export default function MartOnApp() {
 
   useEffect(() => { if (session.token) void load(); }, [load]);
 
-  // 아침(4시~12시)에 그날 처음 앱을 열면 명언 카드뉴스 (생일인 날은 생일 축하가 먼저)
+  // 앱을 열면 오늘의 명언 카드뉴스부터 (로그인 전에도, 게이트 호출벨 화면 기기는 제외)
   useEffect(() => {
-    const me = data?.me;
-    if (!me || kioskRef.current || isBirthdayToday(me.birthday) || !shouldShowMorning()) return;
+    if (kioskRef.current || !shouldShowMorning()) return;
     markMorningSeen();
     setMorningOpen(true);
-  }, [data?.me]);
+  }, []);
 
   // 생일인 날 처음 앱을 열면 축하 (해마다 한 번)
   useEffect(() => {
@@ -162,6 +161,7 @@ export default function MartOnApp() {
     if (!me || !isBirthdayToday(me.birthday)) return;
     const key = `marton-bday-${me.id}-${storeTime(Date.now()).year}`;
     try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch { /* 무시 */ }
+    setMorningOpen(false); // 생일인 날은 생일 축하가 먼저
     setBirthday(birthdayMessage(me.name));
   }, [data?.me]);
   useEffect(() => { if (birthday) void celebrateBirthday(birthday); }, [birthday]);
@@ -426,7 +426,12 @@ export default function MartOnApp() {
   };
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">마트ON 연결 중…</div>;
-  if (!data) return <div className="min-h-screen bg-slate-100"><Login onLogin={() => { setLoading(true); void load(); }} /></div>;
+  if (!data) return (
+    <div className="min-h-screen bg-slate-100">
+      <Login onLogin={() => { setLoading(true); void load(); }} />
+      {morningOpen && <MorningCards onClose={() => setMorningOpen(false)} />}
+    </div>
+  );
 
   const { me, tasks, notices, products, promotions, incidents, patrols, reports, handovers, online, aiEnabled } = data;
   const emergencies = data.emergencies ?? [];
