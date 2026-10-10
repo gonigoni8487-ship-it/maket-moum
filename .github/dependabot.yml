@@ -1,0 +1,23 @@
+# 보안 업데이트 자동 알림: 매주 월요일 의존성과 GitHub Actions의 새 보안 버전을 확인해 PR로 올린다
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    # 나온 지 얼마 안 된 버전은 바로 쓰지 않는다 (공급망 공격 대비)
+    cooldown:
+      default-days: 14
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      timezone: Asia/Seoul

@@ -29,3 +29,13 @@ export function assetLinks(pkg?: string, sha256?: string) {
     target: { namespace: 'android_app', package_name: pkg, sha256_cert_fingerprints: fingerprints },
   }];
 }
+
+/** 모든 응답에 붙이는 보안 헤더 (다른 사이트 안에 몰래 띄우기, 파일 형식 속이기, 주소의 로그인 정보 유출 막기) */
+export const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Referrer-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()',
+  'Strict-Transport-Security': 'max-age=31536000',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+};

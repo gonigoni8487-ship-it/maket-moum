@@ -9,6 +9,7 @@ import { HandoverList } from './Handover';
 import InviteQR from './InviteQR';
 import CouponSend from './CouponSend';
 import SoundSettings from './SoundSettings';
+import SecurityCheck from './SecurityCheck';
 import { Chip, cx, elapsed, Empty, inputCls, primaryBtn, Section } from '../ui';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -168,6 +169,7 @@ export default function Manager({ me, tasks, notices, handovers, online, sounds,
       <CouponSend onError={onError} onToast={onToast} />
 
       <SoundSettings sounds={sounds} myName={me.name} myDept={me.dept} onError={onError} onToast={onToast} />
+      <SecurityCheck onError={onError} onToast={onToast} />
 
       <div className="grid grid-cols-2 gap-2">
         {kpis.map(([label, value, alarm]) => (
