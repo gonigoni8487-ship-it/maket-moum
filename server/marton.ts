@@ -191,9 +191,16 @@ export function broadcast(event: StreamEvent, who?: (s: Staff) => boolean) {
 // ---- 인증 ----
 export type AuthedRequest = Request & { staff: Staff };
 
+/** 로그인 토큰은 crypto.randomUUID() 형식만 받는다 (__proto__ 같은 값으로 내부 데이터를 건드리지 못하게) */
+const TOKEN_FORMAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const validToken = (t: unknown): t is string => typeof t === 'string' && TOKEN_FORMAT.test(t);
+/** 사번은 영문·숫자·하이픈만 */
+const STAFF_ID_FORMAT = /^[A-Za-z0-9-]{1,20}$/;
+
 function staffFromToken(token: string | undefined) {
-  const id = token ? db.sessions[token] : undefined;
-  if (!id || !token) return undefined;
+  if (!validToken(token) || !Object.hasOwn(db.sessions, token)) return undefined;
+  const id = db.sessions[token];
+  if (!id || !Object.hasOwn(db.staff, id)) return undefined;
   const at = (db.sessionAt ??= {})[token];
   if (at === undefined) { db.sessionAt[token] = Date.now(); save(); } // 예전 로그인: 지금부터 30일
   else if (Date.now() - at > SESSION_MAX_MS) { delete db.sessions[token]; delete db.sessionAt[token]; save(); return undefined; }
@@ -298,6 +305,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
       return res.status(403).json({ error: '매장 접속 코드가 올바르지 않습니다.' });
     }
     const id = text(req.body.staffId, 20);
+    if (id && !STAFF_ID_FORMAT.test(id)) return res.status(400).json({ error: '사번은 숫자(또는 영문·숫자)로 입력해 주세요.' });
     const name = text(req.body.name, 20);
     const { dept, wantManager } = req.body;
     const duty = text(req.body.duty, 30);
@@ -347,7 +355,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
-    if (token) { delete db.sessions[token]; delete db.sessionAt?.[token]; }
+    if (validToken(token)) { delete db.sessions[token]; delete db.sessionAt?.[token]; }
     save();
     res.json({ ok: true });
   });
