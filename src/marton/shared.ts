@@ -419,6 +419,8 @@ export interface Bootstrap {
   complaints: Complaint[];
   /** 고객 호출벨 (응대 대기 중 + 오늘) */
   bells: CustomerBell[];
+  /** 실적 지표를 볼 수 있는지 (관리자·승인된 시니어) */
+  kpi?: boolean;
   online: Record<string, number>;
   aiEnabled: boolean;
 }
@@ -439,7 +441,8 @@ export type StreamEvent =
   | { type: 'sounds'; sounds: StoreSound[] }
   | { type: 'emergency'; emergency: Emergency; action: 'created' | 'cleared' }
   | { type: 'complaint'; complaint: Complaint; action: 'created' | 'updated' }
-  | { type: 'bell'; bell: CustomerBell; action: 'ring' | 'answered' };
+  | { type: 'bell'; bell: CustomerBell; action: 'ring' | 'answered' }
+  | { type: 'kpi'; records: import('./kpi').KpiRecord[]; action: 'saved' | 'deleted' };
 
 /** 매장 상품의 현재 행사 (나중에 등록한 행사가 우선) */
 export function promotionFor(p: Product, promotions: Promotion[]): Promotion | undefined {

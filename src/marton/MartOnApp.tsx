@@ -19,14 +19,16 @@ import CouponWallet from './screens/CouponWallet';
 import { HandoverInbox, HandoverSheet } from './screens/Handover';
 import Home, { type HomeGo } from './screens/Home';
 import Complaints from './screens/Complaints';
+import KpiBoard from './screens/KpiBoard';
+import type { KpiRecord } from './kpi';
 import { EmergencyDetail, EmergencySheet } from './screens/Emergency';
 import { BellKiosk, BellSheet } from './screens/Bell';
 import MorningCards, { REOPEN_AFTER_MS } from './screens/MorningCards';
 
 const CACHE_KEY = 'marton-cache';
 
-type Tab = 'home' | 'tasks' | 'request' | 'find' | 'photo' | 'complaint' | 'notices' | 'security' | 'manager';
-const TAB_IDS: Tab[] = ['home', 'tasks', 'request', 'find', 'photo', 'complaint', 'notices', 'security', 'manager'];
+type Tab = 'home' | 'tasks' | 'request' | 'find' | 'photo' | 'complaint' | 'notices' | 'security' | 'manager' | 'kpi';
+const TAB_IDS: Tab[] = ['home', 'tasks', 'request', 'find', 'photo', 'complaint', 'notices', 'security', 'manager', 'kpi'];
 type Urgent = { kind: 'task'; task: Task } | { kind: 'notice'; notice: Notice } | { kind: 'incident'; incident: Incident } | { kind: 'emergency'; emergency: Emergency } | { kind: 'bell'; bell: CustomerBell };
 
 function usePwaHead() {
@@ -73,6 +75,8 @@ export default function MartOnApp() {
   urgentRef.current = urgent;
   const [walletOpen, setWalletOpen] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  // 실적 지표 (영업기밀): 볼 수 있는 사람만, 화면을 열 때 불러온다 (기기 캐시에 저장하지 않음)
+  const [kpiRecords, setKpiRecords] = useState<KpiRecord[] | null>(null);
   const [bellSheet, setBellSheet] = useState(false);
   const [morningOpen, setMorningOpen] = useState(false);
   // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
@@ -123,6 +127,7 @@ export default function MartOnApp() {
     void api('/logout', {}).catch(() => {});
     session.set(null);
     stopAlarm();
+    setKpiRecords(null);
     setData(null);
     setShowSettings(false);
   }, []);
@@ -164,6 +169,13 @@ export default function MartOnApp() {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
+
+  // 실적 지표 화면을 열 때 불러온다
+  const kpiOk = Boolean(data?.kpi);
+  useEffect(() => {
+    if (tab !== 'kpi' || !kpiOk || kpiRecords) return;
+    api<{ records: KpiRecord[] }>('/kpi').then(r => setKpiRecords(r.records), err => onError((err as Error).message));
+  }, [tab, kpiOk, kpiRecords, onError]);
 
   // 생일인 날 처음 앱을 열면 축하 (해마다 한 번)
   useEffect(() => {
@@ -281,6 +293,14 @@ export default function MartOnApp() {
         if (em.clearedBy?.id !== me.id) alert({ title: `✅ ${em.type} 상황 해제`, body: `${em.clearedBy?.name ?? ''}님이 상황 해제를 알렸습니다.`, urgent: false, tag: `emergency-${em.id}`, prefs: { ...p, call: true }, announce: `${em.type} 상황이 해제되었습니다` });
         showToast(`✅ ${em.type} 상황이 해제되었습니다.`);
       }
+      return;
+    }
+    if (e.type === 'kpi') {
+      setKpiRecords(list => {
+        if (!list) return list;
+        const rest = list.filter(r => !e.records.some(x => x.id === r.id));
+        return e.action === 'deleted' ? rest : [...rest, ...e.records];
+      });
       return;
     }
     if (e.type === 'bell') {
@@ -463,7 +483,7 @@ export default function MartOnApp() {
     { id: 'find', label: '상품 찾기', icon: Search },
     { id: 'notices', label: '공지', icon: Megaphone, badge: unreadNotices },
   ];
-  const TITLES: Partial<Record<Tab, string>> = { photo: '사진·가격 확인', complaint: '도와드리겠습니다', security: '보안 신고', manager: '관리' };
+  const TITLES: Partial<Record<Tab, string>> = { photo: '사진·가격 확인', complaint: '도와드리겠습니다', security: '보안 신고', manager: '관리', kpi: '실적 지표' };
   const go = (to: HomeGo) => {
     if (to === 'voice') { unlockAudio(); return setVoiceOpen(true); }
     if (to === 'wallet') return setWalletOpen(true);
@@ -567,10 +587,12 @@ export default function MartOnApp() {
           </div>
         )}
         {tab === 'home' && (
-          <Home me={me} schedules={data.schedules ?? []} emergencies={emergencies} onGo={go} onEmergency={() => { unlockAudio(); setEmergencyOpen(true); }}
+          <Home me={me} kpi={Boolean(data.kpi)} schedules={data.schedules ?? []} emergencies={emergencies} onGo={go} onEmergency={() => { unlockAudio(); setEmergencyOpen(true); }}
             onOpenEmergency={em => setUrgent({ kind: 'emergency', emergency: em })}
             counts={{ tasks: openForMe, notices: notices.filter(n => n.kind !== 'share' && noticeFor(n, me.dept) && !n.readBy.includes(me.id)).length, share: unreadShare, expiry: openChecks, complaints: openComplaints, incidents: openIncidents, coupons: couponCount }} />
         )}
+        {tab === 'kpi' && data.kpi && <KpiBoard me={me} records={kpiRecords} aiEnabled={aiEnabled} onError={onError} onToast={showToast} />}
+        {tab === 'kpi' && !data.kpi && <p className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500">🔒 실적 지표는 점장·부점장과 승인받은 시니어 담당만 볼 수 있습니다.</p>}
         {tab === 'complaint' && <Complaints complaints={complaints} me={me} onError={onError} onToast={showToast} />}
         {tab === 'tasks' && <HandoverInbox handovers={handovers} me={me} onError={onError} />}
         {tab === 'tasks' && <TaskBoard tasks={tasks} me={me} onError={onError} />}

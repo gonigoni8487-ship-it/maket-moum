@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
 import {
-  BellRing, CalendarDays, Camera, Sunrise, ClipboardList, Coffee, HeartHandshake, LayoutDashboard, Megaphone, Mic, Search, Send, Settings, ShieldAlert, Siren, TimerReset, TrendingUp,
+  BellRing, CalendarDays, Camera, ChartColumn, Sunrise, ClipboardList, Coffee, HeartHandshake, LayoutDashboard, Megaphone, Mic, Search, Send, Settings, ShieldAlert, Siren, TimerReset, TrendingUp,
 } from 'lucide-react';
 import { EMERGENCY_INFO, regularHolidays, storeTime, type Emergency, type Staff, type WorkSchedule } from '../shared';
 import { cx } from '../ui';
 
 export type HomeGo =
   | 'tasks' | 'request' | 'find' | 'photo' | 'complaint' | 'security' | 'manager'
-  | 'notice' | 'share' | 'schedule' | 'expiry' | 'voice' | 'wallet' | 'settings' | 'morning' | 'bell';
+  | 'notice' | 'share' | 'schedule' | 'expiry' | 'voice' | 'wallet' | 'settings' | 'morning' | 'bell' | 'kpi';
 
 interface Counts { tasks: number; notices: number; share: number; expiry: number; complaints: number; incidents: number; coupons: number }
 
@@ -45,8 +45,8 @@ function todayShift(me: Staff, schedules: WorkSchedule[]) {
 }
 
 /** 홈: 비상 알림 + 자주 쓰는 기능을 묶음별 큰 버튼으로 */
-export default function Home({ me, counts, schedules, emergencies, onGo, onEmergency, onOpenEmergency }: {
-  me: Staff; counts: Counts; schedules: WorkSchedule[]; emergencies: Emergency[];
+export default function Home({ me, kpi, counts, schedules, emergencies, onGo, onEmergency, onOpenEmergency }: {
+  me: Staff; kpi?: boolean; counts: Counts; schedules: WorkSchedule[]; emergencies: Emergency[];
   onGo: (to: HomeGo) => void; onEmergency: () => void; onOpenEmergency: (e: Emergency) => void;
 }) {
   const t = storeTime(Date.now());
@@ -107,6 +107,7 @@ export default function Home({ me, counts, schedules, emergencies, onGo, onEmerg
         <Tile icon={<BellRing className={ic} />} color="bg-sky-600" label="고객 호출벨" hint="게이트 호출벨 화면" onClick={() => onGo('bell')} />
         <Tile icon={<ShieldAlert className={ic} />} color="bg-slate-700" label="보안 신고" hint="도난 의심·빈 포장" badge={counts.incidents} onClick={() => onGo('security')} />
         <Tile icon={<Settings className={ic} />} color="bg-slate-500" label="알림 설정" hint="소리·진동·퇴근" onClick={() => onGo('settings')} />
+        {kpi && <Tile icon={<ChartColumn className={ic} />} color="bg-indigo-700" label="실적 지표" hint="🔒 영업기밀 · 말로 묻기" onClick={() => onGo('kpi')} />}
         {me.role === 'manager' && (
           <Tile icon={<LayoutDashboard className={ic} />} color="bg-blue-800" label="관리" hint="지시사항·쿠폰·소리" onClick={() => onGo('manager')} />
         )}
