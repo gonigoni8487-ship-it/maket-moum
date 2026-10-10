@@ -123,14 +123,23 @@ export class Router {
       },
     };
 
+    // auth·managerOnly 같은 중간 처리는 next()를 기다리지 않고 돌려준다(Express 방식).
+    // 그래서 next()가 만든 작업을 모두 모아 끝까지 기다린 뒤 응답 여부를 본다 (오래 걸리는 async 처리도 응답이 빠지지 않게).
     let i = 0;
-    const next: Next = async err => {
+    const pending: Promise<void>[] = [];
+    const step = async (err?: unknown) => {
       if (err) throw err;
       const h = route.handlers[i++];
       if (h) await h(req, res, next);
     };
+    const next: Next = err => {
+      const p = step(err);
+      pending.push(p);
+      return p;
+    };
     try {
       await next();
+      for (let k = 0; k < pending.length; k++) await pending[k];
     } catch (e) {
       console.error('MartON route error:', route.method, url.pathname, e);
       if (!sent) res.status(500).json({ error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' });

@@ -28,7 +28,12 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   const [busy, setBusy] = useState(false);
   const [storeCode, setStoreCode] = useState('');
   const [needCode, setNeedCode] = useState(false);
-  useEffect(() => { api<{ storeCodeRequired: boolean }>('/config').then(c => setNeedCode(c.storeCodeRequired), () => {}); }, []);
+  // 관리자 비밀번호가 아직 없으면 처음 로그인하는 점장·부점장이 여기서 만든다
+  const [pinSet, setPinSet] = useState(true);
+  const [pin2, setPin2] = useState('');
+  const loadConfig = () => api<{ storeCodeRequired: boolean; managerPinSet?: boolean }>('/config').then(c => { setNeedCode(c.storeCodeRequired); setPinSet(c.managerPinSet !== false); }, () => {});
+  useEffect(() => { void loadConfig(); }, []);
+  const creatingPin = wantManager && !pinSet;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,6 +41,12 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
     setBusy(true);
     setError('');
     try {
+      if (creatingPin) {
+        if (pin.length < 6) throw new Error('관리자 비밀번호는 6자 이상으로 정해 주세요.');
+        if (pin !== pin2) throw new Error('비밀번호 확인이 맞지 않습니다. 같은 비밀번호를 두 번 넣어 주세요.');
+        await api('/manager-pin/setup', { pin, name, staffId, storeCode });
+        setPinSet(true);
+      }
       const { token, staff } = await login({ storeCode, store, staffId, rank, name, phone: phone || undefined, dept, duty, wantManager, managerPin: pin, title, level: level || undefined, birthday: birthday || undefined });
       session.set(token);
       try { localStorage.setItem(LAST_KEY, JSON.stringify({ store, staffId, rank, name, dept, duty, level, hasPhone: Boolean(staff.phone), hasBirthday: Boolean(staff.birthday) })); } catch { /* 무시 */ }
@@ -43,6 +54,7 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
       onLogin(staff);
     } catch (err) {
       setError((err as Error).message);
+      if (/아직 없습니다|이미 정해져/.test((err as Error).message)) void loadConfig();
     } finally {
       setBusy(false);
     }
@@ -134,14 +146,21 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
             <select className={inputCls} value={title} onChange={e => setTitle(e.target.value)}>
               <option>점장</option><option>영업부점장</option><option>지원부점장</option>
             </select>
-            <input className={inputCls} type="password" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={pin} onChange={e => setPin(e.target.value)} placeholder="관리자 비밀번호 (영문·숫자·기호)" />
+            <input className={inputCls} type="password" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={pin} onChange={e => setPin(e.target.value)} placeholder={creatingPin ? '새 관리자 비밀번호' : '관리자 비밀번호 (영문·숫자·기호)'} />
+          </div>
+        )}
+        {creatingPin && (
+          <div className="space-y-2 rounded-xl bg-amber-50 p-3">
+            <p className="text-sm font-bold text-amber-900">관리자 비밀번호 처음 만들기</p>
+            <p className="text-xs leading-relaxed text-amber-800">아직 관리자 비밀번호가 없습니다. 지금 넣는 비밀번호(6자 이상)가 점장·영업부점장·지원부점장 공용 비밀번호가 됩니다. 나중에 관리 → 보안 점검에서 바꿀 수 있습니다.</p>
+            <input className={inputCls} type="password" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={pin2} onChange={e => setPin2(e.target.value)} placeholder="비밀번호 한 번 더" />
           </div>
         )}
       </div>
 
       {error && <p className="rounded-xl bg-red-50 px-3.5 py-3 text-sm font-medium text-red-700">{error}</p>}
       <button className={primaryBtn} disabled={busy || !store.trim() || !staffId || !rank.trim() || !name || (!phone && !phoneSaved) || !dept || !duty}>
-        {busy ? '로그인 중…' : '출근 · 로그인'}
+        {busy ? '로그인 중…' : creatingPin ? '비밀번호 만들고 로그인' : '출근 · 로그인'}
       </button>
       <p className="text-center text-xs text-slate-400">로그인하면 알림 권한을 요청합니다. 업무요청 알림을 받으려면 허용해 주세요.</p>
     </form>
