@@ -44,6 +44,8 @@ export const FIGURE_FIELDS: { key: FigureKey; label: string }[] = [
 
 export interface KpiRecord {
   id: string;
+  /** 점명 (점마다 따로 보관, 다른 점은 볼 수 없다) */
+  store: string;
   period: KpiPeriod;
   /** day: 2026-10-10, month: 2026-10, year: 2026 */
   key: string;
@@ -54,9 +56,24 @@ export interface KpiRecord {
   source?: 'manual' | 'photo';
 }
 
-/** 실적 지표를 볼 수 있는 사람: 점장·부점장 + 관리자가 허락한 시니어 담당 (주니어는 안 됨) */
-export const canSeeKpi = (s: Pick<Staff, 'id' | 'role' | 'level'>, approved: string[] = []) =>
-  s.role === 'manager' || (s.level === '시니어' && approved.includes(s.id));
+/** 점명 맞추기: "화명 점", "화명" → "화명점" */
+export function normalizeStore(v: unknown) {
+  const s = typeof v === 'string' ? v.replace(/\s+/g, '').slice(0, 20) : '';
+  return !s ? '' : s.endsWith('점') ? s : `${s}점`;
+}
+/** 실적 지표를 볼 수 있는 사람: 점장·부점장 + 관리자가 허락한 시니어 담당 (주니어는 안 됨), 점명이 있어야 함 */
+export const canSeeKpi = (s: Pick<Staff, 'id' | 'role' | 'level' | 'store'>, approved: string[] = []) =>
+  Boolean(normalizeStore(s.store)) && (s.role === 'manager' || (s.level === '시니어' && approved.includes(s.id)));
+/** 볼 수 있는 범위: 자기 점, 관리자는 모든 영업부서 · 시니어는 자기 부서만 */
+export function kpiScope(s: Pick<Staff, 'role' | 'dept' | 'store'>): { store: string; depts: SalesDept[] } {
+  const store = normalizeStore(s.store);
+  if (s.role === 'manager') return { store, depts: [...SALES_DEPTS] };
+  return { store, depts: SALES_DEPTS.includes(s.dept as SalesDept) ? [s.dept as SalesDept] : [] };
+}
+export const inKpiScope = (s: Pick<Staff, 'role' | 'dept' | 'store'>, r: Pick<KpiRecord, 'store' | 'dept'>) => {
+  const sc = kpiScope(s);
+  return Boolean(sc.store) && r.store === sc.store && sc.depts.includes(r.dept);
+};
 
 export const PERIOD_FORMAT: Record<KpiPeriod, RegExp> = {
   day: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/,
@@ -148,9 +165,11 @@ export function figuresFor(records: KpiRecord[], period: KpiPeriod, key: string,
 
 export interface KpiRow { dept: SalesDept | '전체'; figures: KpiFigures; rates: KpiRates }
 /** 기간 하나의 부서별 + 전체 표 */
-export function kpiTable(records: KpiRecord[], period: KpiPeriod, key: string): KpiRow[] {
+/** 기간 하나의 부서별 + 전체 표. 점 전체를 볼 수 없는 사람(시니어)은 구성비·전체 합계 없이 자기 부서만 */
+export function kpiTable(records: KpiRecord[], period: KpiPeriod, key: string, whole = true): KpiRow[] {
   const per = SALES_DEPTS.map(dept => ({ dept, figures: figuresFor(records, period, key, dept) })).filter((r): r is { dept: SalesDept; figures: KpiFigures } => Boolean(r.figures));
   if (!per.length) return [];
+  if (!whole) return per.map(r => ({ ...r, rates: kpiRates(r.figures) }));
   const total = sumFigures(per.map(r => r.figures));
   return [
     ...per.map(r => ({ ...r, rates: kpiRates(r.figures, total.net) })),
@@ -159,14 +178,15 @@ export function kpiTable(records: KpiRecord[], period: KpiPeriod, key: string): 
 }
 
 /** 추이: 월이면 그 달의 날짜별, 년이면 월별 전체 실적 */
-export function kpiTrend(records: KpiRecord[], period: KpiPeriod, key: string): { key: string; label: string; row: KpiRow }[] {
+export function kpiTrend(records: KpiRecord[], period: KpiPeriod, key: string, whole = true): { key: string; label: string; row: KpiRow }[] {
   if (period === 'day') return [];
   const subKeys = period === 'month'
     ? Array.from({ length: new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)), 0)).getUTCDate() }, (_, i) => `${key}-${pad(i + 1)}`)
     : Array.from({ length: 12 }, (_, i) => `${key}-${pad(i + 1)}`);
   const sub: KpiPeriod = period === 'month' ? 'day' : 'month';
   return subKeys.flatMap(k => {
-    const row = kpiTable(records, sub, k).find(r => r.dept === '전체');
+    const t = kpiTable(records, sub, k, whole);
+    const row = whole ? t.find(r => r.dept === '전체') : t[0];
     return row ? [{ key: k, label: sub === 'day' ? `${Number(k.slice(8))}일` : `${Number(k.slice(5))}월`, row }] : [];
   });
 }
@@ -194,19 +214,22 @@ export function periodLabel(period: KpiPeriod, key: string) {
   return `${Number(key.slice(5, 7))}월 ${Number(key.slice(8))}일`;
 }
 
-const METRICS: { id: string; words: RegExp; label: string; pick: (r: KpiRow) => string; say: (r: KpiRow) => string }[] = [
-  { id: 'gross', words: /총매출/, label: '총매출', pick: r => wonText(r.figures.gross), say: r => wonText(r.figures.gross, true) },
-  { id: 'net', words: /순매출|(?<!총)매출/, label: '순매출', pick: r => wonText(r.figures.net), say: r => wonText(r.figures.net, true) },
-  { id: 'achievement', words: /달성/, label: '달성율', pick: r => pct(r.rates.achievement), say: r => pctSay(r.rates.achievement) },
-  { id: 'growth', words: /신장|전년|작년\s*대비/, label: '신장율', pick: r => pct(r.rates.growth, true), say: r => pctSay(r.rates.growth, true) },
-  { id: 'profitRate', words: /이익/, label: '이익율', pick: r => pct(r.rates.profitRate), say: r => pctSay(r.rates.profitRate) },
-  { id: 'totalDiscountRate', words: /총\s*할인|할인율(?!.*에누리)/, label: '총할인율', pick: r => pct(r.rates.totalDiscountRate), say: r => pctSay(r.rates.totalDiscountRate) },
-  { id: 'wasteRate', words: /폐기/, label: '폐기율', pick: r => pct(r.rates.wasteRate), say: r => pctSay(r.rates.wasteRate) },
-  { id: 'lossRate', words: /로스/, label: '로스율', pick: r => pct(r.rates.lossRate), say: r => pctSay(r.rates.lossRate) },
-  { id: 'tastingRate', words: /시식/, label: '시식율', pick: r => pct(r.rates.tastingRate), say: r => pctSay(r.rates.tastingRate) },
-  { id: 'markdownRate', words: /에누리/, label: '할인에누리율', pick: r => pct(r.rates.markdownRate), say: r => pctSay(r.rates.markdownRate) },
-  { id: 'share', words: /구성비|비중/, label: '구성비', pick: r => pct(r.rates.share), say: r => pctSay(r.rates.share) },
+interface Metric { id: string; words: RegExp; label: string; won?: boolean; val: (r: KpiRow) => number | null | undefined }
+const METRICS: Metric[] = [
+  { id: 'gross', words: /총매출/, label: '총매출', won: true, val: r => r.figures.gross },
+  { id: 'net', words: /순매출|(?<!총)매출/, label: '순매출', won: true, val: r => r.figures.net },
+  { id: 'achievement', words: /달성/, label: '달성율', val: r => r.rates.achievement },
+  { id: 'growth', words: /신장/, label: '신장율', val: r => r.rates.growth },
+  { id: 'profitRate', words: /이익/, label: '이익율', val: r => r.rates.profitRate },
+  { id: 'totalDiscountRate', words: /총\s*할인|할인율(?!.*에누리)/, label: '총할인율', val: r => r.rates.totalDiscountRate },
+  { id: 'wasteRate', words: /폐기/, label: '폐기율', val: r => r.rates.wasteRate },
+  { id: 'lossRate', words: /로스/, label: '로스율', val: r => r.rates.lossRate },
+  { id: 'tastingRate', words: /시식/, label: '시식율', val: r => r.rates.tastingRate },
+  { id: 'markdownRate', words: /에누리/, label: '할인에누리율', val: r => r.rates.markdownRate },
+  { id: 'share', words: /구성비|비중/, label: '구성비', val: r => r.rates.share },
 ];
+const show = (m: Metric, r: KpiRow) => { const v = m.val(r); return v === null || v === undefined ? '-' : m.won ? wonText(v) : pct(v, m.id === 'growth'); };
+const say = (m: Metric, r: KpiRow) => { const v = m.val(r); return v === null || v === undefined ? '자료 없음' : m.won ? wonText(v, true) : pctSay(v, m.id === 'growth'); };
 
 /** 한 줄 보고서 (글자) */
 function reportLines(r: KpiRow): string[] {
@@ -215,7 +238,7 @@ function reportLines(r: KpiRow): string[] {
     `순매출 ${wonText(r.figures.net)}${r.figures.gross !== undefined && netFor(r.figures, 'gross') === r.figures.net ? ` (총매출 ${wonText(r.figures.gross)})` : ''}`,
     `달성율 ${pct(x.achievement)} · 신장율 ${pct(x.growth, true)} · 이익율 ${pct(x.profitRate)}`,
     `총할인율 ${pct(x.totalDiscountRate)} (폐기 ${pct(x.wasteRate)} · 로스 ${pct(x.lossRate)} · 시식 ${pct(x.tastingRate)} · 할인에누리 ${pct(x.markdownRate)})`,
-    ...(r.dept !== '전체' ? [`구성비 ${pct(x.share)}`] : []),
+    ...(r.dept !== '전체' && x.share !== null ? [`구성비 ${pct(x.share)}`] : []),
   ];
 }
 function reportSpeech(r: KpiRow) {
@@ -230,8 +253,15 @@ function reportSpeech(r: KpiRow) {
   return parts.join(', ');
 }
 
+/** "전년 대비", "작년이랑 비교" 같은 비교 질문 */
+const COMPARE = /(전년|작년|지난\s*해)\s*(도\s*)?(대비|比|보다|와|과|하고|랑|이랑|비교)|전년\s*비|비교/;
+
 /** 질문에서 기간 찾기: 오늘·어제·이번 달·지난달·올해·작년·10월·10월 5일·3일 */
-export function parseKpiPeriod(q: string, today: { year: number; month: number; date: number }): { period: KpiPeriod; key: string } {
+export function parseKpiPeriod(q: string, today: { year: number; month: number; date: number }): { period: KpiPeriod; key: string; explicit?: boolean } {
+  const found = parsePeriodWords(q, today);
+  return found ? { ...found, explicit: true } : { period: 'month', key: `${today.year}-${pad(today.month)}` }; // 기본: 이번 달 누계
+}
+function parsePeriodWords(q: string, today: { year: number; month: number; date: number }): { period: KpiPeriod; key: string } | null {
   const { year, month, date } = today;
   const day = (y: number, m: number, d: number) => {
     const t = new Date(Date.UTC(y, m - 1, d));
@@ -240,7 +270,7 @@ export function parseKpiPeriod(q: string, today: { year: number; month: number; 
   if (/그저께|그제/.test(q)) return { period: 'day', key: day(year, month, date - 2) };
   if (/어제/.test(q)) return { period: 'day', key: day(year, month, date - 1) };
   if (/오늘|금일/.test(q)) return { period: 'day', key: day(year, month, date) };
-  if (/작년|전년도/.test(q) && !/대비/.test(q)) return { period: 'year', key: String(year - 1) };
+  if (/작년|전년도/.test(q) && !COMPARE.test(q)) return { period: 'year', key: String(year - 1) };
   if (/올해|금년|연간|년간/.test(q)) return { period: 'year', key: String(year) };
   if (/지난\s*달|전월/.test(q)) { const t = new Date(Date.UTC(year, month - 2, 1)); return { period: 'month', key: `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}` }; }
   const md = /(\d{1,2})\s*월\s*(\d{1,2})\s*일/.exec(q);
@@ -249,35 +279,86 @@ export function parseKpiPeriod(q: string, today: { year: number; month: number; 
   if (m && Number(m[1]) >= 1 && Number(m[1]) <= 12) return { period: 'month', key: `${Number(m[1]) > month ? year - 1 : year}-${pad(Number(m[1]))}` };
   const d = /(\d{1,2})\s*일/.exec(q);
   if (d) return { period: 'day', key: day(year, month, Number(d[1])) };
-  return { period: 'month', key: `${year}-${pad(month)}` }; // 기본: 이번 달 누계
+  return null;
 }
 
-export interface KpiAnswer { title: string; text: string; speech: string; found: boolean }
+export interface KpiAnswer { title: string; text: string; speech: string; found: boolean; context: KpiContext }
+/** 이어서 묻기: 앞 질문의 기간·부서 ("9월 순매출?" 다음 "폐기율은 전년대비?") */
+export interface KpiContext { period: KpiPeriod; key: string; dept?: SalesDept }
 
-/** 말로 물은 실적 질문에 글(보고서)과 말로 답한다 */
-export function answerKpi(question: string, records: KpiRecord[], today: { year: number; month: number; date: number }): KpiAnswer {
+/** 1년 전 같은 기간 */
+const lastYearKey = (key: string) => `${Number(key.slice(0, 4)) - 1}${key.slice(4)}`;
+const diffText = (m: Metric, now: number, before: number) => {
+  if (m.won) { const g = before ? (now / before) * 100 - 100 : null; return { text: `${wonText(now - before)} (${pct(g, true)})`, say: `${wonText(Math.abs(now - before), true)} ${now >= before ? '증가' : '감소'}, ${pctSay(g, true)}` }; }
+  const d = now - before;
+  return { text: `${d > 0 ? '+' : ''}${d.toFixed(1)}%p`, say: `${d >= 0 ? '플러스' : '마이너스'} ${Math.abs(d).toFixed(1)}%포인트` };
+};
+
+/**
+ * 말로 물은 실적 질문에 글(보고서)과 말로 답한다.
+ * - records: 그 사람이 볼 수 있는 실적만 (자기 점, 시니어는 자기 부서)
+ * - whole: 점 전체를 볼 수 있는지 (관리자) — 아니면 자기 부서만, 구성비 없음
+ * - context: 앞 질문의 기간·부서 (기간을 말하지 않으면 그대로 이어서)
+ */
+export function answerKpi(question: string, records: KpiRecord[], today: { year: number; month: number; date: number }, opts: { whole?: boolean; ownDept?: SalesDept; context?: KpiContext } = {}): KpiAnswer {
+  const whole = opts.whole ?? true;
   const q = question.replace(/\s+/g, ' ');
-  const { period, key } = parseKpiPeriod(q, today);
-  const dept = SALES_DEPTS.find(d => q.includes(d)) ?? (q.includes('생활') ? '생활문화' : undefined);
-  const table = kpiTable(records, period, key);
-  const label = periodLabel(period, key) + (period === 'month' && key === `${today.year}-${pad(today.month)}` ? ` (${today.month}/1~${today.month}/${today.date} 누계)` : '');
+  const parsed = parseKpiPeriod(q, today);
+  const { period, key } = parsed.explicit || !opts.context ? parsed : opts.context;
+  const named = SALES_DEPTS.find(d => q.includes(d)) ?? (q.includes('생활') ? '생활문화' : undefined);
+  const dept: SalesDept | undefined = whole ? named ?? (parsed.explicit ? undefined : opts.context?.dept) : opts.ownDept;
+  const context: KpiContext = { period, key, dept };
+  const isNow = period === 'month' && key === `${today.year}-${pad(today.month)}`;
+  const label = periodLabel(period, key) + (isNow ? ` (${today.month}/1~${today.month}/${today.date} 누계)` : '');
+  const sayLabel = periodLabel(period, key).replace(`${today.year}년 `, '');
   const target = dept ?? '전체';
-  const row = table.find(r => r.dept === target);
   const title = `📊 ${label} ${target} 실적`;
-  if (!row) return { title, found: false, text: `${label} ${target} 실적이 아직 입력되지 않았습니다.`, speech: `${label.replace(/\(.*\)/, '')} ${target} 실적이 아직 입력되지 않았습니다.` };
+  if (!whole && named && named !== opts.ownDept) {
+    return { title, found: false, context, text: `${named} 실적은 볼 수 없습니다. 내 부서(${opts.ownDept ?? '-'}) 실적만 볼 수 있습니다.`, speech: `${named} 실적은 볼 수 없습니다. 내 부서 실적만 볼 수 있습니다.` };
+  }
+  const row = kpiTable(records, period, key, whole).find(r => r.dept === target);
+  if (!row) return { title, found: false, context, text: `${label} ${target} 실적이 아직 입력되지 않았습니다.`, speech: `${sayLabel} ${target} 실적이 아직 입력되지 않았습니다.` };
 
-  const asked = METRICS.filter(m => m.words.test(q) && !(m.id === 'net' && METRICS.some(o => o.id !== 'net' && o.id !== 'gross' && o.words.test(q))));
-  const sayLabel = label.replace(/\(.*\)/, '').replace(`${today.year}년 `, '').trim();
+  const compare = COMPARE.test(q);
+  let asked = METRICS.filter(m => m.words.test(q) && (whole || m.id !== 'share'));
+  if (asked.some(m => m.id !== 'net' && m.id !== 'gross')) asked = asked.filter(m => m.id !== 'net' || /순매출/.test(q));
+
+  // 전년 대비: 지표를 말하지 않으면 순매출 신장율, 말하면 작년 같은 기간 같은 지표와 비교
+  if (compare) {
+    const metrics = asked.length ? asked : [METRICS.find(m => m.id === 'net')!];
+    const before = kpiTable(records, period, lastYearKey(key), whole).find(r => r.dept === target);
+    const lines: string[] = []; const says: string[] = [];
+    for (const m of metrics) {
+      const now = m.val(row); const prev = before ? m.val(before) : undefined;
+      if (m.id === 'net' && (prev === null || prev === undefined) && row.rates.growth !== null) {
+        lines.push(`순매출 ${wonText(row.figures.net)} · 전년실적 ${wonText(row.figures.lastYear)} → 신장율 ${pct(row.rates.growth, true)}`);
+        says.push(`순매출은 전년 대비 ${pctSay(row.rates.growth, true)}`);
+        continue;
+      }
+      if (now === null || now === undefined || prev === null || prev === undefined) {
+        lines.push(`${m.label}: 올해 ${show(m, row)} · 전년 같은 기간 자료 없음`);
+        says.push(`${m.label}은 전년 같은 기간 자료가 없어 비교할 수 없습니다`);
+        continue;
+      }
+      const d = diffText(m, now, prev);
+      lines.push(`${m.label}: 올해 ${show(m, row)} · 전년 ${show(m, before!)} → ${d.text}`);
+      says.push(`${m.label}은 ${say(m, row)}${m.won ? '으로' : '로'} 전년 ${say(m, before!)} 대비 ${d.say}`);
+    }
+    const t = `${title} — 전년 대비`;
+    const spoken = `${sayLabel} ${target} ${says.join('. ')}`;
+    return { title: t, found: true, context, text: [t, ...lines, '', ...reportLines(row)].join('\n'), speech: spoken.endsWith('다') ? `${spoken}.` : `${spoken}입니다.` };
+  }
   if (asked.length) {
-    const text = [title, ...asked.map(m => `${m.label} ${m.pick(row)}`), '', ...reportLines(row)].join('\n');
-    const speech = `${sayLabel} ${target} ${asked.map(m => `${m.label} ${m.say(row) || '자료 없음'}`).join(', ')}입니다.`;
-    return { title, text, speech, found: true };
+    const text = [title, ...asked.map(m => `${m.label} ${show(m, row)}`), '', ...reportLines(row)].join('\n');
+    const speech = `${sayLabel} ${target} ${asked.map(m => `${m.label} ${say(m, row)}`).join(', ')}입니다.`;
+    return { title, text, speech, found: true, context };
   }
   // 전체를 물으면 부서별 순위도 덧붙인다
+  const table = kpiTable(records, period, key, whole);
   const ranking = target === '전체' ? table.filter(r => r.dept !== '전체').sort((a, b) => (b.figures.net ?? 0) - (a.figures.net ?? 0)) : [];
   const text = [
     title, ...reportLines(row),
     ...(ranking.length ? ['', '부서별 순매출 (구성비 · 달성율)', ...ranking.map((r, i) => `${i + 1}. ${r.dept} ${wonText(r.figures.net)} (${pct(r.rates.share)} · ${pct(r.rates.achievement)})`)] : []),
   ].join('\n');
-  return { title, text, speech: `${sayLabel} ${target} 실적입니다. ${reportSpeech(row)}.`, found: true };
+  return { title, text, speech: `${sayLabel} ${target} 실적입니다. ${reportSpeech(row)}.`, found: true, context };
 }

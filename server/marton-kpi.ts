@@ -1,6 +1,6 @@
 // 마트ON 실적 지표: 영업부서별 일·월·년 실적 저장, 사진 자동 입력, 열람 권한 (영업기밀 — 관리자·승인된 시니어만)
 import type { GoogleGenAI } from '@google/genai';
-import { FIGURE_FIELDS, PERIOD_FORMAT, SALES_DEPTS, canSeeKpi, lastYearFromGrowth, type KpiFigures, type KpiPeriod, type KpiRecord, type SalesDept } from '../src/marton/kpi';
+import { FIGURE_FIELDS, PERIOD_FORMAT, SALES_DEPTS, canSeeKpi, inKpiScope, kpiScope, lastYearFromGrowth, normalizeStore, type KpiFigures, type KpiPeriod, type KpiRecord, type SalesDept } from '../src/marton/kpi';
 import type { Staff } from '../src/marton/shared';
 import { db, save, broadcast, auth, managerOnly, actorOf, newId, securityLog, type AuthedRequest, type RouteApp } from './marton';
 import type { Request, Response, NextFunction } from 'express';
@@ -10,9 +10,13 @@ const MAX_AMOUNT = 1e13; // 10조원 넘는 값은 잘못 읽은 것으로 본�
 
 export const kpiAllowed = (s: Staff) => canSeeKpi(s, db.kpiAccess ?? []);
 function kpiOnly(req: Request, res: Response, next: NextFunction) {
-  if (!kpiAllowed((req as AuthedRequest).staff)) return res.status(403).json({ error: '실적 지표는 점장·부점장과 승인받은 시니어 담당만 볼 수 있습니다.' });
+  const me = (req as AuthedRequest).staff;
+  if (!normalizeStore(me.store)) return res.status(403).json({ error: '점명이 등록되어 있지 않습니다. 로그아웃 후 회원 정보에 점명을 넣고 다시 로그인해 주세요.' });
+  if (!kpiAllowed(me)) return res.status(403).json({ error: '실적 지표는 점장·부점장과 승인받은 시니어 담당만 볼 수 있습니다.' });
   next();
 }
+/** 이 실적을 받을 수 있는 사람 (같은 점, 관리자 또는 그 부서의 승인된 시니어) */
+const viewerOf = (r: KpiRecord) => (s: Staff) => kpiAllowed(s) && inKpiScope(s, r);
 
 const isSalesDept = (d: unknown): d is SalesDept => SALES_DEPTS.includes(d as SalesDept);
 const isPeriod = (p: unknown): p is KpiPeriod => p === 'day' || p === 'month' || p === 'year';
@@ -36,37 +40,44 @@ export function cleanFigures(input: any): KpiFigures | null {
 export function registerKpi(app: RouteApp, genAI: GoogleGenAI, aiEnabled: boolean) {
   const api = '/api/marton';
 
-  app.get(`${api}/kpi`, auth, kpiOnly, (_req, res) => {
-    res.json({ records: db.kpi ?? [] });
+  // 자기 점 실적만, 시니어는 자기 부서만 (다른 점·다른 부서는 내려보내지 않는다)
+  app.get(`${api}/kpi`, auth, kpiOnly, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const sc = kpiScope(me);
+    res.json({ records: (db.kpi ?? []).filter(r => inKpiScope(me, r)), store: sc.store, depts: sc.depts });
   });
 
   // 저장: 같은 기간·부서는 고쳐 쓴다
   app.post(`${api}/kpi`, auth, kpiOnly, (req, res) => {
     const me = (req as AuthedRequest).staff;
+    const store = kpiScope(me).store;
     const list = Array.isArray(req.body.records) ? req.body.records.slice(0, 60) : [];
     const saved: KpiRecord[] = [];
+    let blocked = 0;
     for (const r of list) {
       if (!isPeriod(r?.period) || typeof r.key !== 'string' || !PERIOD_FORMAT[r.period as KpiPeriod].test(r.key) || !isSalesDept(r.dept)) continue;
+      if (!inKpiScope(me, { store, dept: r.dept })) { blocked++; continue; } // 시니어는 자기 부서만 넣을 수 있다
       const figures = cleanFigures(r.figures);
       if (!figures) continue;
       db.kpi ??= [];
-      const i = db.kpi.findIndex(x => x.period === r.period && x.key === r.key && x.dept === r.dept);
-      const rec: KpiRecord = { id: i >= 0 ? db.kpi[i].id : newId().slice(0, 8), period: r.period, key: r.key, dept: r.dept, figures, by: actorOf(me), at: Date.now(), source: r.source === 'photo' ? 'photo' : 'manual' };
+      const i = db.kpi.findIndex(x => x.store === store && x.period === r.period && x.key === r.key && x.dept === r.dept);
+      const rec: KpiRecord = { id: i >= 0 ? db.kpi[i].id : newId().slice(0, 8), store, period: r.period, key: r.key, dept: r.dept, figures, by: actorOf(me), at: Date.now(), source: r.source === 'photo' ? 'photo' : 'manual' };
       if (i >= 0) db.kpi[i] = rec; else db.kpi.push(rec);
       saved.push(rec);
     }
-    if (!saved.length) return res.status(400).json({ error: '저장할 실적이 없습니다. 기간·부서·금액을 확인해 주세요.' });
+    if (!saved.length) return res.status(blocked ? 403 : 400).json({ error: blocked ? '내 부서 실적만 넣을 수 있습니다.' : '저장할 실적이 없습니다. 기간·부서·금액을 확인해 주세요.' });
     save();
-    broadcast({ type: 'kpi', records: saved, action: 'saved' }, kpiAllowed);
-    res.json({ saved: saved.length, records: saved });
+    for (const rec of saved) broadcast({ type: 'kpi', records: [rec], action: 'saved' }, viewerOf(rec));
+    res.json({ saved: saved.length, skipped: blocked, records: saved });
   });
 
-  app.post(`${api}/kpi/:id/delete`, auth, managerOnly, (req, res) => {
-    const rec = db.kpi?.find(r => r.id === req.params.id);
+  app.post(`${api}/kpi/:id/delete`, auth, managerOnly, kpiOnly, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const rec = db.kpi?.find(r => r.id === req.params.id && inKpiScope(me, r));
     if (!rec) return res.status(404).json({ error: '실적을 찾을 수 없습니다.' });
     db.kpi = db.kpi!.filter(r => r !== rec);
     save();
-    broadcast({ type: 'kpi', records: [rec], action: 'deleted' }, kpiAllowed);
+    broadcast({ type: 'kpi', records: [rec], action: 'deleted' }, viewerOf(rec));
     res.json({ ok: true });
   });
 
@@ -87,9 +98,12 @@ export function registerKpi(app: RouteApp, genAI: GoogleGenAI, aiEnabled: boolea
       });
       let parsed: any;
       try { parsed = JSON.parse((r.text ?? '').replace(/^```(?:json)?|```$/g, '').trim()); } catch { parsed = null; }
+      const me = (req as AuthedRequest).staff;
+      const store = kpiScope(me).store;
       const rows = (Array.isArray(parsed?.rows) ? parsed.rows : []).flatMap((row: any) => {
         const figures = cleanFigures(row);
-        return isSalesDept(row?.dept) && figures ? [{ dept: row.dept, figures }] : [];
+        // 시니어는 자기 부서 줄만 받는다
+        return isSalesDept(row?.dept) && figures && inKpiScope(me, { store, dept: row.dept }) ? [{ dept: row.dept, figures }] : [];
       });
       if (!rows.length) return res.status(422).json({ error: '사진에서 부서별 실적을 읽지 못했습니다. 표가 잘 보이게 다시 찍거나 직접 입력해 주세요.' });
       const period = isPeriod(parsed?.period) ? parsed.period : undefined;
@@ -102,19 +116,23 @@ export function registerKpi(app: RouteApp, genAI: GoogleGenAI, aiEnabled: boolea
   });
 
   // ---- 열람 권한: 점장·부점장이 시니어 담당에게 허락 ----
-  app.get(`${api}/kpi/access`, auth, managerOnly, (_req, res) => {
+  // 같은 점 직원만 보이고, 같은 점 직원만 허락할 수 있다
+  app.get(`${api}/kpi/access`, auth, managerOnly, kpiOnly, (req, res) => {
+    const me = (req as AuthedRequest).staff;
+    const store = kpiScope(me).store;
     const approved = db.kpiAccess ?? [];
     const list = Object.values(db.staff)
-      .filter(s => s.role !== 'manager')
-      .map(s => ({ id: s.id, name: s.name, dept: s.dept, rank: s.rank, level: s.level, allowed: canSeeKpi(s, approved), approved: approved.includes(s.id) }))
+      .filter(s => s.role !== 'manager' && normalizeStore(s.store) === store)
+      .map(s => ({ id: s.id, name: s.name, dept: s.dept, rank: s.rank, level: s.level, sales: SALES_DEPTS.includes(s.dept as SalesDept), allowed: canSeeKpi(s, approved), approved: approved.includes(s.id) }))
       .sort((a, b) => (a.level === '시니어' ? 0 : 1) - (b.level === '시니어' ? 0 : 1) || a.dept.localeCompare(b.dept) || a.name.localeCompare(b.name));
     res.json(list);
   });
-  app.post(`${api}/kpi/access`, auth, managerOnly, (req, res) => {
+  app.post(`${api}/kpi/access`, auth, managerOnly, kpiOnly, (req, res) => {
     const me = (req as AuthedRequest).staff;
     const id = typeof req.body.staffId === 'string' ? req.body.staffId : '';
     const target = Object.hasOwn(db.staff, id) ? db.staff[id] : undefined;
-    if (!target) return res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
+    if (!target || normalizeStore(target.store) !== kpiScope(me).store) return res.status(404).json({ error: '같은 점 직원만 허락할 수 있습니다.' });
+    if (req.body.allow && !SALES_DEPTS.includes(target.dept as SalesDept)) return res.status(400).json({ error: '영업부서(수산·축산·농산·가공·생활문화) 시니어 담당만 허락할 수 있습니다.' });
     if (req.body.allow && target.level !== '시니어') return res.status(400).json({ error: '주니어 담당은 실적 지표를 볼 수 없습니다. 시니어 담당만 허락할 수 있습니다.' });
     const set = new Set(db.kpiAccess ?? []);
     if (req.body.allow) set.add(id); else set.delete(id);

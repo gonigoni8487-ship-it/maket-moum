@@ -14,7 +14,7 @@ import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
 import { registerCare, pruneCare } from './marton-care';
 import { registerGuard } from './marton-guard';
 import { registerKpi, kpiAllowed } from './marton-kpi';
-import type { KpiRecord } from '../src/marton/kpi';
+import { normalizeStore, type KpiRecord } from '../src/marton/kpi';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
 export interface RouteApp {
@@ -363,7 +363,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     const { dept, wantManager } = req.body;
     const duty = text(req.body.duty, 30);
     if (!id || !name || !isDept(dept) || !duty) return res.status(400).json({ error: '사번, 이름, 부서, 담당업무를 모두 입력해 주세요.' });
-    const store = text(req.body.store, 20);
+    const store = normalizeStore(req.body.store);
     const rank = text(req.body.rank, 10);
     // 전화번호: 새로 넣으면 바꾸고, 비워 두면 등록된 번호를 그대로 쓴다
     const given = text(req.body.phone, 20);

@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, ImagePlus, Lock, Mic, MicOff, Save, Volume2 } from 'lucide-react';
 import {
-  FIGURE_FIELDS, PERIOD_LABEL, SALES_DEPTS, answerKpi, kpiRates, kpiTable, kpiTrend, pct, periodLabel, wonText,
-  type KpiAnswer, type KpiFigures, type KpiPeriod, type KpiRecord, type KpiRow, type SalesDept,
+  FIGURE_FIELDS, PERIOD_LABEL, answerKpi, kpiRates, kpiScope, kpiTable, kpiTrend, pct, periodLabel, wonText,
+  type KpiAnswer, type KpiContext, type KpiFigures, type KpiPeriod, type KpiRecord, type KpiRow, type SalesDept,
 } from '../kpi';
 import { storeTime, type Staff } from '../shared';
 import { api } from '../api';
@@ -38,14 +38,19 @@ function PeriodPicker({ period, setPeriod, value, setValue }: { period: KpiPerio
 }
 
 // ---- 물어보기: 말하거나 적으면 보고서 글 + 음성 ----
-const ASK_EXAMPLES = ['이번 달 수산 로스율 얼마야?', '어제 전체 실적 알려줘', '9월 축산 달성율이랑 신장율', '올해 농산 이익율', '오늘 부서별 구성비'];
-function Ask({ records }: { records: KpiRecord[] }) {
+function Ask({ records, whole, ownDept }: { records: KpiRecord[]; whole: boolean; ownDept?: SalesDept }) {
   const [q, setQ] = useState('');
   const [answer, setAnswer] = useState<KpiAnswer | null>(null);
+  // 이어서 묻기: "9월달 순매출 얼마야?" 다음 "폐기율은 전년대비 얼마야?"는 같은 9월로
+  const ctx = useRef<KpiContext | undefined>(undefined);
+  const examples = whole
+    ? ['9월달 순매출 얼마야?', '폐기율은 전년대비 얼마야?', '이번 달 수산 로스율 얼마야?', '어제 전체 실적 알려줘', '올해 축산 달성율이랑 신장율']
+    : ['9월달 순매출 얼마야?', '폐기율은 전년대비 얼마야?', '이번 달 로스율 얼마야?', '어제 실적 알려줘', '올해 달성율이랑 신장율'];
   const ask = (text = q) => {
     if (!text.trim()) return;
     const t = todayParts();
-    const a = answerKpi(text, records, { year: t.year, month: t.month, date: t.date });
+    const a = answerKpi(text, records, { year: t.year, month: t.month, date: t.date }, { whole, ownDept, context: ctx.current });
+    ctx.current = a.context;
     setAnswer(a);
     speak(a.speech);
   };
@@ -62,7 +67,7 @@ function Ask({ records }: { records: KpiRecord[] }) {
         <input className={inputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="글로 물어보기 (예: 이번 달 수산 로스율)" />
         <button className="shrink-0 rounded-xl bg-slate-800 px-4 text-sm font-bold text-white">묻기</button>
       </form>
-      <Examples title="예시) 기간 · 부서 · 지표를 말해 보세요" items={ASK_EXAMPLES} onPick={x => { primeSpeech(); setQ(x); ask(x); }} />
+      <Examples title={whole ? '예시) 기간 · 부서 · 지표를 말해 보세요 (기간을 빼면 앞 질문 기간으로)' : '예시) 기간 · 지표를 말해 보세요 (기간을 빼면 앞 질문 기간으로)'} items={examples} onPick={x => { primeSpeech(); setQ(x); ask(x); }} />
       {answer && (
         <article className={cx('space-y-2 rounded-2xl border bg-white p-4', answer.found ? 'border-indigo-200' : 'border-amber-200')}>
           <pre className="whitespace-pre-wrap font-sans text-[15px] leading-relaxed text-slate-800">{answer.text}</pre>
@@ -74,17 +79,17 @@ function Ask({ records }: { records: KpiRecord[] }) {
 }
 
 // ---- 통계: 일·월·년 부서별 표 + 추이 ----
-function Stats({ records }: { records: KpiRecord[] }) {
+function Stats({ records, whole }: { records: KpiRecord[]; whole: boolean }) {
   const [period, setPeriod] = useState<KpiPeriod>('month');
   const [key, setKey] = useState(defaultKey('month'));
   const [open, setOpen] = useState<string | null>(null);
-  const table = useMemo(() => kpiTable(records, period, key), [records, period, key]);
-  const trend = useMemo(() => kpiTrend(records, period, key), [records, period, key]);
+  const table = useMemo(() => kpiTable(records, period, key, whole), [records, period, key, whole]);
+  const trend = useMemo(() => kpiTrend(records, period, key, whole), [records, period, key, whole]);
   const maxNet = Math.max(1, ...trend.map(t => t.row.figures.net ?? 0));
   const cols: [string, (r: KpiRow) => string][] = [
     ['순매출', r => wonText(r.figures.net)], ['달성율', r => pct(r.rates.achievement)], ['신장율', r => pct(r.rates.growth, true)],
     ['이익율', r => pct(r.rates.profitRate)], ['총할인율', r => pct(r.rates.totalDiscountRate)], ['로스율', r => pct(r.rates.lossRate)],
-    ['폐기율', r => pct(r.rates.wasteRate)], ['구성비', r => pct(r.rates.share)],
+    ['폐기율', r => pct(r.rates.wasteRate)], ...(whole ? [['구성비', (r: KpiRow) => pct(r.rates.share)] as [string, (r: KpiRow) => string]] : []),
   ];
   return (
     <div className="space-y-3">
@@ -126,7 +131,7 @@ function Stats({ records }: { records: KpiRecord[] }) {
       })()}
       {trend.length > 0 && (
         <div className="space-y-1.5 rounded-2xl bg-white p-4">
-          <p className="text-sm font-bold text-slate-800">{period === 'month' ? '날짜별' : '월별'} 전체 순매출 · 달성율</p>
+          <p className="text-sm font-bold text-slate-800">{period === 'month' ? '날짜별' : '월별'} {whole ? '전체' : table[0]?.dept ?? ''} 순매출 · 달성율</p>
           {trend.map(t => (
             <div key={t.key} className="grid grid-cols-[3rem_1fr_auto] items-center gap-2 text-xs tabular-nums">
               <span className="text-slate-500">{t.label}</span>
@@ -146,10 +151,10 @@ const toDraft = (f: KpiFigures): Draft => Object.fromEntries(FIGURE_FIELDS.filte
 const fromDraft = (d: Draft) => Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, Number(String(v).replace(/[,\s원%+]/g, ''))]));
 const comma = (v?: string) => { const n = Number(String(v ?? '').replace(/[,\s]/g, '')); return v && Number.isFinite(n) ? n.toLocaleString('ko-KR') : v ?? ''; };
 
-function Input({ records, aiEnabled, onError, onToast }: { records: KpiRecord[]; aiEnabled: boolean; onError: (m: string) => void; onToast: (m: string) => void }) {
+function Input({ records, depts, aiEnabled, onError, onToast }: { records: KpiRecord[]; depts: SalesDept[]; aiEnabled: boolean; onError: (m: string) => void; onToast: (m: string) => void }) {
   const [period, setPeriod] = useState<KpiPeriod>('day');
   const [key, setKey] = useState(defaultKey('day'));
-  const [dept, setDept] = useState<SalesDept>('수산');
+  const [dept, setDept] = useState<SalesDept>(depts[0] ?? '수산');
   const [draft, setDraft] = useState<Draft>({});
   const [photoRows, setPhotoRows] = useState<{ dept: SalesDept; figures: KpiFigures }[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -206,7 +211,7 @@ function Input({ records, aiEnabled, onError, onToast }: { records: KpiRecord[];
 
       <div className="space-y-3 rounded-2xl bg-white p-4">
         <p className="text-sm font-bold text-slate-800">✏️ 직접 입력 <span className="font-normal text-slate-400">(원 단위)</span></p>
-        <div className="flex flex-wrap gap-2">{SALES_DEPTS.map(d => <Chip key={d} active={dept === d} onClick={() => setDept(d)}>{d}</Chip>)}</div>
+        <div className="flex flex-wrap gap-2">{depts.map(d => <Chip key={d} active={dept === d} onClick={() => setDept(d)}>{d}</Chip>)}</div>
         {existing && <p className="text-xs text-slate-500">이미 입력된 실적이 있습니다 ({existing.by.name}). 고쳐서 저장하면 바뀝니다.</p>}
         <div className="grid grid-cols-2 gap-2">
           {FIGURE_FIELDS.map(x => (
@@ -235,7 +240,7 @@ function Input({ records, aiEnabled, onError, onToast }: { records: KpiRecord[];
 
 // ---- 권한: 관리자가 시니어 담당에게 허락 ----
 function Access({ onError, onToast }: { onError: (m: string) => void; onToast: (m: string) => void }) {
-  const [list, setList] = useState<{ id: string; name: string; dept: string; rank?: string; level?: string; allowed: boolean }[] | null>(null);
+  const [list, setList] = useState<{ id: string; name: string; dept: string; rank?: string; level?: string; sales?: boolean; allowed: boolean }[] | null>(null);
   const load = () => api<typeof list>('/kpi/access').then(setList, e => onError((e as Error).message));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggle = async (id: string, allow: boolean, name: string) => {
@@ -244,16 +249,16 @@ function Access({ onError, onToast }: { onError: (m: string) => void; onToast: (
   };
   return (
     <div className="space-y-2">
-      <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">점장·부점장은 항상 볼 수 있고, <b>시니어 담당</b>은 여기서 허락해야 볼 수 있습니다. 주니어 담당은 허락할 수 없습니다.</p>
+      <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">우리 점 직원만 보입니다. 점장·부점장은 우리 점 모든 부서를, <b>허락받은 시니어 담당</b>은 <b>자기 부서만</b> 볼 수 있습니다. 주니어 담당은 허락할 수 없습니다.</p>
       {!list ? <p className="text-sm text-slate-500">불러오는 중…</p> : !list.length ? <Empty>등록된 직원이 없습니다.</Empty> : list.map(s => (
         <div key={s.id} className="flex items-center gap-3 rounded-xl bg-white px-3.5 py-3">
           <div className="min-w-0 flex-1">
             <p className="font-bold text-slate-900">{s.name} <span className="text-sm font-normal text-slate-500">{s.rank ?? ''}</span></p>
             <p className="text-xs text-slate-500">{s.dept} · {s.level ? `${s.level} 담당` : '담당 구분 없음'}</p>
           </div>
-          {s.level === '시니어'
+          {s.level === '시니어' && s.sales !== false
             ? <button onClick={() => toggle(s.id, !s.allowed, s.name)} aria-pressed={s.allowed} className={cx('rounded-lg px-3 py-2 text-sm font-bold', s.allowed ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700')}>{s.allowed ? '허락됨' : '허락하기'}</button>
-            : <span className="text-xs text-slate-400">열람 불가</span>}
+            : <span className="text-xs text-slate-400">{s.sales === false ? '영업부서 아님' : '열람 불가'}</span>}
         </div>
       ))}
     </div>
@@ -265,18 +270,20 @@ export default function KpiBoard({ me, records, aiEnabled, onError, onToast }: {
   me: Staff; records: KpiRecord[] | null; aiEnabled: boolean; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   const [sub, setSub] = useState<Sub>('ask');
+  const scope = kpiScope(me);
+  const whole = me.role === 'manager';
   const tabs: [Sub, string][] = [['ask', '🎤 물어보기'], ['stats', '📈 통계'], ['input', '✏️ 입력'], ...(me.role === 'manager' ? [['access', '👥 권한'] as [Sub, string]] : [])];
   return (
     <div className="space-y-3">
-      <p className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white"><Lock className="size-3.5" />영업기밀 — 화면 캡처·외부 공유 금지 · 점장·부점장, 승인된 시니어 담당만 볼 수 있습니다</p>
+      <p className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white"><Lock className="size-3.5 shrink-0" />영업기밀 — 화면 캡처·외부 공유 금지 · {scope.store} {whole ? '전체 부서' : `${scope.depts[0] ?? ''} 부서만`} 열람</p>
       <div className={cx('grid gap-1 rounded-xl bg-slate-200/70 p-1', tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
         {tabs.map(([k, label]) => <button key={k} onClick={() => setSub(k)} className={cx('rounded-lg py-2 text-sm font-semibold', sub === k ? 'bg-white shadow-sm' : 'text-slate-600')}>{label}</button>)}
       </div>
       {!records ? <p className="text-sm text-slate-500">실적을 불러오는 중…</p> : (
         <>
-          {sub === 'ask' && <Ask records={records} />}
-          {sub === 'stats' && <Stats records={records} />}
-          {sub === 'input' && <Input records={records} aiEnabled={aiEnabled} onError={onError} onToast={onToast} />}
+          {sub === 'ask' && <Ask records={records} whole={whole} ownDept={scope.depts[0]} />}
+          {sub === 'stats' && <Stats records={records} whole={whole} />}
+          {sub === 'input' && <Input records={records} depts={scope.depts} aiEnabled={aiEnabled} onError={onError} onToast={onToast} />}
         </>
       )}
       {sub === 'access' && me.role === 'manager' && <Access onError={onError} onToast={onToast} />}
