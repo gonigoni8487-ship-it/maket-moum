@@ -1,15 +1,15 @@
 import { useRef, useState } from 'react';
-import { Camera, CheckCircle2, Image as ImageIcon, FolderOpen, Loader2, MapPin, Megaphone, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Camera, CheckCircle2, FileText, Image as ImageIcon, FolderOpen, Loader2, MapPin, Megaphone, Paperclip, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
 import { bayText, matchProduct, type FlyerItem, type Product, type Promotion, type VisionFlyerResult } from '../shared';
 import { api } from '../api';
-import { fileToJpeg } from '../camera';
+import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { cx, won } from '../ui';
 import CameraView, { FLYER_MAX_SIDE } from './CameraView';
 import BroadcastMaker from './BroadcastMaker';
 
 const MAX_PAGES = 4;
 
-type Page = { id: number; src: string; state: 'waiting' | 'reading' | 'done' | 'failed'; count?: number; error?: string };
+type Page = { id: number; src: string; pdf?: string; state: 'waiting' | 'reading' | 'done' | 'failed'; count?: number; error?: string };
 type Row = FlyerItem & { key: number; page?: number; include: boolean };
 
 const field = 'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none';
@@ -27,6 +27,7 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
   const [saving, setSaving] = useState(false);
   const [broadcast, setBroadcast] = useState<FlyerItem[] | null>(null);
   const albumRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
   const room = MAX_PAGES - pages.length;
   const reading = pages.some(p => p.state === 'reading' || p.state === 'waiting');
@@ -54,22 +55,28 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
     }
   };
 
-  const addPages = (srcs: string[]) => {
-    const added = srcs.slice(0, room).map(src => ({ id: ++seq.current, src, state: aiEnabled ? 'waiting' : 'done' } as Page));
+  const addPages = (srcs: (string | { src: string; pdf?: string })[]) => {
+    const added = srcs.slice(0, room).map(x => ({ id: ++seq.current, ...(typeof x === 'string' ? { src: x } : x), state: aiEnabled ? 'waiting' : 'done' } as Page));
     setPages(ps => [...ps, ...added]);
     // 한 장씩 차례로 인식 (동시에 보내면 느린 매장 Wi-Fi에서 모두 실패하기 쉽다)
     if (aiEnabled) void added.reduce((chain, p) => chain.then(() => recognize(p)), Promise.resolve());
   };
 
-  const pickAlbum = async (files: FileList | null) => {
+  // 앨범·파일 첨부: 사진과 PDF 전단 (PDF는 여러 쪽을 한 번에 읽는다)
+  const pickFiles = async (files: FileList | null) => {
     if (!files?.length) return;
-    const list = [...files].filter(f => f.type.startsWith('image/'));
-    if (list.length > room) onError(`전단 사진은 한 번에 ${MAX_PAGES}장까지입니다. ${room}장만 넣었습니다.`);
-    try {
-      addPages(await Promise.all(list.slice(0, room).map(f => fileToJpeg(f, FLYER_MAX_SIDE))));
-    } catch {
-      onError('사진을 읽지 못했습니다. 다른 사진을 골라 주세요.');
+    const list = [...files].filter(f => f.type.startsWith('image/') || isPdf(f));
+    if (list.length < files.length) onError('사진(jpg·png 등)이나 PDF 파일만 올릴 수 있습니다.');
+    if (list.length > room) onError(`전단은 한 번에 ${MAX_PAGES}개까지입니다. ${room}개만 넣었습니다.`);
+    const ok: { src: string; pdf?: string }[] = [];
+    for (const f of list.slice(0, room)) {
+      try {
+        ok.push({ src: await flyerFileToDataUrl(f, FLYER_MAX_SIDE), pdf: isPdf(f) ? f.name : undefined });
+      } catch (e) {
+        onError(isPdf(f) ? (e as Error).message : `${f.name} 사진을 읽지 못했습니다. 다른 파일을 골라 주세요.`);
+      }
     }
+    if (ok.length) addPages(ok);
   };
 
   const removePage = (id: number) => {
@@ -105,14 +112,16 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
 
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-semibold text-slate-700">1. 전단 사진 <span className="font-normal text-slate-400">(앞·뒷면 등 최대 {MAX_PAGES}장)</span></span>
+          <span className="text-sm font-semibold text-slate-700">1. 전단 사진·파일 <span className="font-normal text-slate-400">(앞·뒷면, PDF 등 최대 {MAX_PAGES}개)</span></span>
           <span className="text-xs font-semibold text-slate-500">{pages.length} / {MAX_PAGES}</span>
         </div>
         {pages.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
             {pages.map((p, i) => (
               <div key={p.id} className="relative overflow-hidden rounded-xl bg-slate-900">
-                <img src={p.src} alt={`전단 ${i + 1}쪽`} className="aspect-[3/4] w-full object-contain" />
+                {p.pdf
+                  ? <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 bg-slate-100 p-3 text-center text-slate-600"><FileText className="size-10 text-red-500" /><span className="line-clamp-3 break-all text-xs font-semibold">{p.pdf}</span></div>
+                  : <img src={p.src} alt={`전단 ${i + 1}쪽`} className="aspect-[3/4] w-full object-contain" />}
                 <button type="button" onClick={() => removePage(p.id)} aria-label={`전단 ${i + 1}쪽 빼기`} className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white"><X className="size-4" /></button>
                 <div className={cx('absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-white',
                   p.state === 'reading' ? 'bg-blue-600/90' : p.state === 'waiting' ? 'bg-slate-700/90' : p.state === 'failed' ? 'bg-red-600/90' : 'bg-emerald-600/90')}>
@@ -135,9 +144,13 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
             <button type="button" onClick={() => albumRef.current?.click()} className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-pink-200 bg-white py-5 text-[15px] font-bold text-pink-700 active:bg-pink-50">
               <ImageIcon className="size-6" />앨범에서 고르기
             </button>
+            <button type="button" onClick={() => fileRef.current?.click()} className="col-span-2 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-pink-300 bg-white py-3.5 text-[15px] font-bold text-pink-700 active:bg-pink-50">
+              <Paperclip className="size-5" />파일 첨부 (사진·PDF 전단)
+            </button>
           </div>
         )}
-        <input ref={albumRef} type="file" accept="image/*" multiple hidden onChange={e => { void pickAlbum(e.target.files); e.target.value = ''; }} />
+        <input ref={albumRef} type="file" accept="image/*" multiple hidden onChange={e => { void pickFiles(e.target.files); e.target.value = ''; }} />
+        <input ref={fileRef} type="file" accept={FLYER_FILE_ACCEPT} multiple hidden onChange={e => { void pickFiles(e.target.files); e.target.value = ''; }} />
         <p className="text-xs text-slate-500">전단 한 면이 화면에 꽉 차게, 글씨가 흔들리지 않게 찍어 주세요. 판매코드처럼 작은 글씨는 가까이서 나눠 찍으면 더 잘 읽힙니다.</p>
       </div>
 
