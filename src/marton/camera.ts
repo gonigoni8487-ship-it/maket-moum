@@ -98,6 +98,24 @@ export async function fileToJpeg(file: File, maxSide = 1280): Promise<string> {
   return toJpeg(bitmap, bitmap.width, bitmap.height, maxSide);
 }
 
+/** 전단 PDF는 서버 요청 한도(8MB, base64로 1.33배) 안쪽만 */
+export const MAX_FLYER_PDF_BYTES = 5 * 1024 * 1024;
+export const FLYER_FILE_ACCEPT = 'image/*,application/pdf,.pdf';
+export const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+
+/** 첨부한 전단 파일 → 인식용 data URL. 사진은 JPEG로 줄이고, PDF는 그대로 (너무 크면 오류) */
+export async function flyerFileToDataUrl(file: File, maxSide: number): Promise<string> {
+  if (!isPdf(file)) return fileToJpeg(file, maxSide);
+  if (file.size > MAX_FLYER_PDF_BYTES) throw new Error(`PDF 파일이 너무 큽니다 (${(file.size / 1048576).toFixed(1)}MB). 5MB 이하로 줄이거나 쪽을 나눠 올려 주세요.`);
+  const b64 = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => reject(new Error('PDF 파일을 읽지 못했습니다.'));
+    r.readAsDataURL(file);
+  });
+  return `data:application/pdf;base64,${b64}`;
+}
+
 export function dataUrlToBlob(dataUrl: string): Blob {
   const [head, b64] = dataUrl.split(',');
   const mime = /data:([^;]+)/.exec(head)?.[1] ?? 'image/jpeg';

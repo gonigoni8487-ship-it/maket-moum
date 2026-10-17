@@ -82,6 +82,14 @@ export default function Home({ me, kpi, counts, schedules, emergencies, onGo, on
         </span>
       </button>
 
+      <button onClick={() => onGo('broadcast')} className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-500 p-4 text-left text-white shadow-sm active:opacity-90">
+        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-white/20"><Radio className="size-7" /></span>
+        <span className="min-w-0">
+          <span className="block text-lg font-black">행사 방송 만들기 (TTS)</span>
+          <span className="block text-sm text-pink-50">전단 사진 → 쇼호스트 음성 + 배경음악 → MP3</span>
+        </span>
+      </button>
+
       <Group title="자주 쓰는 기능">
         <Tile big icon={<Mic className={icBig} />} color="bg-red-500" label="말로 요청" hint="말하면 담당 부서 호출" onClick={() => onGo('voice')} />
         <Tile big icon={<ClipboardList className={icBig} />} color="bg-blue-600" label="받은 업무" hint="우리 부서 요청 처리" badge={counts.tasks} onClick={() => onGo('tasks')} />
@@ -92,7 +100,6 @@ export default function Home({ me, kpi, counts, schedules, emergencies, onGo, on
       <Group title="고객 응대">
         <Tile icon={<HeartHandshake className={ic} />} color="bg-rose-500" label="도와드리겠습니다" hint="컴플레인 접수 공유" badge={counts.complaints} onClick={() => onGo('complaint')} />
         <Tile icon={<Camera className={ic} />} color="bg-sky-600" label="사진·가격 확인" hint="가격표·바코드·전단" onClick={() => onGo('photo')} />
-        <Tile icon={<Radio className={ic} />} color="bg-pink-600" label="행사 방송 만들기" hint="전단 → 쇼호스트 음성·음악" onClick={() => onGo('broadcast')} />
       </Group>
 
       <Group title="매장 소통">

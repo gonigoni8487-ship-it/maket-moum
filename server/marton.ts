@@ -295,10 +295,10 @@ export function parseJson<T>(raw: string | undefined): T {
   return JSON.parse(t.trim()) as T;
 }
 
-function parseImage(dataUrl: unknown) {
+function parseImage(dataUrl: unknown, allowPdf = false) {
   if (typeof dataUrl !== 'string') return null;
-  const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(dataUrl);
-  return m ? { mimeType: m[1], data: m[2] } : null;
+  const m = /^data:(image\/[a-z+]+|application\/pdf);base64,(.+)$/.exec(dataUrl);
+  return m && (allowPdf || m[1] !== 'application/pdf') ? { mimeType: m[1], data: m[2] } : null;
 }
 
 /** 금액: 2980, "2,980원" 모두 숫자로. "2,950/4,950원"·"69,000~99,000원"처럼 여러 개면 첫 금액 */
@@ -714,13 +714,14 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
       const matched = db.products.find(p => p.barcode === clientBarcode);
       return res.json({ mode, barcode: clientBarcode, matched, message: matched ? describe(matched) : '등록되지 않은 바코드입니다.' } satisfies VisionResult);
     }
-    const image = parseImage(req.body.image);
-    if (!image) return res.status(400).json({ error: '사진을 첨부해 주세요.' });
+    // 행사 전단은 PDF 파일도 받는다 (여러 쪽이면 전부 읽음)
+    const image = parseImage(req.body.image, mode === 'flyer');
+    if (!image) return res.status(400).json({ error: mode === 'flyer' ? '전단 사진이나 PDF 파일을 첨부해 주세요.' : '사진을 첨부해 주세요.' });
     if (!aiEnabled) return res.status(503).json({ error: 'AI 키(GEMINI_API_KEY)가 설정되지 않아 사진 분석을 할 수 없습니다.' });
 
     const prompts = {
       flyer: [
-        '이 사진은 한국 대형마트의 행사 전단지 한 면(또는 행사 POP·쇼카드)입니다. 가격이나 행사 표시가 붙은 상품을 위에서 아래, 왼쪽에서 오른쪽 순서로 빠짐없이 한 상품(묶음)당 한 줄로 추출하세요.',
+        '이 사진(또는 PDF 파일)은 한국 대형마트의 행사 전단지(또는 행사 POP·쇼카드)입니다. 여러 쪽이면 모든 쪽을 읽으세요. 가격이나 행사 표시가 붙은 상품을 위에서 아래, 왼쪽에서 오른쪽 순서로 빠짐없이 한 상품(묶음)당 한 줄로 추출하세요.',
         '- name: 전단에 적힌 상품명 그대로 (브랜드 포함, "2종", "17종" 같은 묶음 표기 포함). 괄호 안 규격·원산지는 빼고',
         '- code: 판매코드·상품코드·바코드 숫자. 전단에 적혀 있을 때만, 없으면 null (지어내지 말 것)',
         '- spec: 상품명 옆 괄호의 규격·단위·포장·원산지 (예: "각 500g/냉장/원산지 별도표기", "3kg/박스/국산", "각 150g×2봉", "상품별 규격 상이"). 없으면 null',
