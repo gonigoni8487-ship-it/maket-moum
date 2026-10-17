@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
 import {
-  BellRing, CalendarDays, Camera, ChartColumn, Sunrise, ClipboardList, Coffee, HeartHandshake, LayoutDashboard, Megaphone, Mic, Search, Send, Settings, ShieldAlert, Siren, TimerReset, TrendingUp,
+  BellRing, CalendarDays, Camera, Radio, ChartColumn, Sunrise, ClipboardList, Coffee, HeartHandshake, LayoutDashboard, Megaphone, Mic, Search, Send, Settings, ShieldAlert, Siren, TimerReset, TrendingUp,
 } from 'lucide-react';
 import { EMERGENCY_INFO, regularHolidays, storeTime, type Emergency, type Staff, type WorkSchedule } from '../shared';
 import { cx } from '../ui';
 
 export type HomeGo =
   | 'tasks' | 'request' | 'find' | 'photo' | 'complaint' | 'security' | 'manager'
-  | 'notice' | 'share' | 'schedule' | 'expiry' | 'voice' | 'wallet' | 'settings' | 'morning' | 'bell' | 'kpi';
+  | 'notice' | 'share' | 'schedule' | 'expiry' | 'voice' | 'wallet' | 'settings' | 'morning' | 'bell' | 'kpi' | 'broadcast';
 
 interface Counts { tasks: number; notices: number; share: number; expiry: number; complaints: number; incidents: number; coupons: number }
 
@@ -92,6 +92,7 @@ export default function Home({ me, kpi, counts, schedules, emergencies, onGo, on
       <Group title="고객 응대">
         <Tile icon={<HeartHandshake className={ic} />} color="bg-rose-500" label="도와드리겠습니다" hint="컴플레인 접수 공유" badge={counts.complaints} onClick={() => onGo('complaint')} />
         <Tile icon={<Camera className={ic} />} color="bg-sky-600" label="사진·가격 확인" hint="가격표·바코드·전단" onClick={() => onGo('photo')} />
+        <Tile icon={<Radio className={ic} />} color="bg-pink-600" label="행사 방송 만들기" hint="전단 → 쇼호스트 음성·음악" onClick={() => onGo('broadcast')} />
       </Group>
 
       <Group title="매장 소통">

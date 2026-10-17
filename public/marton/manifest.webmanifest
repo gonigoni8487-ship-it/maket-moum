@@ -25,6 +25,7 @@
   ],
   "shortcuts": [
     { "name": "말로 요청하기", "short_name": "말로 요청", "url": "/marton/?voice=1", "icons": [{ "src": "/marton/icon-192.png", "sizes": "192x192" }] },
-    { "name": "보안 신고", "short_name": "보안 신고", "url": "/marton/?tab=security", "icons": [{ "src": "/marton/icon-192.png", "sizes": "192x192" }] }
+    { "name": "보안 신고", "short_name": "보안 신고", "url": "/marton/?tab=security", "icons": [{ "src": "/marton/icon-192.png", "sizes": "192x192" }] },
+    { "name": "행사 방송 만들기", "short_name": "행사 방송", "url": "/marton/?broadcast=1", "icons": [{ "src": "/marton/icon-192.png", "sizes": "192x192" }] }
   ]
 }
