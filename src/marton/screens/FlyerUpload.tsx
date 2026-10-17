@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { Camera, CheckCircle2, Image as ImageIcon, Loader2, MapPin, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Camera, CheckCircle2, Image as ImageIcon, FolderOpen, Loader2, MapPin, Megaphone, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
 import { bayText, matchProduct, type FlyerItem, type Product, type Promotion, type VisionFlyerResult } from '../shared';
 import { api } from '../api';
 import { fileToJpeg } from '../camera';
 import { cx, won } from '../ui';
 import CameraView, { FLYER_MAX_SIDE } from './CameraView';
+import BroadcastMaker from './BroadcastMaker';
 
 const MAX_PAGES = 4;
 
@@ -17,18 +18,21 @@ const sameItem = (a: FlyerItem, b: FlyerItem) =>
   (a.code && b.code && a.code === b.code) || (a.name.replace(/\s+/g, '') === b.name.replace(/\s+/g, '') && (a.spec ?? '') === (b.spec ?? ''));
 
 /** 행사 전단 올리기: 사진(여러 장) → 자동 인식 → 직원이 확인·수정 → 행사상품 등록 */
-export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
-  aiEnabled: boolean; products: Product[]; onError: (m: string) => void; onToast: (m: string) => void;
+export default function FlyerUpload({ aiEnabled, products, promotions, onError, onToast }: {
+  aiEnabled: boolean; products: Product[]; promotions: Promotion[]; onError: (m: string) => void; onToast: (m: string) => void;
 }) {
   const [pages, setPages] = useState<Page[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [camera, setCamera] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [broadcast, setBroadcast] = useState<FlyerItem[] | null>(null);
   const albumRef = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
   const room = MAX_PAGES - pages.length;
   const reading = pages.some(p => p.state === 'reading' || p.state === 'waiting');
   const chosen = rows.filter(r => r.include && r.name.trim());
+  const recent = [...promotions].sort((a, b) => b.createdAt - a.createdAt).slice(0, 40);
+  const asItems = (list: FlyerItem[]): FlyerItem[] => list.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period }));
 
   const updatePage = (id: number, patch: Partial<Page>) => setPages(ps => ps.map(p => (p.id === id ? { ...p, ...patch } : p)));
 
@@ -80,7 +84,7 @@ export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
     if (!chosen.length) return onError('등록할 상품을 한 개 이상 선택해 주세요.');
     setSaving(true);
     try {
-      const items: FlyerItem[] = chosen.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period }));
+      const items = asItems(chosen);
       const added = await api<Promotion[]>('/promotions', { items });
       onToast(`행사상품 ${added.length}개를 등록했습니다. 상품찾기·가격표 확인에 바로 반영됩니다.`);
       setPages([]); setRows([]);
@@ -136,6 +140,18 @@ export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
         <input ref={albumRef} type="file" accept="image/*" multiple hidden onChange={e => { void pickAlbum(e.target.files); e.target.value = ''; }} />
         <p className="text-xs text-slate-500">전단 한 면이 화면에 꽉 차게, 글씨가 흔들리지 않게 찍어 주세요. 판매코드처럼 작은 글씨는 가까이서 나눠 찍으면 더 잘 읽힙니다.</p>
       </div>
+
+      {aiEnabled && rows.length === 0 && pages.length === 0 && recent.length > 0 && (
+        <button type="button" onClick={() => setBroadcast(asItems(recent))} className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left active:bg-pink-50">
+          <Megaphone className="size-6 shrink-0 text-pink-600" />
+          <span><span className="block text-[15px] font-bold text-slate-900">등록된 행사로 매장 방송 만들기</span><span className="text-xs text-slate-500">최근 행사상품 {recent.length}개 · 쇼호스트 음성 + 분위기 배경음악 (1~3분)</span></span>
+        </button>
+      )}
+      {aiEnabled && rows.length === 0 && pages.length === 0 && (
+        <button type="button" onClick={() => setBroadcast([])} className="flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-pink-700 underline underline-offset-4">
+          <FolderOpen className="size-4" />만든 방송 보관함 (다시 듣기·MP3 다운로드)
+        </button>
+      )}
 
       {rows.length === 0 && pages.length === 0 && (
         <button type="button" onClick={addBlank} className="w-full text-center text-sm font-semibold text-slate-500 underline underline-offset-4">사진 없이 직접 입력하기</button>
@@ -196,12 +212,19 @@ export default function FlyerUpload({ aiEnabled, products, onError, onToast }: {
             <Plus className="size-4" />직접 추가
           </button>
 
+          {aiEnabled && (
+            <button type="button" onClick={() => setBroadcast(asItems(chosen))} disabled={reading || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-pink-200 bg-white py-3.5 text-[15px] font-bold text-pink-700 active:bg-pink-50 disabled:opacity-50">
+              <Megaphone className="size-5" />선택한 {chosen.length}개로 매장 방송 만들기 (음성 + 음악)
+            </button>
+          )}
+
           <button type="button" onClick={() => void register()} disabled={saving || reading || !chosen.length} className="w-full rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
             {saving ? '등록하는 중…' : reading ? '인식이 끝나면 등록할 수 있습니다' : `선택한 ${chosen.length}개 행사상품 등록 (전 직원 공유)`}
           </button>
         </div>
       )}
 
+      {broadcast && <BroadcastMaker items={broadcast} onClose={() => setBroadcast(null)} onError={onError} />}
       {camera && <CameraView mode="flyer" onClose={() => setCamera(false)} onCapture={photo => { setCamera(false); addPages([photo]); }} />}
     </div>
   );

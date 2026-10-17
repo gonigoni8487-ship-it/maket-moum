@@ -24,7 +24,8 @@
    | `MARTON_MANAGER_PIN` | 필수 | 6자 이상 (영문·숫자·기호 가능). 없으면 점장 로그인이 막힙니다 |
    | `MARTON_STORE_CODE` | 권장 | 매장 공용 접속 코드 (외부인 차단) |
    | `MARTON_VAPID_SUBJECT` | 권장 | `mailto:담당자@회사메일` (푸시 발신자) |
-   | `GEMINI_API_KEY` | 선택 | 사진 AI·AI 답변 |
+   | `GEMINI_API_KEY` | 선택 | 사진 AI·AI 답변·행사 매장 방송(음성·배경음악) |
+   | `MARTON_MUSIC_DAILY_LIMIT` | 선택 | 매장 방송 배경음악 하루 생성 한도 (기본 30곡) |
    | `MARTON_INTEGRATION_KEY` | 선택 | 센서·CCTV 경보 웹훅 키 |
    | `MARTON_HOME_REDIRECT` | 선택 | `1`이면 주소 첫 화면에서 바로 마트ON으로 이동 |
 
@@ -49,7 +50,7 @@
    | `MARTON_MANAGER_PIN` | 6자 이상 (영문·숫자·기호 가능) | 점장·영업부점장·지원부점장 로그인 비밀번호 |
    | `MARTON_STORE_CODE` | `lotte-jamsil-24` | 매장 공용 접속 코드 (조회실에만 게시) |
    | `MARTON_VAPID_SUBJECT` | `mailto:담당자@회사메일` | 푸시 알림 발신자 표시 |
-   | `GEMINI_API_KEY` | (선택) | 사진 AI·AI 답변 |
+   | `GEMINI_API_KEY` | (선택) | 사진 AI·AI 답변·행사 매장 방송 |
 
 5. 배포가 끝나면 `https://marton-xxxx.onrender.com` 주소가 생깁니다. 이 주소로 접속하면 바로 마트ON이 열립니다.
 6. (선택) Render → Settings → Custom Domain에서 `marton.회사도메인` 연결.

@@ -12,7 +12,7 @@ type Mode = VisionResult['mode'];
 const MODES: { mode: Mode; label: string; hint: string; button: string }[] = [
   { mode: 'price', label: '가격표', hint: '가격표를 찍으면 시스템 가격(행사가 포함)과 비교하고, 다르면 바로 가격 오류 요청을 보냅니다.', button: '가격표 촬영' },
   { mode: 'barcode', label: '바코드', hint: '바코드를 비추면 자동으로 읽어 상품·위치·가격을 보여 줍니다. 안 읽히거나 훼손됐으면 번호 입력이나 훼손 신고로 처리합니다.', button: '바코드 스캔' },
-  { mode: 'flyer', label: '행사 전단', hint: '전단 사진을 올리면 상품명·판매코드·규격·금액·행사 프로모션·기간을 자동으로 읽습니다. 확인·수정 후 등록하면 전 직원 상품찾기와 가격표 확인에 바로 반영됩니다.', button: '전단 촬영' },
+  { mode: 'flyer', label: '행사 전단', hint: '전단 사진을 올리면 상품명·판매코드·규격·금액·행사 프로모션·기간을 자동으로 읽습니다. 확인·수정 후 등록하면 전 직원 상품찾기와 가격표 확인에 바로 반영되고, 행사 안내 음성과 배경음악을 넣은 매장 방송도 만들 수 있습니다.', button: '전단 촬영' },
 ];
 
 function ProductCard({ p, onRequest, photo }: { p: Product; onRequest: (d: Draft) => void; photo?: string }) {
@@ -143,7 +143,7 @@ export default function PhotoAI({ me, aiEnabled, products, promotions, onRequest
       ) : mode === 'flyer' ? (
         <>
           <p className="text-sm text-slate-500">{info.hint}</p>
-          <FlyerUpload aiEnabled={aiEnabled} products={products} onError={onError} onToast={onToast} />
+          <FlyerUpload aiEnabled={aiEnabled} products={products} promotions={promotions} onError={onError} onToast={onToast} />
         </>
       ) : <>
       <p className="text-sm text-slate-500">{info.hint}</p>
