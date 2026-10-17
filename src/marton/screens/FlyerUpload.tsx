@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Camera, CheckCircle2, Image as ImageIcon, Loader2, MapPin, Megaphone, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Camera, CheckCircle2, Image as ImageIcon, FolderOpen, Loader2, MapPin, Megaphone, Plus, RotateCw, Trash2, X, AlertTriangle } from 'lucide-react';
 import { bayText, matchProduct, type FlyerItem, type Product, type Promotion, type VisionFlyerResult } from '../shared';
 import { api } from '../api';
 import { fileToJpeg } from '../camera';
@@ -144,7 +144,12 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
       {aiEnabled && rows.length === 0 && pages.length === 0 && recent.length > 0 && (
         <button type="button" onClick={() => setBroadcast(asItems(recent))} className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left active:bg-pink-50">
           <Megaphone className="size-6 shrink-0 text-pink-600" />
-          <span><span className="block text-[15px] font-bold text-slate-900">등록된 행사로 매장 방송 만들기</span><span className="text-xs text-slate-500">최근 행사상품 {recent.length}개 · 행사별 안내 음성 + 분위기 배경음악 (1~3분)</span></span>
+          <span><span className="block text-[15px] font-bold text-slate-900">등록된 행사로 매장 방송 만들기</span><span className="text-xs text-slate-500">최근 행사상품 {recent.length}개 · 쇼호스트 음성 + 분위기 배경음악 (1~3분)</span></span>
+        </button>
+      )}
+      {aiEnabled && rows.length === 0 && pages.length === 0 && (
+        <button type="button" onClick={() => setBroadcast([])} className="flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-pink-700 underline underline-offset-4">
+          <FolderOpen className="size-4" />만든 방송 보관함 (다시 듣기·MP3 다운로드)
         </button>
       )}
 
