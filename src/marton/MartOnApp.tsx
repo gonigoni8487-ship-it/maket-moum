@@ -64,7 +64,7 @@ export default function MartOnApp() {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(Boolean(session.token));
   const [connected, setConnected] = useState(false);
-  // 홈 화면 바로가기: /marton/?tab=security, /marton/?voice=1
+  // 홈 화면 바로가기: /marton/?tab=security, /marton/?voice=1, /marton/?broadcast=1
   const params = new URLSearchParams(window.location.search);
   const [tab, setTab] = useState<Tab>(() => {
     const t = params.get('tab') as Tab | null;
@@ -80,7 +80,7 @@ export default function MartOnApp() {
   const [kpiRecords, setKpiRecords] = useState<KpiRecord[] | null>(null);
   const [bellSheet, setBellSheet] = useState(false);
   const [morningOpen, setMorningOpen] = useState(false);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(() => params.get('broadcast') === '1');
   // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
   const [kiosk, setKiosk] = useState<string | null>(() => { try { return localStorage.getItem('marton-kiosk'); } catch { return null; } });
   const kioskRef = useRef(kiosk);
