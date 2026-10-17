@@ -35,6 +35,7 @@ View your app in AI Studio: https://ai.studio/apps/d6b10975-14b0-404f-bb66-12015
 | 처리현황 | 접수 → 확인 → 처리중 → 완료, 단계마다 처리자·시각 기록 |
 | 상품 찾기 | 상품명/바코드 검색, 음성 질문 “연어 어디 있어요?” → AI가 위치 답변 |
 | 촬영 AI | 사진 올리기(찍기·앨범 → 바로 요청), 행사 전단(여러 장) → 상품명·판매코드·규격·정상가/행사가·행사 프로모션·기간 자동 인식 → 확인·수정 후 등록, 가격표 → 시스템 가격과 비교·오류 요청, 바코드 → 상품 식별 |
+| 행사 매장 방송 | 전단 인식 결과(또는 등록된 행사)로 1~3분 매장 방송 만들기 → AI가 행사 분위기(타임세일·주말특가·명절·신선식품 등)에 맞는 원고 작성 → 직원이 고친 뒤 Gemini TTS 음성 + Lyria 배경음악(새로 작곡한 연주곡) → 기기에서 멘트 때 음악을 줄여 합친 WAV 저장·공유·반복 재생 |
 | 점장 화면 | 전체/부서 공지(긴급 포함, 읽음 수), 미처리·긴급 요청, 부서별 접속 인원·평균 확인/완료 시간 |
 
 환경변수
@@ -42,6 +43,8 @@ View your app in AI Studio: https://ai.studio/apps/d6b10975-14b0-404f-bb66-12015
 - `GEMINI_API_KEY`: 사진 AI·AI 위치 답변 (없으면 상품찾기는 DB 검색으로 동작, 사진 분석은 비활성)
 - `MARTON_MANAGER_PIN`: 점장/부점장 로그인 PIN (개발 모드 기본값 `0000`, 운영 모드에서는 반드시 설정)
 - `MARTON_DATA_FILE`: 데이터 저장 파일 (기본 `data/marton-db.json`)
+- `MARTON_TTS_MODEL` / `MARTON_MUSIC_MODEL`: 매장 방송 음성·음악 모델 (기본 `gemini-3.1-flash-tts-preview` / `lyria-3.5`, 쓸 수 없으면 `gemini-2.5-flash-preview-tts` / `lyria-3-pro-preview`로 자동 전환)
+- `MARTON_MUSIC_DAILY_LIMIT`: 매장 방송 배경음악 하루 생성 한도 (기본 30곡, 곡당 요금이 붙음)
 
 실시간 기능은 Express 서버(`npm run build && npm start`)에서 동작합니다. 정적 호스팅(Cloudflare assets)만으로는 `/api/marton` 이 없어 로그인할 수 없습니다.
 

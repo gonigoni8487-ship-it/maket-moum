@@ -14,6 +14,7 @@ import { registerBoard, pruneBoard, saveFiles, FILE_ID } from './marton-board';
 import { registerCare, pruneCare } from './marton-care';
 import { registerGuard } from './marton-guard';
 import { registerKpi, kpiAllowed } from './marton-kpi';
+import { registerBroadcast } from './marton-broadcast';
 import { normalizeStore, type KpiRecord } from '../src/marton/kpi';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
@@ -409,6 +410,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   registerCare(app);
   registerGuard(app);
   registerKpi(app, genAI, aiEnabled);
+  registerBroadcast(app, genAI, aiEnabled);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);
