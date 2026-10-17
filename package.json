@@ -12,7 +12,7 @@
     "dev:cf": "wrangler dev"
   },
   "dependencies": {
-    "@base-ui/react": "^1.4.1",
+    "@base-ui/react": "^1.8.0",
     "@breezystack/lamejs": "^1.2.7",
     "@fontsource-variable/geist": "^5.2.8",
     "@google/genai": "^1.29.0",
