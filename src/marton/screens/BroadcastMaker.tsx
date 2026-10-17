@@ -22,6 +22,7 @@ const SPEECH_PARALLEL = 2;
 const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:border-pink-500';
 const HOST_TONE = ['bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700'];
 const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age: '40대' }];
+const NO_KEY = 'AI 키(GEMINI_API_KEY)가 서버에 없어 전단을 읽거나 방송을 만들 수 없습니다. Cloudflare → Workers → maket-moum → 설정 → 변수 및 비밀에 GEMINI_API_KEY를 넣어 주세요.';
 const mb = (b: Blob) => `${(b.size / 1048576).toFixed(1)}MB`;
 
 /** 행사 매장 방송 만들기: 행사상품 → 쇼호스트 원고 → 음성 + 배경음악 → 1~3분 방송 파일 (MP3·WAV) */
@@ -214,7 +215,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
                 </label>
               ))}
             </div>}
-            <button type="button" onClick={() => albumRef.current?.click()} disabled={!aiEnabled || reading > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-pink-200 bg-white py-3 text-sm font-bold text-pink-700 active:bg-pink-50 disabled:opacity-50">
+            <button type="button" onClick={() => (aiEnabled ? albumRef.current?.click() : onError(NO_KEY))} disabled={reading > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-pink-200 bg-white py-3 text-sm font-bold text-pink-700 active:bg-pink-50 disabled:opacity-50">
               {reading > 0 ? <><Loader2 className="size-4 animate-spin" />전단 읽는 중… (한 장에 10~20초)</> : <><Paperclip className="size-4" />전단 파일 첨부 (사진·PDF · 찍기)</>}
             </button>
             <input ref={albumRef} type="file" accept={FLYER_FILE_ACCEPT} multiple hidden onChange={e => { void pickFlyers(e.target.files); e.target.value = ''; }} />
@@ -265,7 +266,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
             <input className={inputCls} value={note} onChange={e => setNote(e.target.value)} maxLength={100} placeholder="덧붙일 말 (선택) 예: 오후 3시까지만, 주차 2시간 무료" />
           </section>
 
-          <button type="button" onClick={() => void writeScript()} disabled={!aiEnabled || busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
+          <button type="button" onClick={() => (aiEnabled ? void writeScript() : onError(NO_KEY))} disabled={busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
             {busy ? <><Loader2 className="size-5 animate-spin" />쇼호스트 원고 쓰는 중…</> : <><Wand2 className="size-5" />방송 원고 만들기</>}
           </button>
         </>}
