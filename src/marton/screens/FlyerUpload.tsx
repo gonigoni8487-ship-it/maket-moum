@@ -224,7 +224,7 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
         </div>
       )}
 
-      {broadcast && <BroadcastMaker items={broadcast} onClose={() => setBroadcast(null)} onError={onError} />}
+      {broadcast && <BroadcastMaker items={broadcast} aiEnabled={aiEnabled} startInLibrary={!broadcast.length} onClose={() => setBroadcast(null)} onError={onError} />}
       {camera && <CameraView mode="flyer" onClose={() => setCamera(false)} onCapture={photo => { setCamera(false); addPages([photo]); }} />}
     </div>
   );

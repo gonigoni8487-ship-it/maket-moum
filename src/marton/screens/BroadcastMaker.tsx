@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Download, FolderOpen, Loader2, Megaphone, Mic, Music, Pencil, RotateCw, Share2, Trash2, Users, User, Wand2 } from 'lucide-react';
-import type { FlyerItem } from '../shared';
+import { AlertTriangle, ArrowLeft, Download, FolderOpen, Image as ImageIcon, Loader2, Megaphone, Mic, Music, Pencil, Plus, RotateCw, Share2, Trash2, Users, User, Wand2 } from 'lucide-react';
+import type { FlyerItem, VisionFlyerResult } from '../shared';
+import { fileToJpeg } from '../camera';
+import { FLYER_MAX_SIDE } from './CameraView';
 import {
   BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, hasBrand, hostLabel, lengthLabel,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
@@ -23,16 +25,20 @@ const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age
 const mb = (b: Blob) => `${(b.size / 1048576).toFixed(1)}MB`;
 
 /** 행사 매장 방송 만들기: 행사상품 → 쇼호스트 원고 → 음성 + 배경음악 → 1~3분 방송 파일 (MP3·WAV) */
-export default function BroadcastMaker({ items: source, onClose, onError }: {
-  items: FlyerItem[]; onClose: () => void; onError: (m: string) => void;
+export default function BroadcastMaker({ items: source, aiEnabled, startInLibrary, onClose, onError }: {
+  items: FlyerItem[]; aiEnabled: boolean; startInLibrary?: boolean; onClose: () => void; onError: (m: string) => void;
 }) {
   const [items, setItems] = useState<Item[]>(() => source.map((it, i) => ({ ...it, key: `${i}-${it.name}`, include: i < 12 })));
+  const [reading, setReading] = useState(0);
+  const [draft, setDraft] = useState({ name: '', price: '', condition: '' });
+  const albumRef = useRef<HTMLInputElement>(null);
+  const seq = useRef(source.length);
   const [seconds, setSeconds] = useState<number>(120);
   const [theme, setTheme] = useState<BroadcastTheme>('자동');
   const [hosts, setHosts] = useState<Host[]>([{ gender: '여성', age: '30대' }]);
   const [withMusic, setWithMusic] = useState(true);
   const [note, setNote] = useState('');
-  const [step, setStep] = useState<Step>(source.length ? 'setup' : 'library');
+  const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
   const [busy, setBusy] = useState(false);
   const [script, setScript] = useState<BroadcastScript | null>(null);
   const [progress, setProgress] = useState<Progress>({ voice: 0, voices: 0, music: 'off', mixing: 'waiting' });
@@ -45,6 +51,41 @@ export default function BroadcastMaker({ items: source, onClose, onError }: {
 
   useEffect(() => { void listBroadcasts().then(setLibrary); }, []);
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
+
+  const addItems = (list: FlyerItem[]) => setItems(xs => {
+    const next = [...xs];
+    for (const it of list) {
+      if (next.some(x => x.name.replace(/\s+/g, '') === it.name.replace(/\s+/g, '') && (x.spec ?? '') === (it.spec ?? ''))) continue;
+      next.push({ ...it, key: `n${++seq.current}`, include: next.filter(x => x.include).length < 12 });
+    }
+    return next;
+  });
+
+  // 전단 사진을 여기서 바로 읽는다 (한 장씩 차례로)
+  const pickFlyers = async (files: FileList | null) => {
+    const list = [...(files ?? [])].filter(f => f.type.startsWith('image/')).slice(0, 4);
+    if (!list.length) return;
+    setReading(list.length);
+    for (const f of list) {
+      try {
+        const r = await api<VisionFlyerResult>('/ai/vision', { mode: 'flyer', image: await fileToJpeg(f, FLYER_MAX_SIDE) });
+        if (!r.items.length) onError('전단에서 행사상품을 찾지 못했습니다. 더 가까이, 밝은 곳에서 찍은 사진으로 다시 해 주세요.');
+        addItems(r.items);
+      } catch (e) {
+        onError((e as Error).message);
+      } finally {
+        setReading(n => n - 1);
+      }
+    }
+  };
+
+  const addDraft = () => {
+    const name = draft.name.trim();
+    if (!name) return onError('상품명을 입력해 주세요.');
+    const price = Number(draft.price.replace(/\D/g, '')) || undefined;
+    addItems([{ name, price, condition: draft.condition.trim() || undefined }]);
+    setDraft({ name: '', price: '', condition: '' });
+  };
 
   const setHost = (i: number, patch: Partial<Host>) => setHosts(hs => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
@@ -131,7 +172,7 @@ export default function BroadcastMaker({ items: source, onClose, onError }: {
 
   const back = () => {
     if (step === 'making') return;
-    if (step === 'setup' || (step === 'library' && !source.length)) return onClose();
+    if (step === 'setup' || (step === 'library' && startInLibrary && !script)) return onClose();
     setStep(step === 'done' ? 'script' : step === 'script' ? 'setup' : script && result ? 'done' : script ? 'script' : 'setup');
   };
 
@@ -149,13 +190,19 @@ export default function BroadcastMaker({ items: source, onClose, onError }: {
       </div>
 
       <div className="mx-auto max-w-2xl space-y-5 p-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+        {!aiEnabled && step !== 'library' && (
+          <p className="rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">
+            AI 키(GEMINI_API_KEY)가 서버에 설정되지 않아 방송을 만들 수 없습니다. Cloudflare → Workers → maket-moum → 설정 → 변수 및 비밀에 <b>GEMINI_API_KEY</b>를 넣으면 바로 켜집니다. 보관함의 방송은 지금도 들을 수 있습니다.
+          </p>
+        )}
         {step === 'setup' && <>
           <section className="space-y-2">
             <div className="flex items-baseline justify-between">
               <h2 className="text-sm font-semibold text-slate-700">1. 방송할 행사상품</h2>
               <span className="text-xs font-semibold text-slate-500">{chosen.length} / {items.length}개</span>
             </div>
-            <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-2xl bg-white">
+            {items.length === 0 && !reading && <p className="rounded-2xl bg-white px-3.5 py-4 text-sm text-slate-600">방송할 행사상품이 없습니다. 아래에서 <b>전단 사진</b>을 올리거나 직접 입력해 주세요.</p>}
+            {items.length > 0 && <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-2xl bg-white">
               {items.map(it => (
                 <label key={it.key} className="flex items-start gap-3 px-3.5 py-2.5">
                   <input type="checkbox" checked={it.include} onChange={e => setItems(xs => xs.map(x => (x.key === it.key ? { ...x, include: e.target.checked } : x)))} className="mt-0.5 size-5 shrink-0 accent-pink-600" />
@@ -165,6 +212,16 @@ export default function BroadcastMaker({ items: source, onClose, onError }: {
                   </span>
                 </label>
               ))}
+            </div>}
+            <button type="button" onClick={() => albumRef.current?.click()} disabled={!aiEnabled || reading > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-pink-200 bg-white py-3 text-sm font-bold text-pink-700 active:bg-pink-50 disabled:opacity-50">
+              {reading > 0 ? <><Loader2 className="size-4 animate-spin" />전단 읽는 중… (한 장에 10~20초)</> : <><ImageIcon className="size-4" />전단 사진으로 상품 넣기 (찍기·앨범)</>}
+            </button>
+            <input ref={albumRef} type="file" accept="image/*" multiple hidden onChange={e => { void pickFlyers(e.target.files); e.target.value = ''; }} />
+            <div className="grid grid-cols-[1fr_5.5rem] gap-2">
+              <input className={field} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} maxLength={60} placeholder="직접 입력: 상품명" aria-label="상품명" />
+              <input className={field} inputMode="numeric" value={draft.price} onChange={e => setDraft({ ...draft, price: e.target.value })} placeholder="행사가" aria-label="행사가" />
+              <input className={field} value={draft.condition} onChange={e => setDraft({ ...draft, condition: e.target.value })} maxLength={100} placeholder="혜택 (예: 1+1, 엘포인트 30%)" aria-label="행사 혜택" />
+              <button type="button" onClick={addDraft} className="flex items-center justify-center gap-1 rounded-xl bg-slate-800 text-sm font-bold text-white"><Plus className="size-4" />추가</button>
             </div>
             <p className="text-xs text-slate-500">1분이면 3~5개, 3분이면 8~12개가 듣기 좋습니다.</p>
           </section>
@@ -207,7 +264,7 @@ export default function BroadcastMaker({ items: source, onClose, onError }: {
             <input className={inputCls} value={note} onChange={e => setNote(e.target.value)} maxLength={100} placeholder="덧붙일 말 (선택) 예: 오후 3시까지만, 주차 2시간 무료" />
           </section>
 
-          <button type="button" onClick={() => void writeScript()} disabled={busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
+          <button type="button" onClick={() => void writeScript()} disabled={!aiEnabled || busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
             {busy ? <><Loader2 className="size-5 animate-spin" />쇼호스트 원고 쓰는 중…</> : <><Wand2 className="size-5" />방송 원고 만들기</>}
           </button>
         </>}

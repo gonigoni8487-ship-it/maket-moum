@@ -24,6 +24,7 @@ import type { KpiRecord } from './kpi';
 import { EmergencyDetail, EmergencySheet } from './screens/Emergency';
 import { BellKiosk, BellSheet } from './screens/Bell';
 import MorningCards, { REOPEN_AFTER_MS } from './screens/MorningCards';
+import BroadcastMaker from './screens/BroadcastMaker';
 
 const CACHE_KEY = 'marton-cache';
 
@@ -79,6 +80,7 @@ export default function MartOnApp() {
   const [kpiRecords, setKpiRecords] = useState<KpiRecord[] | null>(null);
   const [bellSheet, setBellSheet] = useState(false);
   const [morningOpen, setMorningOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
   const [kiosk, setKiosk] = useState<string | null>(() => { try { return localStorage.getItem('marton-kiosk'); } catch { return null; } });
   const kioskRef = useRef(kiosk);
@@ -489,6 +491,7 @@ export default function MartOnApp() {
     if (to === 'wallet') return setWalletOpen(true);
     if (to === 'settings') return setShowSettings(true);
     if (to === 'morning') return setMorningOpen(true);
+    if (to === 'broadcast') return setBroadcastOpen(true);
     if (to === 'bell') return setBellSheet(true);
     if (to === 'notice' || to === 'share' || to === 'schedule' || to === 'expiry') { setBoardSection(to); return setTab('notices'); }
     setTab(to);
@@ -636,6 +639,10 @@ export default function MartOnApp() {
       )}
 
       {morningOpen && <MorningCards name={me.name} onClose={() => setMorningOpen(false)} />}
+      {broadcastOpen && (
+        <BroadcastMaker aiEnabled={aiEnabled} onClose={() => setBroadcastOpen(false)} onError={onError}
+          items={[...promotions].sort((a, b) => b.createdAt - a.createdAt).slice(0, 40).map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period }))} />
+      )}
       {bellSheet && <BellSheet onClose={() => setBellSheet(false)} onKiosk={pl => { setBellSheet(false); openKiosk(pl); }} onError={onError} onToast={showToast} />}
       {kiosk && <BellKiosk place={kiosk} bells={data.bells ?? []} onExit={() => openKiosk(null)} onError={onError} />}
 
