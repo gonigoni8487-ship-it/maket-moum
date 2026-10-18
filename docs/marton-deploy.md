@@ -30,6 +30,7 @@
    | `MARTON_HOME_REDIRECT` | 선택 | `1`이면 주소 첫 화면에서 바로 마트ON으로 이동 |
 
    (터미널을 쓴다면 `npx wrangler secret put MARTON_MANAGER_PIN` 도 같습니다)
+   - 값은 **유형: 비밀(Secret)** 으로 넣으세요. **설정 → 빌드 → 변수**(빌드 때만 쓰는 값)에 넣으면 앱이 읽지 못합니다.
 3. 저장하면 다시 배포됩니다. `https://<worker 주소>/marton/` 로 접속해 점장 로그인 → **직원 초대 QR**.
 
 - 이 저장소에 연결된 Worker가 여러 개면(`maket-moum`, `maket-moum1`, `maket-moum3` 등) **각각 별도 매장 데이터**를 가집니다. 마트ON용으로 하나를 정해 그 Worker에만 비밀값을 넣고 직원에게 그 주소만 안내하세요.
