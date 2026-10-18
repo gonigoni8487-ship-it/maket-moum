@@ -225,7 +225,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
               <input className={field} value={draft.condition} onChange={e => setDraft({ ...draft, condition: e.target.value })} maxLength={100} placeholder="혜택 (예: 1+1, 엘포인트 30%)" aria-label="행사 혜택" />
               <button type="button" onClick={addDraft} className="flex items-center justify-center gap-1 rounded-xl bg-slate-800 text-sm font-bold text-white"><Plus className="size-4" />추가</button>
             </div>
-            <p className="text-xs text-slate-500">1분이면 3~5개, 3분이면 8~12개가 듣기 좋습니다.</p>
+            <p className="text-xs text-slate-500">30초면 1~2개, 1분이면 3~5개, 3분이면 8~12개가 듣기 좋습니다.</p>
           </section>
 
           <section className="space-y-2">

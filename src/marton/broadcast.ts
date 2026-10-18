@@ -44,10 +44,10 @@ export const isHost = (v: any): v is Host => HOST_GENDERS.includes(v?.gender) &&
 /** TTS 다중 화자 이름 (원고에는 나오지 않는다) */
 export const SPEAKER_NAMES = ['Speaker1', 'Speaker2'] as const;
 
-export const MIN_SECONDS = 60;
+export const MIN_SECONDS = 30;
 export const MAX_SECONDS = 180;
-export const LENGTH_CHOICES = [60, 90, 120, 150, 180] as const;
-export const lengthLabel = (s: number) => (s % 60 ? `${Math.floor(s / 60)}분 30초` : `${s / 60}분`);
+export const LENGTH_CHOICES = [30, 60, 90, 120, 150, 180] as const;
+export const lengthLabel = (s: number) => (s < 60 ? `${s}초` : s % 60 ? `${Math.floor(s / 60)}분 30초` : `${s / 60}분`);
 
 /** 방송 구성 (초): 음악만 나오는 첫머리·끝, 멘트 사이 쉼 */
 export const MUSIC_INTRO_S = 4;
@@ -58,7 +58,7 @@ const CHARS_PER_SECOND = 6;
 
 /** 목표 길이에 맞는 멘트 분량 (공백 뺀 글자 수) */
 export function scriptBudget(seconds: number) {
-  const segments = Math.max(3, Math.min(9, Math.round(seconds / 22)));
+  const segments = seconds < 45 ? 2 : Math.max(3, Math.min(9, Math.round(seconds / 22))); // 30초는 두 단락
   const speech = seconds - MUSIC_INTRO_S - MUSIC_OUTRO_S - SEGMENT_GAP_S * (segments - 1);
   return { segments, chars: Math.round(speech * CHARS_PER_SECOND) };
 }
