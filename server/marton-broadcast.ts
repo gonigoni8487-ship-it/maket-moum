@@ -1,7 +1,7 @@
 // 마트ON 행사 매장 방송: 행사상품 → 쇼호스트 원고(AI 작성) → 음성(Gemini TTS, 1인·2인 대화) + 배경음악(Lyria). 합치기는 기기에서 한다.
 import type { GoogleGenAI } from '@google/genai';
 import {
-  BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, isHost, hostLabel,
+  BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, isHost, hostLabel, isPace, paceOf, type Pace,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
 import { bayText, matchProduct, storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
@@ -90,7 +90,7 @@ function cleanSegments(input: unknown, hostCount: number): BroadcastSegment[] {
 }
 
 /** 성우 연기 지시 (Gemini TTS 프롬프트 가이드의 장면·연출 메모 형식) */
-function speechPrompt(hosts: Host[], tone: string, transcript: string) {
+function speechPrompt(hosts: Host[], tone: string, pace: Pace, transcript: string) {
   const people = hosts.map((h, i) => `${hosts.length > 1 ? `${SPEAKER_NAMES[i]}: ` : ''}${HOST_VOICE[h.gender][h.age].persona}`);
   return [
     '# AUDIO PROFILE',
@@ -99,6 +99,7 @@ function speechPrompt(hosts: Host[], tone: string, transcript: string) {
     `${BRAND} 매장 스피커로 나가는 홈쇼핑 생방송 스타일의 행사 안내. 장 보는 손님들이 걸음을 멈추고 귀 기울이게 만드는 방송.`,
     '### DIRECTOR\'S NOTES',
     `말투: ${tone}.`,
+    paceOf(pace).direction && `빠르기: ${paceOf(pace).direction}`,
     '원고를 읽는 느낌이 절대 나면 안 됨. 실제 쇼호스트가 카메라 앞에서 즉석으로 말하듯 자연스럽게, 숨 쉬는 타이밍과 미소가 들리게.',
     '문장마다 억양과 빠르기에 변화를 주고, 가격·할인·"롯데마트"에서는 살짝 힘을 주고 반 박자 쉬었다 가기. 기계처럼 일정한 속도와 높낮이 금지.',
     hosts.length > 1 ? '두 사람은 오래 호흡을 맞춘 진행자 콤비. 상대 말에 진짜로 반응하듯 맞장구와 리액션을 살려서, 말이 끝나자마자 자연스럽게 받기.' : '',
@@ -122,8 +123,9 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const hosts = cleanHosts(req.body.hosts);
     const duo = hosts.length > 1;
     const note = text(req.body.note, 100);
+    const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
     const store = text((req as AuthedRequest).staff.store, 20);
-    const { segments, chars } = scriptBudget(seconds);
+    const { segments, chars } = scriptBudget(seconds, pace);
     const themes = Object.keys(THEME_STYLE);
     const now = storeTime(Date.now());
 
@@ -155,6 +157,8 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       '',
       '[정확성]',
       '- 상품명·가격·할인 조건·기간은 아래 데이터 그대로. 없는 가격·혜택·수량 한정·원산지를 지어내지 마세요.',
+      '- 가격을 말할 때는 규격(중량·용량·개수·포장)을 꼭 같이: "백 그램에 삼천구백구십 원", "이 킬로 한 박스에 만 구천구백 원", "다섯 개 묶음이 삼천구백팔십 원". 규격이 없는 상품만 가격만 말하기.',
+      '- 정상가가 있으면 "원래 오천구백구십 원인데 오늘은 삼천구백구십 원"처럼 정상가→행사가 순서로 차이가 들리게. 혜택 조건(엘포인트·행사카드·몇 개 이상)은 가격과 붙여서 누가 받는지 분명히.',
       '- 귀로 듣는 방송: 숫자는 한글로 풀어 쓰기 (14,900원 → 만 사천구백 원, 500g → 오백 그램, 1+1 → 원 플러스 원, 30% → 삼십 퍼센트, L.POINT → 엘포인트, 10/18 → 시월 십팔일). 괄호·기호·이모지 금지.',
       '',
       wantTheme === '자동' ? `theme: 상품과 날짜를 보고 ${themes.join(', ')} 중 하나` : `theme: "${wantTheme}" (이 분위기로)`,
@@ -176,7 +180,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       list = await addBrand(list, hosts.length);
       res.json({
         title: text(raw.title, 40) || `${theme} 안내 방송`,
-        theme, hosts,
+        theme, hosts, pace,
         tone: text(raw.tone, 120) || THEME_STYLE[theme].tone,
         music: text(raw.music, 300) || THEME_STYLE[theme].music,
         segments: list,
@@ -214,6 +218,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const [segment] = cleanSegments([{ lines: req.body.lines }], hosts.length);
     if (!segment) return res.status(400).json({ error: '읽을 원고가 비어 있습니다.' });
     const tone = text(req.body.tone, 120) || '밝고 친근하게';
+    const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
     const duo = hosts.length > 1 && segment.lines.some(l => l.who === 1);
     const transcript = duo ? segment.lines.map(l => `${SPEAKER_NAMES[l.who]}: ${l.text}`).join('\n') : segment.lines.map(l => l.text).join('\n');
     const voiceOf = (h: Host) => ({ prebuiltVoiceConfig: { voiceName: HOST_VOICE[h.gender][h.age].voice } });
@@ -221,7 +226,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     try {
       const response = await withModels(candidates('MARTON_TTS_MODEL', TTS_MODELS), model => genAI.models.generateContent({
         model,
-        contents: [{ parts: [{ text: speechPrompt(duo ? hosts : [solo], tone, transcript) }] }],
+        contents: [{ parts: [{ text: speechPrompt(duo ? hosts : [solo], tone, pace, transcript) }] }],
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: duo

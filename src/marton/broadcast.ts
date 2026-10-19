@@ -53,14 +53,58 @@ export const lengthLabel = (s: number) => (s < 60 ? `${s}초` : s % 60 ? `${Math
 export const MUSIC_INTRO_S = 4;
 export const MUSIC_OUTRO_S = 5;
 export const SEGMENT_GAP_S = 2;
-/** 쇼호스트 말 빠르기: 공백 뺀 글자 기준 초당 약 6자 */
-const CHARS_PER_SECOND = 6;
+/** 말 빠르기: 공백 뺀 글자 기준 초당 글자 수와 성우 지시. 빠를수록 같은 길이에 더 많이 말한다 */
+export const PACES = [
+  { id: 'normal', label: '보통', cps: 6, direction: '' },
+  { id: 'brisk', label: '조금 빠르게', cps: 6.8, direction: '평소보다 조금 빠른 템포로 경쾌하게 치고 나가기. 문장 사이 쉼은 짧게, 그래도 상품명·가격·숫자는 또렷하게.' },
+  { id: 'fast', label: '빠르게', cps: 7.6, direction: '타임세일 생방송처럼 빠른 템포로 힘 있게 몰아가기. 쉼은 최소로, 그래도 가격·숫자는 한 글자씩 또렷하게.' },
+] as const;
+export type Pace = (typeof PACES)[number]['id'];
+export const isPace = (v: unknown): v is Pace => PACES.some(p => p.id === v);
+export const paceOf = (v: unknown) => PACES.find(p => p.id === v) ?? PACES[0];
 
-/** 목표 길이에 맞는 멘트 분량 (공백 뺀 글자 수) */
-export function scriptBudget(seconds: number) {
+/** 목표 길이·빠르기에 맞는 멘트 분량 (공백 뺀 글자 수) */
+export function scriptBudget(seconds: number, pace: Pace = 'normal') {
   const segments = seconds < 45 ? 2 : Math.max(3, Math.min(9, Math.round(seconds / 22))); // 30초는 두 단락
   const speech = seconds - MUSIC_INTRO_S - MUSIC_OUTRO_S - SEGMENT_GAP_S * (segments - 1);
-  return { segments, chars: Math.round(speech * CHARS_PER_SECOND) };
+  return { segments, chars: Math.round(speech * paceOf(pace).cps) };
+}
+
+// ---- 한 줄 입력 → 상품명·규격·행사가·정상가·혜택·기간 ("노르웨이 생연어 100g 5,990원→3,990원 엘포인트 30% 10/16~10/22") ----
+const AMOUNT = /(\d{1,3}(?:,\d{3})+|\d+)\s*원/g;
+const SPEC = /\d+(?:\.\d+)?\s*(?:kg|g|ml|l|리터|그램|킬로그램|킬로|개입|입|개|봉|팩|마리|미|구|송이|박스|판|포기|단|통|병|캔|인분|매|롤)(?:\s*[x×*]\s*\d+\s*(?:개|입|봉|팩|캔|병|ea)?)?(?:\s*\/\s*[가-힣a-z]+)*/i;
+const PERIOD = /\d{1,2}[./]\d{1,2}\s*(?:\([월화수목금토일]\))?\s*[~-]\s*(?:\d{1,2}[./])?\d{1,2}\s*(?:\([월화수목금토일]\))?/;
+const PROMO = /(?:\d+\s*\+\s*\d+|\d+\s*개\s*이상|엘\s*포인트|L\.?\s*POINT|엘포|행사\s*카드|[가-힣]+카드|\d+\s*%|\d+\s*천\s*원\s*할인|할인|증정|덤|교차|한정|단독|이상\s*구매)/i;
+const num = (s: string) => Number(s.replace(/,/g, ''));
+
+export function parseItemLine(line: string): FlyerItem | null {
+  let rest = line.replace(/\s+/g, ' ').trim();
+  if (!rest) return null;
+  const period = PERIOD.exec(rest)?.[0];
+  if (period) rest = rest.replace(period, ' ');
+  // 금액: "원"이 붙은 숫자. 두 개면 큰 쪽이 정상가, 작은 쪽이 행사가
+  const amounts = [...rest.matchAll(AMOUNT)].map(m => ({ text: m[0], n: num(m[1]) })).filter(a => a.n >= 10 && a.n < 1e8);
+  let price: number | undefined, originalPrice: number | undefined;
+  if (amounts.length) {
+    const sorted = [...amounts].sort((a, b) => a.n - b.n);
+    price = sorted[0].n;
+    if (sorted.length > 1 && sorted.at(-1)!.n > price) originalPrice = sorted.at(-1)!.n;
+    for (const a of amounts) rest = rest.replace(a.text, ' ');
+    rest = rest.replace(/\s*(?:→|->|>)\s*/g, ' ');
+  } else {
+    // "원" 없이 쓴 가격: 단위·%·+가 붙지 않은 세 자리 이상 숫자
+    const bare = /(?:^|\s)(\d{1,3}(?:,\d{3})+|\d{3,})(?=\s|$)/.exec(rest);
+    if (bare) { price = num(bare[1]); rest = rest.replace(bare[1], ' '); }
+  }
+  const spec = SPEC.exec(rest)?.[0]?.replace(/\s+/g, '');
+  if (spec) rest = rest.replace(SPEC, ' ');
+  // 혜택: 첫 행사 표시부터 끝까지
+  const promoAt = rest.search(PROMO);
+  const condition = promoAt >= 0 ? rest.slice(promoAt).replace(/\s+/g, ' ').trim() : undefined;
+  if (promoAt >= 0) rest = rest.slice(0, promoAt);
+  const name = rest.replace(/[/,·|()[\]]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!name) return null;
+  return { name, spec, price, originalPrice, condition: condition || undefined, period: period?.replace(/\s+/g, '') };
 }
 
 /** 대사 한 줄. who: 0 = 첫 번째 진행자, 1 = 두 번째 진행자 */
@@ -76,6 +120,8 @@ export interface BroadcastScript {
   hosts: Host[];
   /** 말투 지시 */
   tone: string;
+  /** 말 빠르기 */
+  pace: Pace;
   /** 배경음악 설명 (영어, 음악 생성 AI용) */
   music: string;
   segments: BroadcastSegment[];
@@ -86,6 +132,7 @@ export interface BroadcastScriptRequest {
   seconds: number;
   theme: BroadcastTheme;
   hosts: Host[];
+  pace: Pace;
   /** 덧붙일 말 (선택) */
   note?: string;
 }
