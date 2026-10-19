@@ -1,12 +1,13 @@
 // 마트ON 행사 매장 방송: 행사상품 → 쇼호스트 원고(AI 작성) → 음성(Gemini TTS, 1인·2인 대화) + 배경음악(Lyria). 합치기는 기기에서 한다.
 import type { GoogleGenAI } from '@google/genai';
 import {
-  BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, isHost, hostLabel, isPace, paceOf, type Pace,
+  BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
 import { storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
 import { platform } from './platform';
-import { auth, text, parseJson, type RouteApp } from './marton';
+import { auth, db, text, parseJson, type RouteApp } from './marton';
+import { normalizeStore } from '../src/marton/kpi';
 
 const AI_MODEL = 'gemini-3.5-flash';
 // 음성·음악 모델은 미리보기 단계라 이름이 바뀌기 쉽다. 환경변수로 바꿀 수 있고, 없는 모델이면 다음 후보로 넘어간다.
@@ -179,7 +180,9 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       const theme = (themes.includes(raw.theme) ? raw.theme : wantTheme !== '자동' ? wantTheme : '주말특가') as BroadcastScript['theme'];
       let list = cleanSegments(raw.segments, hosts.length);
       if (!list.length) return res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 다시 시도해 주세요.' });
-      list = await addBrand(list, hosts.length);
+      list = await removePlaces(list, hosts.length);
+      list = stripPlaces(await addBrand(list, hosts.length)); // 롯데마트 보완 후에도 위치가 다시 들어가지 않게
+      if (!list.length) return res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 다시 시도해 주세요.' });
       res.json({
         title: text(raw.title, 40) || `${theme} 안내 방송`,
         theme, hosts, pace,
@@ -192,6 +195,46 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' });
     }
   });
+
+  /** 등록된 직원들의 점포명 (화명점, 화명 점 …) */
+  const knownStores = () => [...new Set(Object.values(db.staff).map(s => normalizeStore(s.store)).filter(Boolean))];
+  const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  /** 규칙으로 확실히 지운다: 점포명은 빼고, 층·코너·매대 위치가 든 문장은 통째로 뺀다 */
+  function stripPlaces(list: BroadcastSegment[]): BroadcastSegment[] {
+    const stores = knownStores().map(st => new RegExp(`${esc(st.slice(0, -1))}\\s?점\\s?(?:에서는|에서|의|에|은|는)?\\s*`, 'g'));
+    return list.flatMap(seg => {
+      const lines = seg.lines.flatMap(l => {
+        let t = l.text.replace(new RegExp(`${BRAND}\\s*[가-힣A-Za-z]{1,8}\\s?점(?![포수심원])`, 'g'), BRAND);
+        for (const re of stores) t = t.replace(re, '');
+        t = t.replace(/[가-힣]{1,8}점\s*(고객|손님)/g, '$1');
+        t = t.split(/(?<=[.!?~…])\s+/).filter(x => !PLACE_WORDS.test(x)).join(' ').replace(/\s+/g, ' ').trim();
+        return t ? [{ ...l, text: t }] : [];
+      });
+      return lines.length ? [{ lines }] : [];
+    });
+  }
+
+  /** 점포명·위치가 들어간 단락은 AI로 한 번 다시 쓰게 하고, 그래도 남으면 규칙으로 지운다 (공용 방송) */
+  async function removePlaces(list: BroadcastSegment[], hostCount: number) {
+    const storeRe = knownStores().length ? new RegExp(knownStores().map(st => `${esc(st.slice(0, -1))}\\s?점`).join('|')) : null;
+    const bad = (seg: BroadcastSegment) => hasPlaceMention(seg) || Boolean(storeRe && seg.lines.some(l => storeRe.test(l.text)));
+    const hits = list.map((seg, i) => (bad(seg) ? i : -1)).filter(i => i >= 0);
+    if (!hits.length) return list;
+    const out = [...list];
+    try {
+      const response = await genAI.models.generateContent({
+        model: AI_MODEL,
+        config: { responseMimeType: 'application/json' },
+        contents: [{ parts: [{ text: `아래 매장 방송 단락들은 전국 ${BRAND} 어느 점포에서나 트는 공용 방송인데, 점포 이름(○○점)이나 층·코너·매대·입구 같은 매장 위치가 들어가 있습니다. 그 부분만 빼고 같은 말맛·길이로 자연스럽게 고치세요. "${BRAND}"는 단락마다 한 번 남기고, 다른 내용·순서·who는 바꾸지 마세요.\nJSON으로만: {"segments":[{"lines":[{"who":0,"text":""}]}]}\n\n${JSON.stringify({ segments: hits.map(i => list[i]) })}` }] }],
+      });
+      const fixed = cleanSegments(parseJson<{ segments?: unknown }>(response.text).segments, hostCount);
+      hits.forEach((i, k) => { if (fixed[k]) out[i] = fixed[k]; });
+    } catch (e) {
+      console.error('MartON broadcast place fix error:', e);
+    }
+    return stripPlaces(out);
+  }
 
   /** "롯데마트"가 빠진 단락만 골라 자연스럽게 한 번 넣어 다시 쓰게 한다 (실패하면 그대로 두고 화면에서 표시) */
   async function addBrand(list: BroadcastSegment[], hostCount: number) {
