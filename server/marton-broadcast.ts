@@ -4,9 +4,9 @@ import {
   BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, isHost, hostLabel, isPace, paceOf, type Pace,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
-import { bayText, matchProduct, storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
+import { storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
 import { platform } from './platform';
-import { auth, db, text, parseJson, type AuthedRequest, type RouteApp } from './marton';
+import { auth, text, parseJson, type RouteApp } from './marton';
 
 const AI_MODEL = 'gemini-3.5-flash';
 // 음성·음악 모델은 미리보기 단계라 이름이 바뀌기 쉽다. 환경변수로 바꿀 수 있고, 없는 모델이면 다음 후보로 넘어간다.
@@ -52,16 +52,14 @@ function audioPart(response: any): { data: string; mimeType: string } | undefine
   return undefined;
 }
 
-/** 원고에 넣을 사실: 전단 내용 + 아낀 금액(계산) + 매장 위치(상품 DB). AI가 지어내지 않도록 근거를 다 준다 */
+/** 원고에 넣을 사실: 전단 내용 + 아낀 금액(계산). 모든 점포 공용 방송이라 매장 위치는 넣지 않는다. AI가 지어내지 않도록 근거를 다 준다 */
 function itemFacts(it: FlyerItem) {
   const save = it.originalPrice && it.price && it.originalPrice > it.price ? it.originalPrice - it.price : 0;
-  const product = matchProduct(it, db.products);
   return [
     it.name, it.spec && `(${it.spec})`,
     it.price && `행사가 ${won(it.price)}`, it.originalPrice && `정상가 ${won(it.originalPrice)}`,
     save && `${won(save)} 저렴 (${Math.round(save / it.originalPrice! * 100)}%)`,
     it.condition && `혜택 ${it.condition}`, it.period && `기간 ${it.period}`,
-    product && `매장 위치 ${product.floor} ${product.corner} ${bayText(product)}`,
   ].filter(Boolean).join(' / ');
 }
 
@@ -96,7 +94,7 @@ function speechPrompt(hosts: Host[], tone: string, pace: Pace, transcript: strin
     '# AUDIO PROFILE',
     ...people,
     '## THE SCENE',
-    `${BRAND} 매장 스피커로 나가는 홈쇼핑 생방송 스타일의 행사 안내. 장 보는 손님들이 걸음을 멈추고 귀 기울이게 만드는 방송.`,
+    `${BRAND} 매장 스피커로 나가는 홈쇼핑 생방송 스타일의 행사 안내. 마감 직전 주문 전화가 몰리는 순간처럼 들뜨고 생동감 있게, 장 보는 손님들이 "지금 사야겠다" 싶어 걸음을 멈추는 방송.`,
     '### DIRECTOR\'S NOTES',
     `말투: ${tone}.`,
     paceOf(pace).direction && `빠르기: ${paceOf(pace).direction}`,
@@ -124,7 +122,6 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const duo = hosts.length > 1;
     const note = text(req.body.note, 100);
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
-    const store = text((req as AuthedRequest).staff.store, 20);
     const { segments, chars } = scriptBudget(seconds, pace);
     const themes = Object.keys(THEME_STYLE);
     const now = storeTime(Date.now());
@@ -140,14 +137,19 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       `- ${segments}개 단락. 단락 사이에는 배경음악만 잠깐 나옵니다. 상품이 적으면 핵심 상품을 다른 각도로 한 번 더 짚는 단락을 넣으세요.`,
       '',
       `[${BRAND} — 반드시 지킬 것]`,
-      `- 모든 단락에 "${BRAND}"를 딱 한 번씩, 문장 속에 자연스럽게 (예: "${BRAND}에서만 이 가격", "${BRAND} 수산 코너로 오세요", "${BRAND} 엘포인트 회원님이라면"). 한 단락에 두 번 이상은 금지.`,
-      store ? `- 첫 단락에서 한 번은 "${BRAND} ${store}"처럼 점포 이름까지.` : '',
+      `- 모든 단락에 "${BRAND}"를 딱 한 번씩, 문장 속에 자연스럽게 (예: "${BRAND}에서만 이 가격", "${BRAND}에서 지금 바로 담아 가세요", "${BRAND} 엘포인트 회원님이라면"). 한 단락에 두 번 이상은 금지.`,
+      `- 전국 ${BRAND} 어느 점포에서나 트는 공용 방송입니다. ○○점 같은 점포 이름, 층·코너·매대·진열 위치("수산 코너로", "입구 쪽", "몇 번 매대")는 절대 말하지 마세요.`,
       '',
       '[후킹·설득·맥락 — 자동으로 넣을 것]',
       '- 첫 마디는 귀를 잡는 후킹: 손님 상황을 짚는 질문이나 놀라운 숫자로 시작 (예: "오늘 저녁 반찬 아직 고민 중이시죠?", "이 가격 실화예요").',
       `- 맥락: 오늘은 ${now.month}월 ${now.date}일 ${WEEKDAYS[now.day]}요일. 계절·요일·끼니 상황과 상품 쓰임새(어떻게 먹으면 좋은지, 누구랑 먹으면 좋은지, 같이 사면 좋은 상품)를 엮어서 왜 지금 사야 하는지 이야기로.`,
-      '- 설득: 아낀 금액은 주어진 계산값으로 "만 원 넘게 아끼시는 거예요"처럼 체감되게. 행사 기간이 있으면 끝나는 날을 짚어 긴박감. 매장 위치가 있으면 "어디로 오시면 된다"로 행동 유도.',
-      '- 마지막 단락: 핵심 혜택 한 번 더 + 기간 + 지금 바로 오시라는 마무리.',
+      '- 설득: 아낀 금액은 주어진 계산값으로 "만 원 넘게 아끼시는 거예요"처럼 체감되게. 행사 기간이 있으면 끝나는 날을 짚어 긴박감.',
+      '- 지금 안 사면 놓칠 것 같은 느낌: "이 가격이면 금방 빠져요", "늦으면 아쉬우실 거예요", "보이실 때 바로 담으세요", "지금 담아 가시는 분이 이득이에요" 같은 표현을 단락마다 하나씩, 매번 다르게. 단, "한정 수량 ○개", "곧 품절", "마감 임박" 같은 수량·재고 사실은 데이터에 있을 때만.',
+      '- 마지막 단락: 핵심 혜택 한 번 더 + 기간 + "지금 바로 담아 가세요" 행동 유도로 힘 있게 마무리.',
+      '',
+      '[생동감]',
+      '- 홈쇼핑 마감 직전처럼 들뜨고 에너지 넘치게: 감탄("와!", "세상에", "대박이죠?"), 손님에게 바로 거는 말("여러분 이거 보셨어요?"), 짧고 힘 있는 문장, 리듬감 있는 반복("싸다, 싸다, 정말 싸요!").',
+      '- 한 문장은 짧게(대부분 20자 안팎). 느슨한 설명·긴 수식어 없이 템포 있게 치고 나가기.',
       '',
       '[사람처럼 — AI 티 금지]',
       '- 실제 쇼호스트 입말: "자, 여러분", "이거 보세요", "진짜예요", "솔직히 말씀드리면", "어머", "그쵸?" 같은 말맛. 말끝을 ~요/~죠/~거든요/~잖아요/~세요로 섞고, 같은 어미를 연달아 쓰지 마세요.',
@@ -199,7 +201,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
         config: { responseMimeType: 'application/json' },
-        contents: [{ parts: [{ text: `아래 매장 방송 단락들에 "${BRAND}"가 빠져 있습니다. 각 단락의 한 대사에 "${BRAND}"를 딱 한 번, 원래 말맛을 살려 자연스럽게 넣어 고치세요 (예: "${BRAND}에서만", "${BRAND} ○○ 코너"). 다른 내용·순서·who는 바꾸지 마세요.\nJSON으로만: {"segments":[{"lines":[{"who":0,"text":""}]}]}\n\n${JSON.stringify({ segments: missing.map(i => list[i]) })}` }] }],
+        contents: [{ parts: [{ text: `아래 매장 방송 단락들에 "${BRAND}"가 빠져 있습니다. 각 단락의 한 대사에 "${BRAND}"를 딱 한 번, 원래 말맛을 살려 자연스럽게 넣어 고치세요 (예: "${BRAND}에서만", "${BRAND}에서 지금 바로". 점포 이름·코너·매대 위치는 넣지 말 것). 다른 내용·순서·who는 바꾸지 마세요.\nJSON으로만: {"segments":[{"lines":[{"who":0,"text":""}]}]}\n\n${JSON.stringify({ segments: missing.map(i => list[i]) })}` }] }],
       });
       const fixed = cleanSegments(parseJson<{ segments?: unknown }>(response.text).segments, hostCount);
       const out = [...list];
@@ -257,7 +259,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     try {
       const response = await withModels(candidates('MARTON_MUSIC_MODEL', MUSIC_MODELS), model => genAI.models.generateContent({
         model,
-        contents: [{ parts: [{ text: `Instrumental background bed for in-store supermarket announcements with a voice-over on top, about ${seconds} seconds long. ${style}. No vocals, no lyrics, no singing, no spoken words. Keep it light and sparse in the midrange (no busy lead melody, no loud drums, no sudden drops or build-ups) so the speaking voice always stays in front. Steady volume and consistent mood throughout, with a clean ending.` }] }],
+        contents: [{ parts: [{ text: `Instrumental background bed for in-store supermarket sale announcements with a voice-over on top, about ${seconds} seconds long. ${style}. It should make shoppers feel excited and in the mood to buy right now: upbeat, bouncy, catchy groove with a steady driving beat and bright, positive, feel-good energy, like a busy sale day. No vocals, no lyrics, no singing, no spoken words. Keep the midrange open (no busy lead melody over the voice, no heavy drums, no sudden drops or long build-ups) so the speaking voice always stays in front. Steady volume and consistent energy throughout, with a clean ending.` }] }],
         config: { responseModalities: ['AUDIO', 'TEXT'] },
       }));
       const part = audioPart(response);

@@ -9,12 +9,12 @@ export type BroadcastTheme = (typeof BROADCAST_THEMES)[number];
 
 /** 행사 분위기별 기본 말투·음악 */
 export const THEME_STYLE: Record<Exclude<BroadcastTheme, '자동'>, { tone: string; music: string }> = {
-  '타임세일': { tone: '지금 안 오면 놓친다는 긴박감, 빠른 템포로 신나게', music: 'light upbeat funk pop, 120 bpm, muted guitar and soft brass, playful time-sale mood' },
-  '주말특가': { tone: '가족 나들이처럼 밝고 들뜬 기분으로', music: 'cheerful light acoustic pop, 105 bpm, ukulele, soft claps and glockenspiel, happy weekend mood' },
-  '명절': { tone: '명절 인사를 건네듯 따뜻하고 넉넉하게', music: 'warm gentle Korean traditional fusion, soft gayageum melody over light strings, 90 bpm, cozy holiday mood' },
-  '신선식품': { tone: '산지에서 막 들어온 걸 자랑하듯 자신 있고 산뜻하게', music: 'fresh light acoustic folk, 100 bpm, plucked guitar and marimba, clean morning market mood' },
-  '시즌행사': { tone: '계절 분위기에 설레는 목소리로 화사하게', music: 'soft bright seasonal pop, 108 bpm, piano and light bells, warm celebratory mood' },
-  '창립·오픈': { tone: '큰 잔치를 알리듯 힘차고 자랑스럽게', music: 'celebratory light orchestral pop, 112 bpm, soft brass and strings, festive mood' },
+  '타임세일': { tone: '마감 직전처럼 다급하고 신나게, 지금 안 오면 놓친다는 긴박감으로', music: 'energetic funky pop, 126 bpm, tight drums, slap bass and short brass hits, exciting time-sale shopping rush' },
+  '주말특가': { tone: '들뜨고 신나는 주말 기분으로, 손님을 끌어당기듯 활기차게', music: 'upbeat bouncy pop, 120 bpm, claps, bright synths and plucky guitar, happy weekend shopping spree vibe' },
+  '명절': { tone: '명절 장 보는 설렘을 살려 밝고 힘차게, 넉넉한 혜택을 자랑하듯', music: 'festive upbeat Korean fusion, 112 bpm, lively janggu groove, gayageum riffs and bright strings, joyful holiday shopping energy' },
+  '신선식품': { tone: '막 들어온 신선함을 자랑하듯 자신 있고 생기 있게', music: 'fresh upbeat acoustic pop, 116 bpm, marimba, whistles and crisp handclaps, lively market morning energy' },
+  '시즌행사': { tone: '계절 행사에 들뜬 목소리로 화사하고 신나게', music: 'catchy feel-good pop, 118 bpm, piano stabs, bells and four-on-the-floor beat, sparkling seasonal sale mood' },
+  '창립·오픈': { tone: '큰 잔치를 알리듯 힘차고 신나게, 지금이 기회라는 느낌으로', music: 'celebratory upbeat pop, 122 bpm, brass fanfare hits, punchy drums and claps, grand sale festival energy' },
 };
 
 // ---- 쇼호스트 목소리: 성별 × 연령대 ----
