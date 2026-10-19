@@ -34,6 +34,11 @@ export function decodeMusic(b64: string): Promise<AudioBuffer> {
   return new OfflineAudioContext(1, 1, OUT_RATE).decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
 }
 
+/** 직접 고른 음악 파일(mp3·wav·m4a) → AudioBuffer (기기 안에서만 쓰고 서버로 보내지 않는다) */
+export async function decodeMusicFile(file: File): Promise<AudioBuffer> {
+  return new OfflineAudioContext(1, 1, OUT_RATE).decodeAudioData(await file.arrayBuffer());
+}
+
 /** 소리가 나는 부분의 평균 크기(RMS)와 최대값 (조용한 구간은 빼고 잰다) */
 function loudness(buf: AudioBuffer) {
   let sum = 0, count = 0, peak = 0;

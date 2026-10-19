@@ -7,7 +7,7 @@ import {
   BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, VOICE_STYLES, voiceStyleLabel, type VoiceStyle, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
-import { decodeMusic, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
+import { decodeMusic, decodeMusicFile, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
 import { deleteBroadcast, downloadBlob, listBroadcasts, safeFileName, saveBroadcast, type SavedBroadcast } from '../broadcast-library';
 import { api } from '../api';
 import { Chip, cx, inputCls, won } from '../ui';
@@ -38,6 +38,21 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [theme, setTheme] = useState<BroadcastTheme>('자동');
   const [hosts, setHosts] = useState<Host[]>([{ gender: '여성', age: '30대' }]);
   const [withMusic, setWithMusic] = useState(true);
+  // 배경음악: AI가 매번 새로 작곡 / 직접 고른 음악 파일 (Suno 등으로 만든 매장 음악)
+  const [musicSource, setMusicSource] = useState<'ai' | 'file'>('ai');
+  const [musicFile, setMusicFile] = useState<{ name: string; buf: AudioBuffer } | null>(null);
+  const musicFileRef = useRef<HTMLInputElement>(null);
+  const pickMusicFile = async (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > 30 * 1048576) return onError('음악 파일이 너무 큽니다. 30MB 이하로 골라 주세요.');
+    try {
+      setMusicFile({ name: f.name, buf: await decodeMusicFile(f) });
+      setMusicSource('file');
+    } catch {
+      onError('이 음악 파일을 읽지 못했습니다. mp3·wav·m4a 파일로 골라 주세요.');
+    }
+  };
+  const useFile = withMusic && musicSource === 'file';
   const [pace, setPace] = useState<Pace>('brisk'); // 기본은 템포 있게
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('natural');
   const [editing, setEditing] = useState<string | null>(null);
@@ -123,10 +138,12 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     if (!segments.length) return onError('원고가 비어 있습니다.');
     setStep('making');
     setResult(null);
+    if (useFile && !musicFile) { setStep('script'); return onError('배경음악으로 쓸 음악 파일을 골라 주세요.'); }
     setProgress({ voice: 0, voices: segments.length, music: withMusic ? 'making' : 'off', mixing: 'waiting' });
 
     const musicKey = `${script.music}|${seconds}`;
     const musicJob: Promise<AudioBuffer | null> = !withMusic ? Promise.resolve(null)
+      : useFile ? Promise.resolve(musicFile!.buf)
       : musicCache.current.has(musicKey) ? Promise.resolve(musicCache.current.get(musicKey)!)
       : api<BroadcastMusic>('/ai/broadcast/music', { music: script.music, seconds })
         .then(m => decodeMusic(m.audio))
@@ -295,8 +312,25 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           <section className="space-y-2">
             <label className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-3">
               <input type="checkbox" checked={withMusic} onChange={e => setWithMusic(e.target.checked)} className="size-5 accent-pink-600" />
-              <span className="text-sm"><span className="font-semibold text-slate-900">행사 분위기 배경음악 넣기</span><span className="block text-xs text-slate-500">AI가 새로 작곡한 잔잔한 연주곡. 목소리보다 항상 작게 깔리고, 말할 때는 더 줄어듭니다.</span></span>
+              <span className="text-sm"><span className="font-semibold text-slate-900">배경음악 넣기</span><span className="block text-xs text-slate-500">목소리보다 항상 작게 깔리고, 말할 때는 더 줄어듭니다.</span></span>
             </label>
+            {withMusic && (
+              <div className="space-y-2 rounded-2xl bg-white p-3.5">
+                <div className="flex flex-wrap gap-2">
+                  <Chip active={musicSource === 'ai'} onClick={() => setMusicSource('ai')}>🎵 AI가 새로 작곡 (매번 다른 곡)</Chip>
+                  <Chip active={musicSource === 'file'} onClick={() => (musicFile ? setMusicSource('file') : musicFileRef.current?.click())}>📁 내 음악 파일</Chip>
+                </div>
+                {musicSource === 'ai'
+                  ? <p className="text-xs text-slate-500">밝고 경쾌한 마트 광고 음악으로, 만들 때마다 조성·빠르기·악기를 바꿔 새 곡을 만듭니다.</p>
+                  : <div className="flex items-center gap-2 text-sm">
+                      <Music className="size-4 shrink-0 text-pink-600" />
+                      <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">{musicFile?.name ?? '선택한 파일 없음'}</span>
+                      <button type="button" onClick={() => musicFileRef.current?.click()} className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">바꾸기</button>
+                    </div>}
+                {musicSource === 'file' && <p className="text-xs text-slate-500">Suno 등으로 직접 만든 음악(mp3·wav)을 깝니다. 방송보다 짧으면 이어 붙여 반복합니다. 매장에서 틀어도 되는 음악인지 꼭 확인해 주세요.</p>}
+                <input ref={musicFileRef} type="file" accept="audio/*,.mp3,.wav,.m4a" hidden onChange={e => { void pickMusicFile(e.target.files?.[0]); e.target.value = ''; }} />
+              </div>
+            )}
             <input className={inputCls} value={note} onChange={e => setNote(e.target.value)} maxLength={100} placeholder="덧붙일 말 (선택) 예: 오후 3시까지만, 주차 2시간 무료" />
           </section>
 
@@ -369,7 +403,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           <section className="space-y-3 rounded-2xl bg-white p-5">
             <p className="font-bold text-slate-900">방송을 만들고 있습니다</p>
             <Row icon={<Mic className="size-4" />} label={`쇼호스트 음성 ${progress.voice} / ${progress.voices} 단락`} state={progress.voice >= progress.voices ? 'done' : 'making'} />
-            {progress.music !== 'off' && <Row icon={<Music className="size-4" />} label={progress.music === 'failed' ? '배경음악 실패 · 음성만으로 만듭니다' : '배경음악 작곡'} state={progress.music} />}
+            {progress.music !== 'off' && <Row icon={<Music className="size-4" />} label={progress.music === 'failed' ? '배경음악 실패 · 음성만으로 만듭니다' : useFile ? '내 음악 파일 깔기' : '배경음악 작곡'} state={progress.music} />}
             <Row icon={<Download className="size-4" />} label="음성·음악 합치고 MP3 만들기" state={progress.mixing} />
             <p className="text-xs text-slate-500">1~2분쯤 걸립니다. 화면을 닫지 말고 기다려 주세요.</p>
           </section>
@@ -397,7 +431,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           </section>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setStep('script')} className="flex items-center justify-center gap-1.5 rounded-xl bg-white py-3 text-sm font-bold text-slate-700"><Pencil className="size-4" />원고 고치기</button>
-            <button type="button" onClick={() => { musicCache.current.clear(); void make(); }} className="flex items-center justify-center gap-1.5 rounded-xl bg-white py-3 text-sm font-bold text-slate-700">{withMusic ? <><Music className="size-4" />음악 새로 만들기</> : <><RotateCw className="size-4" />다시 만들기</>}</button>
+            <button type="button" onClick={() => { musicCache.current.clear(); void make(); }} className="flex items-center justify-center gap-1.5 rounded-xl bg-white py-3 text-sm font-bold text-slate-700">{withMusic && !useFile ? <><Music className="size-4" />음악 새로 만들기</> : <><RotateCw className="size-4" />다시 만들기</>}</button>
           </div>
         </>}
 
