@@ -38,7 +38,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [theme, setTheme] = useState<BroadcastTheme>('자동');
   const [hosts, setHosts] = useState<Host[]>([{ gender: '여성', age: '30대' }]);
   const [withMusic, setWithMusic] = useState(true);
-  const [pace, setPace] = useState<Pace>('normal');
+  const [pace, setPace] = useState<Pace>('brisk'); // 기본은 템포 있게
   const [editing, setEditing] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
