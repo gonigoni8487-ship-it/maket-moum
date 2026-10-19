@@ -40,6 +40,25 @@ export const HOST_VOICE: Record<HostGender, Record<HostAge, { voice: string; per
   },
 };
 export const hostLabel = (h: Host) => `${h.gender} ${h.age}`;
+
+/** 목소리 느낌: 자연스럽게(기본) / 활기차고 경쾌하게(밝고 통통 튀는 목소리로 바꾸고 텐션을 올린다) */
+export const VOICE_STYLES = [
+  { id: 'natural', label: '자연스럽게' },
+  { id: 'lively', label: '활기차고 경쾌하게' },
+] as const;
+export type VoiceStyle = (typeof VOICE_STYLES)[number]['id'];
+export const isVoiceStyle = (v: unknown): v is VoiceStyle => VOICE_STYLES.some(x => x.id === v);
+export const voiceStyleLabel = (v: VoiceStyle) => VOICE_STYLES.find(x => x.id === v)!.label;
+/** 활기찬 쇼호스트용 목소리 (Gemini TTS 기본 목소리 중 밝고 업비트한 것) */
+const LIVELY_VOICE: Record<HostGender, Record<HostAge, string>> = {
+  여성: { '20대': 'Zephyr', '30대': 'Autonoe', '40대': 'Laomedeia', '50대': 'Aoede' },
+  남성: { '20대': 'Fenrir', '30대': 'Puck', '40대': 'Sadachbia', '50대': 'Achird' },
+};
+const LIVELY_PERSONA = '평소보다 텐션을 한 단계 올린 활기차고 경쾌한 홈쇼핑 쇼호스트. 밝고 통통 튀는 목소리, 웃음이 섞인 하이텐션, 리듬감 있게 치고 나가는 진행';
+export const hostVoice = (h: Host, style: VoiceStyle = 'natural') =>
+  style === 'lively'
+    ? { voice: LIVELY_VOICE[h.gender][h.age], persona: `${HOST_VOICE[h.gender][h.age].persona.split('.')[0]}. ${LIVELY_PERSONA}` }
+    : HOST_VOICE[h.gender][h.age];
 export const isHost = (v: any): v is Host => HOST_GENDERS.includes(v?.gender) && HOST_AGES.includes(v?.age);
 /** TTS 다중 화자 이름 (원고에는 나오지 않는다) */
 export const SPEAKER_NAMES = ['Speaker1', 'Speaker2'] as const;
@@ -127,6 +146,8 @@ export interface BroadcastScript {
   tone: string;
   /** 말 빠르기 */
   pace: Pace;
+  /** 목소리 느낌 */
+  voiceStyle: VoiceStyle;
   /** 배경음악 설명 (영어, 음악 생성 AI용) */
   music: string;
   segments: BroadcastSegment[];
@@ -138,6 +159,7 @@ export interface BroadcastScriptRequest {
   theme: BroadcastTheme;
   hosts: Host[];
   pace: Pace;
+  voiceStyle: VoiceStyle;
   /** 덧붙일 말 (선택) */
   note?: string;
 }

@@ -4,7 +4,7 @@ import type { FlyerItem, VisionFlyerResult } from '../shared';
 import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { FLYER_MAX_SIDE } from './CameraView';
 import {
-  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
+  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, VOICE_STYLES, voiceStyleLabel, type VoiceStyle, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
 import { decodeMusic, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
@@ -39,6 +39,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [hosts, setHosts] = useState<Host[]>([{ gender: '여성', age: '30대' }]);
   const [withMusic, setWithMusic] = useState(true);
   const [pace, setPace] = useState<Pace>('brisk'); // 기본은 템포 있게
+  const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('natural');
   const [editing, setEditing] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
@@ -100,7 +101,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     try {
       const s = await api<BroadcastScript>('/ai/broadcast/script', {
         items: chosen.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
-        seconds, theme, hosts, pace, note: note.trim() || undefined,
+        seconds, theme, hosts, pace, voiceStyle, note: note.trim() || undefined,
       });
       setScript(s);
       setStep('script');
@@ -138,10 +139,10 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const worker = async () => {
         while (next < segments.length) {
           const i = next++;
-          const key = JSON.stringify([script.hosts, script.tone, script.pace, segments[i].lines]);
+          const key = JSON.stringify([script.hosts, script.voiceStyle, script.tone, script.pace, segments[i].lines]);
           let buf = speechCache.current.get(key);
           if (!buf) {
-            const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines: segments[i].lines, hosts: script.hosts, tone: script.tone, pace: script.pace });
+            const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines: segments[i].lines, hosts: script.hosts, tone: script.tone, pace: script.pace, voiceStyle: script.voiceStyle });
             buf = pcmToBuffer(r.audio, r.sampleRate);
             speechCache.current.set(key, buf);
           }
@@ -157,7 +158,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const mp3 = await toMp3(mixed);
       const wav = toWav(mixed);
       const secs = Math.round(mixed.duration);
-      const saved = await saveBroadcast({ id: crypto.randomUUID(), title: script.title, theme: script.theme, hosts: script.hosts.map(hostLabel).join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
+      const saved = await saveBroadcast({ id: crypto.randomUUID(), title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
       if (saved) void listBroadcasts().then(setLibrary);
       setResult({ url: URL.createObjectURL(mp3), mp3, wav, seconds: secs, musicFailed: withMusic && !music, saved });
       setStep('done');
@@ -277,6 +278,11 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
                 <div className="flex flex-wrap gap-2">{HOST_AGES.map(a => <Chip key={a} active={h.age === a} onClick={() => setHost(i, { age: a })}>{a}</Chip>)}</div>
               </div>
             ))}
+            <div className="space-y-1.5 rounded-2xl bg-white p-3.5">
+              <span className="text-xs font-bold text-slate-500">목소리 느낌</span>
+              <div className="flex flex-wrap gap-2">{VOICE_STYLES.map(v => <Chip key={v.id} active={voiceStyle === v.id} onClick={() => setVoiceStyle(v.id)}>{v.id === 'lively' ? `🎉 ${v.label}` : v.label}</Chip>)}</div>
+              {voiceStyle === 'lively' && <p className="text-xs text-pink-700">밝고 통통 튀는 목소리로 바꾸고, 처음부터 끝까지 텐션 높게 진행합니다.</p>}
+            </div>
             <p className="text-xs text-slate-500">홈쇼핑 쇼호스트처럼 말합니다. 2인 대화는 두 사람이 주고받으며 맞장구치는 방송입니다.</p>
           </section>
 
@@ -306,6 +312,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
               <span className="rounded bg-pink-100 px-2 py-0.5 text-pink-700">{script.theme}</span>
               <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700">{lengthLabel(seconds)} 목표</span>
               <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700">말 빠르기 {paceOf(script.pace).label}</span>
+              <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700">목소리 {voiceStyleLabel(script.voiceStyle ?? 'natural')}</span>
               {script.hosts.map((h, i) => <span key={i} className={cx('rounded px-2 py-0.5', script.hosts.length > 1 ? HOST_TONE[i] : 'bg-slate-200 text-slate-700')}>{hostLabel(h)} 쇼호스트</span>)}
             </div>
           </section>

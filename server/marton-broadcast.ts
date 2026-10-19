@@ -1,7 +1,7 @@
 // 마트ON 행사 매장 방송: 행사상품 → 쇼호스트 원고(AI 작성) → 음성(Gemini TTS, 1인·2인 대화) + 배경음악(Lyria). 합치기는 기기에서 한다.
 import type { GoogleGenAI } from '@google/genai';
 import {
-  BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace,
+  BRAND, BROADCAST_THEMES, THEME_STYLE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace, hostVoice, isVoiceStyle, type VoiceStyle,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
 import { storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
@@ -89,8 +89,8 @@ function cleanSegments(input: unknown, hostCount: number): BroadcastSegment[] {
 }
 
 /** 성우 연기 지시 (Gemini TTS 프롬프트 가이드의 장면·연출 메모 형식) */
-function speechPrompt(hosts: Host[], tone: string, pace: Pace, transcript: string) {
-  const people = hosts.map((h, i) => `${hosts.length > 1 ? `${SPEAKER_NAMES[i]}: ` : ''}${HOST_VOICE[h.gender][h.age].persona}`);
+function speechPrompt(hosts: Host[], style: VoiceStyle, tone: string, pace: Pace, transcript: string) {
+  const people = hosts.map((h, i) => `${hosts.length > 1 ? `${SPEAKER_NAMES[i]}: ` : ''}${hostVoice(h, style).persona}`);
   return [
     '# AUDIO PROFILE',
     ...people,
@@ -99,6 +99,7 @@ function speechPrompt(hosts: Host[], tone: string, pace: Pace, transcript: strin
     '### DIRECTOR\'S NOTES',
     `말투: ${tone}.`,
     paceOf(pace).direction && `빠르기: ${paceOf(pace).direction}`,
+    style === 'lively' && '에너지: 처음부터 끝까지 높은 텐션 유지. 감탄은 크게, 가격은 신나게 외치듯, 문장 끝은 올려서 밝게. 그래도 소리 지르거나 발음이 뭉개지지 않게.',
     '원고를 읽는 느낌이 절대 나면 안 됨. 실제 쇼호스트가 카메라 앞에서 즉석으로 말하듯 자연스럽게, 숨 쉬는 타이밍과 미소가 들리게.',
     '문장마다 억양과 빠르기에 변화를 주고, 가격·할인·"롯데마트"에서는 살짝 힘을 주고 반 박자 쉬었다 가기. 기계처럼 일정한 속도와 높낮이 금지.',
     hosts.length > 1 ? '두 사람은 오래 호흡을 맞춘 진행자 콤비. 상대 말에 진짜로 반응하듯 맞장구와 리액션을 살려서, 말이 끝나자마자 자연스럽게 받기.' : '',
@@ -123,6 +124,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const duo = hosts.length > 1;
     const note = text(req.body.note, 100);
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
+    const voiceStyle: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const { segments, chars } = scriptBudget(seconds, pace);
     const themes = Object.keys(THEME_STYLE);
     const now = storeTime(Date.now());
@@ -185,7 +187,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       if (!list.length) return res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 다시 시도해 주세요.' });
       res.json({
         title: text(raw.title, 40) || `${theme} 안내 방송`,
-        theme, hosts, pace,
+        theme, hosts, pace, voiceStyle,
         tone: text(raw.tone, 120) || THEME_STYLE[theme].tone,
         music: text(raw.music, 300) || THEME_STYLE[theme].music,
         segments: list,
@@ -264,14 +266,15 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     if (!segment) return res.status(400).json({ error: '읽을 원고가 비어 있습니다.' });
     const tone = text(req.body.tone, 120) || '밝고 친근하게';
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
+    const style: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const duo = hosts.length > 1 && segment.lines.some(l => l.who === 1);
     const transcript = duo ? segment.lines.map(l => `${SPEAKER_NAMES[l.who]}: ${l.text}`).join('\n') : segment.lines.map(l => l.text).join('\n');
-    const voiceOf = (h: Host) => ({ prebuiltVoiceConfig: { voiceName: HOST_VOICE[h.gender][h.age].voice } });
+    const voiceOf = (h: Host) => ({ prebuiltVoiceConfig: { voiceName: hostVoice(h, style).voice } });
     const solo = hosts[segment.lines[0].who] ?? hosts[0];
     try {
       const response = await withModels(candidates('MARTON_TTS_MODEL', TTS_MODELS), model => genAI.models.generateContent({
         model,
-        contents: [{ parts: [{ text: speechPrompt(duo ? hosts : [solo], tone, pace, transcript) }] }],
+        contents: [{ parts: [{ text: speechPrompt(duo ? hosts : [solo], style, tone, pace, transcript) }] }],
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: duo
