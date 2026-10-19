@@ -1,7 +1,7 @@
 // 마트ON 행사 매장 방송: 행사상품 → 쇼호스트 원고(AI 작성) → 음성(Gemini TTS, 1인·2인 대화) + 배경음악(Lyria). 합치기는 기기에서 한다.
 import type { GoogleGenAI } from '@google/genai';
 import {
-  BRAND, BROADCAST_THEMES, THEME_STYLE, HOST_VOICE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace,
+  BRAND, BROADCAST_THEMES, THEME_STYLE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace, hostVoice, isVoiceStyle, type VoiceStyle,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
 import { storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
@@ -89,8 +89,8 @@ function cleanSegments(input: unknown, hostCount: number): BroadcastSegment[] {
 }
 
 /** 성우 연기 지시 (Gemini TTS 프롬프트 가이드의 장면·연출 메모 형식) */
-function speechPrompt(hosts: Host[], tone: string, pace: Pace, transcript: string) {
-  const people = hosts.map((h, i) => `${hosts.length > 1 ? `${SPEAKER_NAMES[i]}: ` : ''}${HOST_VOICE[h.gender][h.age].persona}`);
+function speechPrompt(hosts: Host[], style: VoiceStyle, tone: string, pace: Pace, transcript: string) {
+  const people = hosts.map((h, i) => `${hosts.length > 1 ? `${SPEAKER_NAMES[i]}: ` : ''}${hostVoice(h, style).persona}`);
   return [
     '# AUDIO PROFILE',
     ...people,
@@ -99,12 +99,39 @@ function speechPrompt(hosts: Host[], tone: string, pace: Pace, transcript: strin
     '### DIRECTOR\'S NOTES',
     `말투: ${tone}.`,
     paceOf(pace).direction && `빠르기: ${paceOf(pace).direction}`,
+    style === 'lively' && '에너지: 처음부터 끝까지 높은 텐션 유지. 감탄은 크게, 가격은 신나게 외치듯, 문장 끝은 올려서 밝게. 그래도 소리 지르거나 발음이 뭉개지지 않게.',
     '원고를 읽는 느낌이 절대 나면 안 됨. 실제 쇼호스트가 카메라 앞에서 즉석으로 말하듯 자연스럽게, 숨 쉬는 타이밍과 미소가 들리게.',
     '문장마다 억양과 빠르기에 변화를 주고, 가격·할인·"롯데마트"에서는 살짝 힘을 주고 반 박자 쉬었다 가기. 기계처럼 일정한 속도와 높낮이 금지.',
     hosts.length > 1 ? '두 사람은 오래 호흡을 맞춘 진행자 콤비. 상대 말에 진짜로 반응하듯 맞장구와 리액션을 살려서, 말이 끝나자마자 자연스럽게 받기.' : '',
     '#### TRANSCRIPT',
     transcript,
   ].filter(Boolean).join('\n');
+}
+
+// ---- 배경음악: 매장 기본 스타일(현장에서 정한 설명) + 만들 때마다 조성·빠르기·악기를 무작위로 바꿔 매번 다른 곡 ----
+const MUSIC_HOUSE_STYLE = 'Bright, upbeat instrumental background track for a Korean supermarket in-store promotional announcement. Cheerful commercial jingle, lively major-key melody, light pop drums, claps, bouncy bass, sparkling keyboard and acoustic guitar. Energetic, friendly, welcoming and family-oriented. Simple catchy melody, clean professional retail advertising sound.';
+const MUSIC_RULES = 'No vocals, no lyrics, no spoken words, no dramatic transitions, no harsh sounds. Keep the midrange clear so a Korean shopping-host voice can be heard easily. Steady volume throughout and a smooth fade-out ending.';
+const MUSIC_VARIATIONS = {
+  key: ['C major', 'D major', 'E-flat major', 'F major', 'G major', 'A major', 'B-flat major'],
+  bpm: [112, 116, 118, 120, 122, 124, 126, 128],
+  colour: [
+    'glockenspiel and ukulele lead with handclaps',
+    'marimba and whistled hook with finger snaps',
+    'bright piano stabs and short brass hits',
+    'plucky synth and funky muted guitar',
+    'toy piano and pizzicato strings',
+    'electric piano chords and tambourine',
+    'xylophone riff and acoustic strums',
+    'steel drum accents and shakers',
+  ],
+  groove: ['bouncy pop', 'light funk', 'feel-good disco-pop', 'sunny ska-pop', 'happy shuffle', 'upbeat city-pop'],
+};
+const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
+
+/** 음악 생성 지시: 기본 스타일 + 행사 분위기 + 무작위 변주 */
+export function musicPrompt(themeStyle: string, seconds: number) {
+  const v = `Variation for this take: ${pick(MUSIC_VARIATIONS.groove)} groove in ${pick(MUSIC_VARIATIONS.key)} at about ${pick(MUSIC_VARIATIONS.bpm)} bpm, featuring ${pick(MUSIC_VARIATIONS.colour)}.`;
+  return `${MUSIC_HOUSE_STYLE} Event mood: ${themeStyle}. ${v} ${MUSIC_RULES} Approximately ${seconds} seconds long.`;
 }
 
 export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: boolean) {
@@ -123,6 +150,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const duo = hosts.length > 1;
     const note = text(req.body.note, 100);
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
+    const voiceStyle: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const { segments, chars } = scriptBudget(seconds, pace);
     const themes = Object.keys(THEME_STYLE);
     const now = storeTime(Date.now());
@@ -151,6 +179,8 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       '[생동감]',
       '- 홈쇼핑 마감 직전처럼 들뜨고 에너지 넘치게: 감탄("와!", "세상에", "대박이죠?"), 손님에게 바로 거는 말("여러분 이거 보셨어요?"), 짧고 힘 있는 문장, 리듬감 있는 반복("싸다, 싸다, 정말 싸요!").',
       '- 한 문장은 짧게(대부분 20자 안팎). 느슨한 설명·긴 수식어 없이 템포 있게 치고 나가기.',
+      '- 귀에 박히는 후크를 방송마다 한 번: 짧은 구호를 두 번 받아 치듯 (예: "할인은 팍팍, 팍팍! 신선함은 꽉꽉, 꽉꽉!", "식탁은 풍성하게, 가격은 가볍게!"). 매번 새로 지어서, 예시를 그대로 쓰지 말 것.',
+      '- 현장 말맛 참고: "장바구니 꽉꽉 채울 준비 되셨나요?", "득템 찬스!", "오늘 안 오면 손해죠!", "카드 꺼내면? 할인 팍팍!" 같은 신나는 마트 방송 입말.',
       '',
       '[사람처럼 — AI 티 금지]',
       '- 실제 쇼호스트 입말: "자, 여러분", "이거 보세요", "진짜예요", "솔직히 말씀드리면", "어머", "그쵸?" 같은 말맛. 말끝을 ~요/~죠/~거든요/~잖아요/~세요로 섞고, 같은 어미를 연달아 쓰지 마세요.',
@@ -185,7 +215,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       if (!list.length) return res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 다시 시도해 주세요.' });
       res.json({
         title: text(raw.title, 40) || `${theme} 안내 방송`,
-        theme, hosts, pace,
+        theme, hosts, pace, voiceStyle,
         tone: text(raw.tone, 120) || THEME_STYLE[theme].tone,
         music: text(raw.music, 300) || THEME_STYLE[theme].music,
         segments: list,
@@ -264,14 +294,15 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     if (!segment) return res.status(400).json({ error: '읽을 원고가 비어 있습니다.' });
     const tone = text(req.body.tone, 120) || '밝고 친근하게';
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
+    const style: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const duo = hosts.length > 1 && segment.lines.some(l => l.who === 1);
     const transcript = duo ? segment.lines.map(l => `${SPEAKER_NAMES[l.who]}: ${l.text}`).join('\n') : segment.lines.map(l => l.text).join('\n');
-    const voiceOf = (h: Host) => ({ prebuiltVoiceConfig: { voiceName: HOST_VOICE[h.gender][h.age].voice } });
+    const voiceOf = (h: Host) => ({ prebuiltVoiceConfig: { voiceName: hostVoice(h, style).voice } });
     const solo = hosts[segment.lines[0].who] ?? hosts[0];
     try {
       const response = await withModels(candidates('MARTON_TTS_MODEL', TTS_MODELS), model => genAI.models.generateContent({
         model,
-        contents: [{ parts: [{ text: speechPrompt(duo ? hosts : [solo], tone, pace, transcript) }] }],
+        contents: [{ parts: [{ text: speechPrompt(duo ? hosts : [solo], style, tone, pace, transcript) }] }],
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: duo
@@ -302,7 +333,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     try {
       const response = await withModels(candidates('MARTON_MUSIC_MODEL', MUSIC_MODELS), model => genAI.models.generateContent({
         model,
-        contents: [{ parts: [{ text: `Instrumental background bed for in-store supermarket sale announcements with a voice-over on top, about ${seconds} seconds long. ${style}. It should make shoppers feel excited and in the mood to buy right now: upbeat, bouncy, catchy groove with a steady driving beat and bright, positive, feel-good energy, like a busy sale day. No vocals, no lyrics, no singing, no spoken words. Keep the midrange open (no busy lead melody over the voice, no heavy drums, no sudden drops or long build-ups) so the speaking voice always stays in front. Steady volume and consistent energy throughout, with a clean ending.` }] }],
+        contents: [{ parts: [{ text: musicPrompt(style, seconds) }] }],
         config: { responseModalities: ['AUDIO', 'TEXT'] },
       }));
       const part = audioPart(response);
