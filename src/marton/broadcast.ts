@@ -112,6 +112,11 @@ export interface BroadcastLine { who: 0 | 1; text: string }
 export interface BroadcastSegment { lines: BroadcastLine[] }
 export const segmentText = (s: BroadcastSegment) => s.lines.map(l => l.text).join(' ');
 export const hasBrand = (s: BroadcastSegment) => segmentText(s).includes(BRAND);
+/** 전국 공용 방송이라 넣지 않는 위치 표현: 층·코너·매대·진열 위치 */
+export const PLACE_WORDS = /\d+\s*번\s*(?:매대|칸|통로)|\d+\s*번째\s*칸|매대|진열대|코너|지하\s*\d*\s*층|\d+\s*층|입구\s*(?:쪽|앞)|계산대\s*(?:앞|옆|쪽)/;
+/** 점포명: "롯데마트 ○○점", "○○점 고객 여러분" */
+export const STORE_WORDS = new RegExp(`${BRAND}\\s*[가-힣A-Za-z]{1,8}\\s?점(?![포수심원])|[가-힣]{1,8}점\\s*(?:고객|손님)`);
+export const hasPlaceMention = (s: BroadcastSegment) => s.lines.some(l => PLACE_WORDS.test(l.text) || STORE_WORDS.test(l.text));
 
 export interface BroadcastScript {
   title: string;

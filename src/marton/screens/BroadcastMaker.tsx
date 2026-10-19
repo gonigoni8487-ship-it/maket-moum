@@ -4,7 +4,7 @@ import type { FlyerItem, VisionFlyerResult } from '../shared';
 import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { FLYER_MAX_SIDE } from './CameraView';
 import {
-  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, hasBrand, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
+  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
 import { decodeMusic, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
@@ -320,6 +320,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
                   <span>{si + 1}단락</span>
                   {!hasBrand(seg) && <span className="flex items-center gap-1 text-amber-600"><AlertTriangle className="size-3.5" />"{BRAND}"를 넣어 주세요</span>}
+                  {hasPlaceMention(seg) && <span className="flex items-center gap-1 text-red-600"><AlertTriangle className="size-3.5" />점포명·매대 위치는 빼 주세요 (공용 방송)</span>}
                 </div>
                 {seg.lines.map((l, li) => (
                   <div key={li} className="space-y-1">
