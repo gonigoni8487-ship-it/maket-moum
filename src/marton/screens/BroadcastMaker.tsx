@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Download, FolderOpen, Loader2, Paperclip, Megaphone, Mic, Music, Pencil, Plus, RotateCw, Share2, Trash2, Users, User, Wand2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Download, FolderOpen, Gauge, Loader2, Paperclip, Megaphone, Mic, Music, Pencil, Plus, RotateCw, Share2, Trash2, Users, User, Wand2 } from 'lucide-react';
 import type { FlyerItem, VisionFlyerResult } from '../shared';
 import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { FLYER_MAX_SIDE } from './CameraView';
 import {
-  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, hasBrand, hostLabel, lengthLabel,
+  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, hasBrand, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
 import { decodeMusic, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
@@ -31,13 +31,15 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
 }) {
   const [items, setItems] = useState<Item[]>(() => source.map((it, i) => ({ ...it, key: `${i}-${it.name}`, include: i < 12 })));
   const [reading, setReading] = useState(0);
-  const [draft, setDraft] = useState({ name: '', price: '', condition: '' });
+  const [draft, setDraft] = useState('');
   const albumRef = useRef<HTMLInputElement>(null);
   const seq = useRef(source.length);
   const [seconds, setSeconds] = useState<number>(120);
   const [theme, setTheme] = useState<BroadcastTheme>('자동');
   const [hosts, setHosts] = useState<Host[]>([{ gender: '여성', age: '30대' }]);
   const [withMusic, setWithMusic] = useState(true);
+  const [pace, setPace] = useState<Pace>('normal');
+  const [editing, setEditing] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
   const [busy, setBusy] = useState(false);
@@ -81,13 +83,14 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     }
   };
 
+  // 한 줄 입력: "노르웨이 생연어 100g 5,990원→3,990원 엘포인트 30%" → 상품명·규격·정상가·행사가·혜택으로 나눈다
   const addDraft = () => {
-    const name = draft.name.trim();
-    if (!name) return onError('상품명을 입력해 주세요.');
-    const price = Number(draft.price.replace(/\D/g, '')) || undefined;
-    addItems([{ name, price, condition: draft.condition.trim() || undefined }]);
-    setDraft({ name: '', price: '', condition: '' });
+    const lines = draft.split(/\n|;/).map(parseItemLine).filter((x): x is FlyerItem => Boolean(x));
+    if (!lines.length) return onError('상품명을 입력해 주세요. 예: 노르웨이 생연어 100g 3,990원 엘포인트 30%');
+    addItems(lines);
+    setDraft('');
   };
+  const editItem = (key: string, patch: Partial<Item>) => setItems(xs => xs.map(x => (x.key === key ? { ...x, ...patch } : x)));
 
   const setHost = (i: number, patch: Partial<Host>) => setHosts(hs => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
@@ -97,7 +100,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     try {
       const s = await api<BroadcastScript>('/ai/broadcast/script', {
         items: chosen.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
-        seconds, theme, hosts, note: note.trim() || undefined,
+        seconds, theme, hosts, pace, note: note.trim() || undefined,
       });
       setScript(s);
       setStep('script');
@@ -135,10 +138,10 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const worker = async () => {
         while (next < segments.length) {
           const i = next++;
-          const key = JSON.stringify([script.hosts, script.tone, segments[i].lines]);
+          const key = JSON.stringify([script.hosts, script.tone, script.pace, segments[i].lines]);
           let buf = speechCache.current.get(key);
           if (!buf) {
-            const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines: segments[i].lines, hosts: script.hosts, tone: script.tone });
+            const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines: segments[i].lines, hosts: script.hosts, tone: script.tone, pace: script.pace });
             buf = pcmToBuffer(r.audio, r.sampleRate);
             speechCache.current.set(key, buf);
           }
@@ -204,27 +207,46 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
               <span className="text-xs font-semibold text-slate-500">{chosen.length} / {items.length}개</span>
             </div>
             {items.length === 0 && !reading && <p className="rounded-2xl bg-white px-3.5 py-4 text-sm text-slate-600">방송할 행사상품이 없습니다. 아래에서 <b>전단 사진</b>을 올리거나 직접 입력해 주세요.</p>}
-            {items.length > 0 && <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-2xl bg-white">
-              {items.map(it => (
-                <label key={it.key} className="flex items-start gap-3 px-3.5 py-2.5">
-                  <input type="checkbox" checked={it.include} onChange={e => setItems(xs => xs.map(x => (x.key === it.key ? { ...x, include: e.target.checked } : x)))} className="mt-0.5 size-5 shrink-0 accent-pink-600" />
-                  <span className="min-w-0 text-sm">
-                    <span className="font-semibold text-slate-900">{it.name}</span>{it.spec && <span className="text-slate-400"> {it.spec}</span>}
-                    <span className="block text-xs text-slate-500">{[it.price && won(it.price), it.condition, it.period].filter(Boolean).join(' · ')}</span>
-                  </span>
-                </label>
+            {items.length > 0 && <div className={cx('divide-y divide-slate-100 overflow-y-auto rounded-2xl bg-white', !editing && 'max-h-72')}>
+              {items.map(it => editing === it.key ? (
+                <div key={it.key} className="space-y-2 bg-pink-50/50 px-3.5 py-3">
+                  <label className="block text-[11px] font-semibold text-slate-500 space-y-0.5">상품명<input className={field} value={it.name} onChange={e => editItem(it.key, { name: e.target.value })} maxLength={60} /></label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] font-semibold text-slate-500 space-y-0.5">규격·중량<input className={field} value={it.spec ?? ''} onChange={e => editItem(it.key, { spec: e.target.value || undefined })} maxLength={40} placeholder="100g, 2kg/박스" /></label>
+                    <label className="text-[11px] font-semibold text-slate-500 space-y-0.5">행사기간<input className={field} value={it.period ?? ''} onChange={e => editItem(it.key, { period: e.target.value || undefined })} maxLength={40} placeholder="10/16~10/22" /></label>
+                    <label className="text-[11px] font-semibold text-slate-500 space-y-0.5">정상가<input className={field} inputMode="numeric" value={it.originalPrice?.toLocaleString() ?? ''} onChange={e => editItem(it.key, { originalPrice: Number(e.target.value.replace(/\D/g, '')) || undefined })} placeholder="원" /></label>
+                    <label className="text-[11px] font-semibold text-slate-500 space-y-0.5 text-pink-600">행사가<input className={cx(field, 'font-bold text-pink-700')} inputMode="numeric" value={it.price?.toLocaleString() ?? ''} onChange={e => editItem(it.key, { price: Number(e.target.value.replace(/\D/g, '')) || undefined })} placeholder="원" /></label>
+                  </div>
+                  <label className="block text-[11px] font-semibold text-slate-500 space-y-0.5">혜택<input className={field} value={it.condition ?? ''} onChange={e => editItem(it.key, { condition: e.target.value || undefined })} maxLength={100} placeholder="엘포인트 30%, 1+1" /></label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setItems(xs => xs.filter(x => x.key !== it.key))} className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-slate-500"><Trash2 className="size-4" />빼기</button>
+                    <button type="button" onClick={() => setEditing(null)} className="ml-auto flex items-center gap-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white"><Check className="size-4" />완료</button>
+                  </div>
+                </div>
+              ) : (
+                <div key={it.key} className="flex items-start gap-3 px-3.5 py-2.5">
+                  <input type="checkbox" checked={it.include} onChange={e => editItem(it.key, { include: e.target.checked })} aria-label={`${it.name} 방송에 넣기`} className="mt-0.5 size-5 shrink-0 accent-pink-600" />
+                  <button type="button" onClick={() => setEditing(it.key)} className="min-w-0 flex-1 text-left text-sm">
+                    <span className="font-semibold text-slate-900">{it.name}</span>{it.spec && <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">{it.spec}</span>}
+                    <span className="block text-xs text-slate-500">
+                      {it.originalPrice && it.price && it.originalPrice > it.price && <span className="mr-1 line-through">{won(it.originalPrice)}</span>}
+                      {it.price ? <b className="text-pink-700">{won(it.price)}</b> : <span className="text-amber-600">가격 없음</span>}
+                      {[it.condition, it.period].filter(Boolean).map(x => ` · ${x}`).join('')}
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => setEditing(it.key)} aria-label={`${it.name} 고치기`} className="shrink-0 rounded-lg p-1.5 text-slate-400 active:bg-slate-100"><Pencil className="size-4" /></button>
+                </div>
               ))}
             </div>}
             <button type="button" onClick={() => (aiEnabled ? albumRef.current?.click() : onError(NO_KEY))} disabled={reading > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-pink-200 bg-white py-3 text-sm font-bold text-pink-700 active:bg-pink-50 disabled:opacity-50">
               {reading > 0 ? <><Loader2 className="size-4 animate-spin" />전단 읽는 중… (한 장에 10~20초)</> : <><Paperclip className="size-4" />전단 파일 첨부 (사진·PDF · 찍기)</>}
             </button>
             <input ref={albumRef} type="file" accept={FLYER_FILE_ACCEPT} multiple hidden onChange={e => { void pickFlyers(e.target.files); e.target.value = ''; }} />
-            <div className="grid grid-cols-[1fr_5.5rem] gap-2">
-              <input className={field} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} maxLength={60} placeholder="직접 입력: 상품명" aria-label="상품명" />
-              <input className={field} inputMode="numeric" value={draft.price} onChange={e => setDraft({ ...draft, price: e.target.value })} placeholder="행사가" aria-label="행사가" />
-              <input className={field} value={draft.condition} onChange={e => setDraft({ ...draft, condition: e.target.value })} maxLength={100} placeholder="혜택 (예: 1+1, 엘포인트 30%)" aria-label="행사 혜택" />
-              <button type="button" onClick={addDraft} className="flex items-center justify-center gap-1 rounded-xl bg-slate-800 text-sm font-bold text-white"><Plus className="size-4" />추가</button>
+            <div className="flex gap-2">
+              <input className={field} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraft(); } }} maxLength={160} placeholder="한 줄로: 생연어 100g 3,990원 엘포인트 30%" aria-label="상품 한 줄 입력" />
+              <button type="button" onClick={addDraft} className="flex shrink-0 items-center justify-center gap-1 rounded-xl bg-slate-800 px-4 text-sm font-bold text-white"><Plus className="size-4" />추가</button>
             </div>
+            <p className="text-xs text-slate-500">상품명·규격(그램 등)·가격·혜택을 한 줄로 쓰면 알아서 나눕니다. 정상가도 있으면 "5,990원→3,990원"처럼. 상품을 누르면 고칠 수 있어요.</p>
             <p className="text-xs text-slate-500">30초면 1~2개, 1분이면 3~5개, 3분이면 8~12개가 듣기 좋습니다.</p>
           </section>
 
@@ -259,6 +281,12 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           </section>
 
           <section className="space-y-2">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Gauge className="size-4" />5. 말 빠르기</h2>
+            <div className="flex flex-wrap gap-2">{PACES.map(p => <Chip key={p.id} active={pace === p.id} onClick={() => setPace(p.id)}>{p.label}</Chip>)}</div>
+            <p className="text-xs text-slate-500">빠를수록 같은 시간에 더 많은 상품을 소개합니다. 가격·숫자는 또렷하게 읽습니다.</p>
+          </section>
+
+          <section className="space-y-2">
             <label className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-3">
               <input type="checkbox" checked={withMusic} onChange={e => setWithMusic(e.target.checked)} className="size-5 accent-pink-600" />
               <span className="text-sm"><span className="font-semibold text-slate-900">행사 분위기 배경음악 넣기</span><span className="block text-xs text-slate-500">AI가 새로 작곡한 잔잔한 연주곡. 목소리보다 항상 작게 깔리고, 말할 때는 더 줄어듭니다.</span></span>
@@ -277,6 +305,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
             <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
               <span className="rounded bg-pink-100 px-2 py-0.5 text-pink-700">{script.theme}</span>
               <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700">{lengthLabel(seconds)} 목표</span>
+              <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700">말 빠르기 {paceOf(script.pace).label}</span>
               {script.hosts.map((h, i) => <span key={i} className={cx('rounded px-2 py-0.5', script.hosts.length > 1 ? HOST_TONE[i] : 'bg-slate-200 text-slate-700')}>{hostLabel(h)} 쇼호스트</span>)}
             </div>
           </section>
