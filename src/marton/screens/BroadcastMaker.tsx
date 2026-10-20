@@ -4,7 +4,7 @@ import type { FlyerItem, VisionFlyerResult } from '../shared';
 import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { FLYER_MAX_SIDE } from './CameraView';
 import {
-  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, VOICE_STYLES, voiceStyleLabel, type VoiceStyle, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
+  BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, VOICE_STYLES, koreanNumber, scriptGaps, voiceStyleLabel, type VoiceStyle, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
 import { decodeMusic, decodeMusicFile, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
@@ -24,7 +24,7 @@ const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 te
 const HOST_TONE = ['bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700'];
 const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age: '40대' }];
 const NO_KEY = 'AI 키(GEMINI_API_KEY)가 서버에 없어 전단을 읽거나 방송을 만들 수 없습니다. Cloudflare → Workers → maket-moum → 설정 → 변수 및 비밀에 GEMINI_API_KEY를 넣어 주세요.';
-const REWRITE_EXAMPLES = ['더 짧게', '더 신나게', '가격 강조', '후크 넣기', '혜택 쉽게 풀어서', '마무리 멘트로'];
+const REWRITE_EXAMPLES = ['가격 넣어 줘', '더 짧게', '더 신나게', '가격 강조', '후크 넣기', '혜택 쉽게 풀어서', '마무리 멘트로'];
 const mb = (b: Blob) => `${(b.size / 1048576).toFixed(1)}MB`;
 
 /** 행사 매장 방송 만들기: 행사상품 → 쇼호스트 원고 → 음성 + 배경음악 → 1~3분 방송 파일 (MP3·WAV) */
@@ -62,6 +62,8 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [note, saveNote] = useBroadcastNote();
   // 첨부한 전단은 바로 읽지 않고 기다린다 → 추가 지시사항을 적은 뒤 "인식하고 원고 만들기"에서 지시대로 인식
   const [pending, setPending] = useState<File[]>([]);
+  // 원고를 쓸 때 넘긴 상품 (상품·가격이 원고에 다 들어갔는지 점검용)
+  const [scriptItems, setScriptItems] = useState<{ items: FlyerItem[]; all: boolean }>({ items: [], all: false });
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
   const [busy, setBusy] = useState(false);
   const [script, setScript] = useState<BroadcastScript | null>(null);
@@ -140,6 +142,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
         seconds, theme, hosts, pace, voiceStyle, note: note.trim() || undefined,
       });
       setScript(s);
+      setScriptItems({ items: use, all: !note.trim() });
       setStep('script');
     } catch (e) {
       onError((e as Error).message);
@@ -295,7 +298,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
                     <label className="text-[11px] font-semibold text-slate-500 space-y-0.5">정상가<input className={field} inputMode="numeric" value={it.originalPrice?.toLocaleString() ?? ''} onChange={e => editItem(it.key, { originalPrice: Number(e.target.value.replace(/\D/g, '')) || undefined })} placeholder="원" /></label>
                     <label className="text-[11px] font-semibold text-slate-500 space-y-0.5 text-pink-600">행사가<input className={cx(field, 'font-bold text-pink-700')} inputMode="numeric" value={it.price?.toLocaleString() ?? ''} onChange={e => editItem(it.key, { price: Number(e.target.value.replace(/\D/g, '')) || undefined })} placeholder="원" /></label>
                   </div>
-                  <label className="block text-[11px] font-semibold text-slate-500 space-y-0.5">혜택<input className={field} value={it.condition ?? ''} onChange={e => editItem(it.key, { condition: e.target.value || undefined })} maxLength={100} placeholder="엘포인트 30%, 1+1" /></label>
+                  <label className="block text-[11px] font-semibold text-slate-500 space-y-0.5">혜택<input className={field} value={it.condition ?? ''} onChange={e => editItem(it.key, { condition: e.target.value || undefined })} maxLength={200} placeholder="행사카드 50% + 수산대전 20%" /></label>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setItems(xs => xs.filter(x => x.key !== it.key))} className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-slate-500"><Trash2 className="size-4" />빼기</button>
                     <button type="button" onClick={() => setEditing(null)} className="ml-auto flex items-center gap-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white"><Check className="size-4" />완료</button>
@@ -428,6 +431,18 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
               <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Pencil className="size-4" />방송 원고</h2>
               <p className="text-xs text-slate-500">글자를 눌러 바로 고치거나, ✨다시 쓰기로 한 단락만 AI에게 다시 맡길 수 있습니다. 고친 단락만 음성을 새로 만듭니다.{script.hosts.length > 1 && ' 진행자 이름표를 누르면 말하는 사람이 바뀝니다.'}</p>
             </div>
+            {scriptItems.items.length > 0 && (() => {
+              const gaps = scriptGaps(script.segments, scriptItems.items, scriptItems.all);
+              return gaps.length === 0
+                ? <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">✓ {scriptItems.all ? `행사상품 ${scriptItems.items.length}개 모두` : '원고에 나온 상품 모두'} 가격까지 들어갔어요</p>
+                : (
+                  <div className="space-y-1 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                    <p className="font-bold">확인해 주세요 · 빠진 상품·가격 {gaps.length}개</p>
+                    {gaps.map(g => <p key={g.name}>• {g.name}: {g.problem === 'missing' ? '원고에 없음' : `가격(${koreanNumber(g.price!)} 원)이 안 나옴`}</p>)}
+                    <p className="text-amber-700">해당 단락을 직접 고치거나 ✨다시 쓰기에 "가격 넣어 줘"라고 지시해 주세요.</p>
+                  </div>
+                );
+            })()}
             {script.segments.map((seg, si) => (
               <div key={si} className="space-y-2 rounded-2xl bg-white p-3">
                 <div className="flex items-center gap-1 text-xs font-semibold text-slate-400">
