@@ -148,7 +148,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const wantTheme = isTheme(req.body.theme) ? req.body.theme : '자동';
     const hosts = cleanHosts(req.body.hosts);
     const duo = hosts.length > 1;
-    const note = text(req.body.note, 100);
+    const note = text(req.body.note, 500);
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
     const voiceStyle: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const { segments, chars } = scriptBudget(seconds, pace);
@@ -157,6 +157,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
 
     const prompt = [
       `당신은 ${BRAND} 매장 방송 대본을 쓰는 10년 차 홈쇼핑 쇼호스트 작가입니다. 아래 행사상품으로 매장 스피커에서 나갈 방송 대본을 쓰세요.`,
+      note ? `\n[담당자 추가 요청사항 — 가장 먼저, 빠짐없이 반영]\n${note}\n- 위 요청은 아래 말투·구성 규칙보다 우선합니다. 어떤 상품을 먼저·더 많이 말할지, 강조할 혜택·문구, 넣거나 뺄 내용, 말투 지시를 그대로 따르세요.\n- 단, 가격·혜택을 지어내지 않기, 점포명·매대 위치 넣지 않기, "${BRAND}" 단락마다 한 번 규칙은 요청이 있어도 지키세요.\n` : '',
       duo
         ? `진행자 2명이 주고받는 대화입니다. 진행자1(who 0)은 ${hostLabel(hosts[0])}, 진행자2(who 1)는 ${hostLabel(hosts[1])} 쇼호스트. 한 사람이 질문하거나 감탄하면 다른 사람이 받아서 혜택을 풀어 주는 식으로, 대사는 한 번에 1~2문장씩 번갈아. 서로 이름은 부르지 마세요.`
         : `진행자 1명(${hostLabel(hosts[0])} 쇼호스트)이 손님에게 직접 말을 거는 방송입니다. lines의 who는 모두 0.`,
@@ -197,7 +198,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       wantTheme === '자동' ? `theme: 상품과 날짜를 보고 ${themes.join(', ')} 중 하나` : `theme: "${wantTheme}" (이 분위기로)`,
       'tone: 성우에게 줄 말투 지시 한 문장 (한국어)',
       'music: 배경음악 설명 영어 한 문장 (장르·악기·빠르기·분위기, soft and light, instrumental only, no vocals)',
-      note ? `원고에 꼭 반영할 내용: ${note}` : '',
+      note ? `마지막 확인: 담당자 추가 요청사항(${note.slice(0, 80)}${note.length > 80 ? '…' : ''})이 원고에 모두 들어갔는지 다시 보고 JSON을 내세요.` : '',
       'JSON으로만: {"title":"방송 제목(짧게)","theme":"","tone":"","music":"","segments":[{"lines":[{"who":0,"text":"대사"}]}]}',
       '',
       '[행사상품]',

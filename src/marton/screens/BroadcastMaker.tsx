@@ -23,6 +23,7 @@ const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 te
 const HOST_TONE = ['bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700'];
 const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age: '40대' }];
 const NO_KEY = 'AI 키(GEMINI_API_KEY)가 서버에 없어 전단을 읽거나 방송을 만들 수 없습니다. Cloudflare → Workers → maket-moum → 설정 → 변수 및 비밀에 GEMINI_API_KEY를 넣어 주세요.';
+const NOTE_EXAMPLES = ['1+1 상품을 먼저', '행사카드 할인 강조', '오늘 하루만 강조', '가족 장보기 분위기로', '어르신도 알아듣게 또박또박', '신선함 강조'];
 const mb = (b: Blob) => `${(b.size / 1048576).toFixed(1)}MB`;
 
 /** 행사 매장 방송 만들기: 행사상품 → 쇼호스트 원고 → 음성 + 배경음악 → 1~3분 방송 파일 (MP3·WAV) */
@@ -56,7 +57,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [pace, setPace] = useState<Pace>('brisk'); // 기본은 템포 있게
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('natural');
   const [editing, setEditing] = useState<string | null>(null);
-  const [note, setNote] = useState('');
+  // 추가 요청사항: 원고 작가에게 주는 지시. 같은 기기에서는 마지막에 쓴 것을 기억한다
+  const [note, setNote] = useState(() => { try { return localStorage.getItem('marton-broadcast-note') ?? ''; } catch { return ''; } });
+  const saveNote = (v: string) => { setNote(v); try { localStorage.setItem('marton-broadcast-note', v); } catch { /* 저장 불가 */ } };
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
   const [busy, setBusy] = useState(false);
   const [script, setScript] = useState<BroadcastScript | null>(null);
@@ -269,6 +272,19 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           </section>
 
           <section className="space-y-2">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Pencil className="size-4" />추가 요청사항 <span className="font-normal text-slate-400">(원고에 그대로 반영)</span></h2>
+            <textarea rows={3} className={cx(field, 'resize-none')} value={note} onChange={e => saveNote(e.target.value)} maxLength={500}
+              placeholder={'예: 한우를 제일 먼저, 가장 길게 소개해 줘\n행사카드 할인을 꼭 두 번 강조\n오늘 하루만 이 가격이라는 말 넣어 줘'} aria-label="추가 요청사항" />
+            <div className="flex flex-wrap gap-1.5">
+              {NOTE_EXAMPLES.map(x => (
+                <button key={x} type="button" onClick={() => saveNote(note.trim() ? `${note.trim()}\n${x}` : x)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 active:bg-slate-100">+ {x}</button>
+              ))}
+              {note && <button type="button" onClick={() => saveNote('')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-slate-400">지우기</button>}
+            </div>
+            <p className="text-xs text-slate-500">전단·상품과 함께 원하는 방향을 적으면 원고가 그대로 따릅니다. 가격을 지어내거나 점포명·매대 위치를 넣는 요청은 반영하지 않습니다.</p>
+          </section>
+
+          <section className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-700">2. 방송 길이</h2>
             <div className="flex flex-wrap gap-2">{LENGTH_CHOICES.map(s => <Chip key={s} active={seconds === s} onClick={() => setSeconds(s)}>{lengthLabel(s)}</Chip>)}</div>
           </section>
@@ -331,7 +347,6 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
                 <input ref={musicFileRef} type="file" accept="audio/*,.mp3,.wav,.m4a" hidden onChange={e => { void pickMusicFile(e.target.files?.[0]); e.target.value = ''; }} />
               </div>
             )}
-            <input className={inputCls} value={note} onChange={e => setNote(e.target.value)} maxLength={100} placeholder="덧붙일 말 (선택) 예: 오후 3시까지만, 주차 2시간 무료" />
           </section>
 
           <button type="button" onClick={() => (aiEnabled ? void writeScript() : onError(NO_KEY))} disabled={busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
