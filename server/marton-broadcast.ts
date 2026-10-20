@@ -4,7 +4,7 @@ import {
   BRAND, BROADCAST_THEMES, THEME_STYLE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace, hostVoice, isVoiceStyle, type VoiceStyle,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
-import { storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
+import { matchProduct, storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
 import { platform } from './platform';
 import { auth, db, text, parseJson, type RouteApp } from './marton';
 import { normalizeStore } from '../src/marton/kpi';
@@ -53,11 +53,12 @@ function audioPart(response: any): { data: string; mimeType: string } | undefine
   return undefined;
 }
 
-/** 원고에 넣을 사실: 전단 내용 + 아낀 금액(계산). 모든 점포 공용 방송이라 매장 위치는 넣지 않는다. AI가 지어내지 않도록 근거를 다 준다 */
+/** 원고에 넣을 사실: 전단 내용 + 아낀 금액(계산) + 분류(수산·축산 등, 상품 DB에 있으면). 모든 점포 공용 방송이라 매장 위치는 넣지 않는다. AI가 지어내지 않도록 근거를 다 준다 */
 function itemFacts(it: FlyerItem) {
   const save = it.originalPrice && it.price && it.originalPrice > it.price ? it.originalPrice - it.price : 0;
+  const dept = matchProduct(it, db.products)?.dept;
   return [
-    it.name, it.spec && `(${it.spec})`,
+    dept && `[${dept}]`, it.name, it.spec && `(${it.spec})`,
     it.price && `행사가 ${won(it.price)}`, it.originalPrice && `정상가 ${won(it.originalPrice)}`,
     save && `${won(save)} 저렴 (${Math.round(save / it.originalPrice! * 100)}%)`,
     it.condition && `혜택 ${it.condition}`, it.period && `기간 ${it.period}`,
@@ -148,7 +149,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const wantTheme = isTheme(req.body.theme) ? req.body.theme : '자동';
     const hosts = cleanHosts(req.body.hosts);
     const duo = hosts.length > 1;
-    const note = text(req.body.note, 100);
+    const note = text(req.body.note, 500);
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
     const voiceStyle: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const { segments, chars } = scriptBudget(seconds, pace);
@@ -157,6 +158,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
 
     const prompt = [
       `당신은 ${BRAND} 매장 방송 대본을 쓰는 10년 차 홈쇼핑 쇼호스트 작가입니다. 아래 행사상품으로 매장 스피커에서 나갈 방송 대본을 쓰세요.`,
+      note ? `\n[담당자 추가 요청사항 — 가장 먼저, 빠짐없이 반영]\n${note}\n- 위 요청은 아래 말투·구성 규칙보다 우선합니다. 어떤 상품을 먼저·더 많이 말할지, 강조할 혜택·문구, 넣거나 뺄 내용, 말투 지시를 그대로 따르세요.\n- 요청이 특정 분류·상품만 말하라고 하면(예: "수산물만", "과일·채소만", "1+1 상품만") 아래 행사상품 중 해당하는 것만 골라 쓰고, 나머지 상품은 원고에서 아예 빼세요. 분류 표시([수산] 등)가 없는 상품은 상품명으로 판단하세요(연어·고등어·전복·새우·오징어·꽃게·김·초밥 → 수산물).\n- 단, 가격·혜택을 지어내지 않기, 점포명·매대 위치 넣지 않기, "${BRAND}" 단락마다 한 번 규칙은 요청이 있어도 지키세요.\n` : '',
       duo
         ? `진행자 2명이 주고받는 대화입니다. 진행자1(who 0)은 ${hostLabel(hosts[0])}, 진행자2(who 1)는 ${hostLabel(hosts[1])} 쇼호스트. 한 사람이 질문하거나 감탄하면 다른 사람이 받아서 혜택을 풀어 주는 식으로, 대사는 한 번에 1~2문장씩 번갈아. 서로 이름은 부르지 마세요.`
         : `진행자 1명(${hostLabel(hosts[0])} 쇼호스트)이 손님에게 직접 말을 거는 방송입니다. lines의 who는 모두 0.`,
@@ -197,7 +199,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       wantTheme === '자동' ? `theme: 상품과 날짜를 보고 ${themes.join(', ')} 중 하나` : `theme: "${wantTheme}" (이 분위기로)`,
       'tone: 성우에게 줄 말투 지시 한 문장 (한국어)',
       'music: 배경음악 설명 영어 한 문장 (장르·악기·빠르기·분위기, soft and light, instrumental only, no vocals)',
-      note ? `원고에 꼭 반영할 내용: ${note}` : '',
+      note ? `마지막 확인: 담당자 추가 요청사항(${note.slice(0, 80)}${note.length > 80 ? '…' : ''})이 원고에 모두 들어갔는지 다시 보고 JSON을 내세요.` : '',
       'JSON으로만: {"title":"방송 제목(짧게)","theme":"","tone":"","music":"","segments":[{"lines":[{"who":0,"text":"대사"}]}]}',
       '',
       '[행사상품]',
@@ -285,6 +287,44 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       return list;
     }
   }
+
+  // 1-2) 원고 한 단락만 다시 쓰기 (직원 지시: "더 짧게", "가격 강조" 등). 앞뒤 단락과 이어지게, 사실은 그대로
+  app.post(`${api}/ai/broadcast/rewrite`, auth, async (req, res) => {
+    if (!aiEnabled) return res.status(503).json(noKey);
+    const hosts = cleanHosts(req.body.hosts);
+    const [segment] = cleanSegments([{ lines: req.body.lines }], hosts.length);
+    if (!segment) return res.status(400).json({ error: '다시 쓸 단락이 비어 있습니다.' });
+    const instruction = text(req.body.instruction, 200) || '같은 내용을 더 생동감 있고 자연스럽게';
+    const before = text(req.body.before, 400), after = text(req.body.after, 400);
+    const items = cleanItems(req.body.items);
+    const duo = hosts.length > 1;
+    try {
+      const response = await genAI.models.generateContent({
+        model: AI_MODEL,
+        config: { responseMimeType: 'application/json', temperature: 1 },
+        contents: [{ parts: [{ text: [
+          `${BRAND} 매장 방송 원고의 한 단락만 다시 쓰세요. 지시: ${instruction}`,
+          `- 홈쇼핑 쇼호스트 입말, 짧고 생동감 있게. 숫자는 한글로 풀어 쓰기. "${BRAND}"는 딱 한 번. 점포 이름·층·코너·매대 위치는 넣지 않기.`,
+          '- 가격·혜택·기간은 아래 행사상품 데이터와 지금 단락에 있는 사실만. 없는 내용을 지어내지 마세요.',
+          '- 지시에 길이 말이 없으면 지금 단락과 비슷한 길이로. 앞뒤 단락과 자연스럽게 이어지게, 같은 말을 반복하지 않게.',
+          duo ? `- 진행자 2명 대화(who 0: ${hostLabel(hosts[0])}, who 1: ${hostLabel(hosts[1])}). 주고받는 형식 유지.` : '- 진행자 1명, who는 모두 0.',
+          before && `[앞 단락] ${before}`,
+          `[다시 쓸 단락] ${JSON.stringify(segment)}`,
+          after && `[뒤 단락] ${after}`,
+          items.length ? `[행사상품]\n${items.map(itemFacts).join('\n')}` : '',
+          'JSON으로만: {"lines":[{"who":0,"text":""}]}',
+        ].filter(Boolean).join('\n') }] }],
+      });
+      const [fresh] = cleanSegments([{ lines: parseJson<{ lines?: unknown }>(response.text).lines }], hosts.length);
+      if (!fresh) return res.status(502).json({ error: '단락을 다시 쓰지 못했습니다. 다시 시도해 주세요.' });
+      const [done] = stripPlaces(await addBrand(await removePlaces([fresh], hosts.length), hosts.length));
+      if (!done) return res.status(502).json({ error: '단락을 다시 쓰지 못했습니다. 다시 시도해 주세요.' });
+      res.json(done satisfies BroadcastSegment);
+    } catch (e) {
+      console.error('MartON broadcast rewrite error:', e);
+      res.status(502).json({ error: '단락을 다시 쓰지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+    }
+  });
 
   // 2) 단락 하나를 음성으로 (단락별로 나눠 보내 응답이 커지지 않게). 진행자 2명이면 다중 화자
   app.post(`${api}/ai/broadcast/speech`, auth, async (req, res) => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Check, Download, FolderOpen, Gauge, Loader2, Paperclip, Megaphone, Mic, Music, Pencil, Plus, RotateCw, Share2, Trash2, Users, User, Wand2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, Download, FolderOpen, Gauge, Loader2, Paperclip, Megaphone, Mic, Music, Pencil, Plus, RotateCw, Share2, Sparkles, Trash2, Users, User, Wand2, X } from 'lucide-react';
 import type { FlyerItem, VisionFlyerResult } from '../shared';
 import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { FLYER_MAX_SIDE } from './CameraView';
@@ -23,6 +23,8 @@ const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 te
 const HOST_TONE = ['bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700'];
 const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age: '40대' }];
 const NO_KEY = 'AI 키(GEMINI_API_KEY)가 서버에 없어 전단을 읽거나 방송을 만들 수 없습니다. Cloudflare → Workers → maket-moum → 설정 → 변수 및 비밀에 GEMINI_API_KEY를 넣어 주세요.';
+const REWRITE_EXAMPLES = ['더 짧게', '더 신나게', '가격 강조', '후크 넣기', '혜택 쉽게 풀어서', '마무리 멘트로'];
+const NOTE_EXAMPLES = ['수산물 행사만', '1+1 상품을 먼저', '행사카드 할인 강조', '오늘 하루만 강조', '가족 장보기 분위기로', '어르신도 알아듣게 또박또박', '신선함 강조'];
 const mb = (b: Blob) => `${(b.size / 1048576).toFixed(1)}MB`;
 
 /** 행사 매장 방송 만들기: 행사상품 → 쇼호스트 원고 → 음성 + 배경음악 → 1~3분 방송 파일 (MP3·WAV) */
@@ -56,7 +58,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [pace, setPace] = useState<Pace>('brisk'); // 기본은 템포 있게
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('natural');
   const [editing, setEditing] = useState<string | null>(null);
-  const [note, setNote] = useState('');
+  // 추가 요청사항: 원고 작가에게 주는 지시. 같은 기기에서는 마지막에 쓴 것을 기억한다
+  const [note, setNote] = useState(() => { try { return localStorage.getItem('marton-broadcast-note') ?? ''; } catch { return ''; } });
+  const saveNote = (v: string) => { setNote(v); try { localStorage.setItem('marton-broadcast-note', v); } catch { /* 저장 불가 */ } };
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
   const [busy, setBusy] = useState(false);
   const [script, setScript] = useState<BroadcastScript | null>(null);
@@ -129,6 +133,45 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
 
   const editLine = (si: number, li: number, patch: Partial<BroadcastSegment['lines'][number]>) =>
     setScript(s => s && { ...s, segments: s.segments.map((seg, i) => (i !== si ? seg : { lines: seg.lines.map((l, j) => (j === li ? { ...l, ...patch } : l)) })) });
+  // ---- 원고 부분 수정: 단락 순서·추가·삭제, 대사 추가·삭제, 한 단락만 AI로 다시 쓰기 ----
+  const setSegments = (fn: (segs: BroadcastSegment[]) => BroadcastSegment[]) => setScript(s => s && { ...s, segments: fn(s.segments) });
+  const moveSeg = (si: number, d: -1 | 1) => setSegments(segs => {
+    const j = si + d;
+    if (j < 0 || j >= segs.length) return segs;
+    const next = [...segs];
+    [next[si], next[j]] = [next[j], next[si]];
+    return next;
+  });
+  const deleteSeg = (si: number) => { if (confirm(`${si + 1}단락을 지울까요?`)) setSegments(segs => segs.filter((_, i) => i !== si)); };
+  const addSeg = () => setSegments(segs => [...segs, { lines: [{ who: 0, text: '' }] }]);
+  const addLine = (si: number) => setSegments(segs => segs.map((seg, i) => (i !== si ? seg : { lines: [...seg.lines, { who: (seg.lines.at(-1)?.who === 0 && (script?.hosts.length ?? 1) > 1 ? 1 : 0) as 0 | 1, text: '' }] })));
+  const deleteLine = (si: number, li: number) => setSegments(segs => segs.map((seg, i) => (i !== si ? seg : { lines: seg.lines.filter((_, j) => j !== li) })).filter(seg => seg.lines.length));
+  const [rewriting, setRewriting] = useState<{ si: number; instruction: string; busy: boolean } | null>(null);
+  const rewriteSeg = async () => {
+    if (!script || !rewriting) return;
+    if (!aiEnabled) return onError(NO_KEY);
+    const { si, instruction } = rewriting;
+    const text = (seg?: BroadcastSegment) => seg?.lines.map(l => l.text).join(' ') ?? '';
+    setRewriting({ ...rewriting, busy: true });
+    try {
+      const fresh = await api<BroadcastSegment>('/ai/broadcast/rewrite', {
+        lines: script.segments[si].lines, instruction: instruction.trim() || undefined, hosts: script.hosts,
+        before: text(script.segments[si - 1]), after: text(script.segments[si + 1]),
+        items: chosen.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
+      });
+      setSegments(segs => segs.map((seg, i) => (i === si ? fresh : seg)));
+      setRewriting(null);
+    } catch (e) {
+      onError((e as Error).message);
+      setRewriting(r => r && { ...r, busy: false });
+    }
+  };
+  const openSaved = (b: SavedBroadcast) => {
+    if (!b.script) return onError('예전에 만든 방송이라 원고가 저장되어 있지 않습니다. 새로 만든 방송부터 원고를 다시 열 수 있어요.');
+    setScript(b.script);
+    if (b.target) setSeconds(b.target);
+    setStep('script');
+  };
 
   const make = async () => {
     if (!script) return;
@@ -175,7 +218,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const mp3 = await toMp3(mixed);
       const wav = toWav(mixed);
       const secs = Math.round(mixed.duration);
-      const saved = await saveBroadcast({ id: crypto.randomUUID(), title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
+      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
       if (saved) void listBroadcasts().then(setLibrary);
       setResult({ url: URL.createObjectURL(mp3), mp3, wav, seconds: secs, musicFailed: withMusic && !music, saved });
       setStep('done');
@@ -269,6 +312,19 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           </section>
 
           <section className="space-y-2">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Pencil className="size-4" />추가 요청사항 <span className="font-normal text-slate-400">(원고에 그대로 반영)</span></h2>
+            <textarea rows={3} className={cx(field, 'resize-none')} value={note} onChange={e => saveNote(e.target.value)} maxLength={500}
+              placeholder={'예: 한우를 제일 먼저, 가장 길게 소개해 줘\n행사카드 할인을 꼭 두 번 강조\n오늘 하루만 이 가격이라는 말 넣어 줘'} aria-label="추가 요청사항" />
+            <div className="flex flex-wrap gap-1.5">
+              {NOTE_EXAMPLES.map(x => (
+                <button key={x} type="button" onClick={() => saveNote(note.trim() ? `${note.trim()}\n${x}` : x)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 active:bg-slate-100">+ {x}</button>
+              ))}
+              {note && <button type="button" onClick={() => saveNote('')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-slate-400">지우기</button>}
+            </div>
+            <p className="text-xs text-slate-500">전단·상품과 함께 원하는 방향을 적으면 원고가 그대로 따릅니다. 가격을 지어내거나 점포명·매대 위치를 넣는 요청은 반영하지 않습니다.</p>
+          </section>
+
+          <section className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-700">2. 방송 길이</h2>
             <div className="flex flex-wrap gap-2">{LENGTH_CHOICES.map(s => <Chip key={s} active={seconds === s} onClick={() => setSeconds(s)}>{lengthLabel(s)}</Chip>)}</div>
           </section>
@@ -331,7 +387,6 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
                 <input ref={musicFileRef} type="file" accept="audio/*,.mp3,.wav,.m4a" hidden onChange={e => { void pickMusicFile(e.target.files?.[0]); e.target.value = ''; }} />
               </div>
             )}
-            <input className={inputCls} value={note} onChange={e => setNote(e.target.value)} maxLength={100} placeholder="덧붙일 말 (선택) 예: 오후 3시까지만, 주차 2시간 무료" />
           </section>
 
           <button type="button" onClick={() => (aiEnabled ? void writeScript() : onError(NO_KEY))} disabled={busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
@@ -354,27 +409,53 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           <section className="space-y-3">
             <div>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Pencil className="size-4" />방송 원고</h2>
-              <p className="text-xs text-slate-500">눌러서 고칠 수 있습니다. 단락 사이에는 배경음악이 잠깐 나옵니다.{script.hosts.length > 1 && ' 진행자 이름표를 누르면 말하는 사람이 바뀝니다.'}</p>
+              <p className="text-xs text-slate-500">글자를 눌러 바로 고치거나, ✨다시 쓰기로 한 단락만 AI에게 다시 맡길 수 있습니다. 고친 단락만 음성을 새로 만듭니다.{script.hosts.length > 1 && ' 진행자 이름표를 누르면 말하는 사람이 바뀝니다.'}</p>
             </div>
             {script.segments.map((seg, si) => (
               <div key={si} className="space-y-2 rounded-2xl bg-white p-3">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
-                  <span>{si + 1}단락</span>
-                  {!hasBrand(seg) && <span className="flex items-center gap-1 text-amber-600"><AlertTriangle className="size-3.5" />"{BRAND}"를 넣어 주세요</span>}
-                  {hasPlaceMention(seg) && <span className="flex items-center gap-1 text-red-600"><AlertTriangle className="size-3.5" />점포명·매대 위치는 빼 주세요 (공용 방송)</span>}
+                <div className="flex items-center gap-1 text-xs font-semibold text-slate-400">
+                  <span className="mr-auto">{si + 1}단락</span>
+                  <button type="button" onClick={() => setRewriting(r => (r?.si === si ? null : { si, instruction: '', busy: false }))} className={cx('flex items-center gap-1 rounded-lg px-2 py-1 font-bold', rewriting?.si === si ? 'bg-pink-600 text-white' : 'bg-pink-50 text-pink-700')}><Sparkles className="size-3.5" />다시 쓰기</button>
+                  <button type="button" onClick={() => moveSeg(si, -1)} disabled={si === 0} aria-label={`${si + 1}단락 위로`} className="rounded-lg p-1.5 text-slate-500 active:bg-slate-100 disabled:opacity-30"><ChevronUp className="size-4" /></button>
+                  <button type="button" onClick={() => moveSeg(si, 1)} disabled={si === script.segments.length - 1} aria-label={`${si + 1}단락 아래로`} className="rounded-lg p-1.5 text-slate-500 active:bg-slate-100 disabled:opacity-30"><ChevronDown className="size-4" /></button>
+                  <button type="button" onClick={() => deleteSeg(si)} disabled={script.segments.length === 1} aria-label={`${si + 1}단락 지우기`} className="rounded-lg p-1.5 text-slate-400 active:bg-slate-100 disabled:opacity-30"><Trash2 className="size-4" /></button>
                 </div>
+                {(!hasBrand(seg) || hasPlaceMention(seg)) && (
+                  <div className="flex flex-wrap gap-x-3 text-xs font-semibold">
+                    {!hasBrand(seg) && <span className="flex items-center gap-1 text-amber-600"><AlertTriangle className="size-3.5" />"{BRAND}"를 넣어 주세요</span>}
+                    {hasPlaceMention(seg) && <span className="flex items-center gap-1 text-red-600"><AlertTriangle className="size-3.5" />점포명·매대 위치는 빼 주세요 (공용 방송)</span>}
+                  </div>
+                )}
+                {rewriting?.si === si && (
+                  <div className="space-y-2 rounded-xl bg-pink-50 p-2.5">
+                    <input className={field} value={rewriting.instruction} onChange={e => setRewriting({ ...rewriting, instruction: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void rewriteSeg(); } }} maxLength={200} placeholder="어떻게 고칠까요? (비우면 더 생동감 있게)" aria-label={`${si + 1}단락 다시 쓰기 지시`} />
+                    <div className="flex flex-wrap gap-1.5">
+                      {REWRITE_EXAMPLES.map(x => <button key={x} type="button" onClick={() => setRewriting({ ...rewriting, instruction: x })} className="rounded-full border border-pink-200 bg-white px-2.5 py-1 text-xs font-semibold text-pink-700">{x}</button>)}
+                    </div>
+                    <button type="button" onClick={() => void rewriteSeg()} disabled={rewriting.busy} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-pink-600 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+                      {rewriting.busy ? <><Loader2 className="size-4 animate-spin" />다시 쓰는 중…</> : <><Sparkles className="size-4" />이 단락만 다시 쓰기</>}
+                    </button>
+                  </div>
+                )}
                 {seg.lines.map((l, li) => (
                   <div key={li} className="space-y-1">
-                    {script.hosts.length > 1 && (
-                      <button type="button" onClick={() => editLine(si, li, { who: l.who === 0 ? 1 : 0 })} className={cx('rounded px-2 py-0.5 text-xs font-bold', HOST_TONE[l.who])}>
-                        진행자 {l.who + 1} · {hostLabel(script.hosts[l.who])}
-                      </button>
+                    {(script.hosts.length > 1 || seg.lines.length > 1) && (
+                      <div className="flex items-center">
+                        {script.hosts.length > 1 && (
+                          <button type="button" onClick={() => editLine(si, li, { who: l.who === 0 ? 1 : 0 })} className={cx('rounded px-2 py-0.5 text-xs font-bold', HOST_TONE[l.who])}>
+                            진행자 {l.who + 1} · {hostLabel(script.hosts[l.who])}
+                          </button>
+                        )}
+                        {seg.lines.length > 1 && <button type="button" onClick={() => deleteLine(si, li)} aria-label={`${si + 1}단락 ${li + 1}번째 대사 지우기`} className="ml-auto rounded p-1 text-slate-300 active:text-slate-500"><X className="size-4" /></button>}
+                      </div>
                     )}
-                    <textarea rows={Math.min(6, Math.max(2, Math.ceil(l.text.length / 30)))} className={cx(field, 'resize-none')} value={l.text} onChange={e => editLine(si, li, { text: e.target.value })} maxLength={300} aria-label={`${si + 1}단락 ${li + 1}번째 대사`} />
+                    <textarea rows={Math.min(6, Math.max(2, Math.ceil(l.text.length / 30)))} className={cx(field, 'resize-none')} value={l.text} onChange={e => editLine(si, li, { text: e.target.value })} maxLength={300} placeholder="대사를 입력하세요" aria-label={`${si + 1}단락 ${li + 1}번째 대사`} />
                   </div>
                 ))}
+                <button type="button" onClick={() => addLine(si)} className="flex items-center gap-1 text-xs font-semibold text-slate-500"><Plus className="size-3.5" />대사 추가</button>
               </div>
             ))}
+            <button type="button" onClick={addSeg} className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 bg-white py-3 text-sm font-bold text-slate-600"><Plus className="size-4" />단락 추가</button>
           </section>
 
           <details className="rounded-2xl bg-white px-3.5 py-3">
@@ -435,14 +516,14 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           </div>
         </>}
 
-        {step === 'library' && <Library items={library} onChange={() => void listBroadcasts().then(setLibrary)} onShare={share} />}
+        {step === 'library' && <Library items={library} onChange={() => void listBroadcasts().then(setLibrary)} onShare={share} onEdit={openSaved} />}
       </div>
     </div>
   );
 }
 
 /** 이 기기에 저장된 방송: 다시 듣기·MP3 다운로드·공유·삭제 */
-function Library({ items, onChange, onShare }: { items: SavedBroadcast[]; onChange: () => void; onShare: (b: Blob, name: string) => Promise<void> }) {
+function Library({ items, onChange, onShare, onEdit }: { items: SavedBroadcast[]; onChange: () => void; onShare: (b: Blob, name: string) => Promise<void>; onEdit: (b: SavedBroadcast) => void }) {
   const [open, setOpen] = useState<{ id: string; url: string } | null>(null);
   useEffect(() => () => { if (open) URL.revokeObjectURL(open.url); }, [open]);
   if (!items.length) return <p className="rounded-2xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">아직 만든 방송이 없습니다.<br />행사 전단을 올린 뒤 "매장 방송 만들기"를 눌러 보세요.</p>;
@@ -456,6 +537,7 @@ function Library({ items, onChange, onShare }: { items: SavedBroadcast[]; onChan
             <p className="text-xs text-slate-500">{new Date(b.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {Math.floor(b.seconds / 60)}분 {b.seconds % 60}초 · {b.theme} · {b.hosts}</p>
           </button>
           {open?.id === b.id && <audio src={open.url} controls autoPlay loop className="w-full" />}
+          {b.script && <button type="button" onClick={() => onEdit(b)} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-100 py-2.5 text-sm font-bold text-slate-700"><Pencil className="size-4" />원고 열어 고치기</button>}
           <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
             <button type="button" onClick={() => downloadBlob(b.mp3, safeFileName(b.title, 'mp3'))} className="flex items-center justify-center gap-1.5 rounded-xl bg-pink-600 py-2.5 text-sm font-bold text-white"><Download className="size-4" />MP3 다운로드</button>
             <button type="button" onClick={() => void onShare(b.mp3, safeFileName(b.title, 'mp3'))} className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-pink-200 py-2.5 text-sm font-bold text-pink-700"><Share2 className="size-4" />공유</button>

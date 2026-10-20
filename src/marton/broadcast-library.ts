@@ -1,4 +1,5 @@
-// 만든 매장 방송 보관함: 이 기기(IndexedDB)에 MP3로 최근 20개 보관 → 다시 듣기·내려받기 (다시 만들지 않아도 됨)
+// 만든 매장 방송 보관함: 이 기기(IndexedDB)에 MP3로 최근 20개 보관 → 다시 듣기·내려받기, 원고를 다시 열어 고치기
+import type { BroadcastScript } from './broadcast';
 export interface SavedBroadcast {
   id: string;
   title: string;
@@ -7,6 +8,9 @@ export interface SavedBroadcast {
   seconds: number;
   createdAt: number;
   mp3: Blob;
+  /** 원고와 목표 길이 (다시 열어 고치기). 예전에 저장한 방송에는 없다 */
+  script?: BroadcastScript;
+  target?: number;
 }
 
 const DB_NAME = 'marton-broadcasts';
