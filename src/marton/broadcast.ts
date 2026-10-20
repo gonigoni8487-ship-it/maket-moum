@@ -89,11 +89,51 @@ export function scriptBudget(seconds: number, pace: Pace = 'normal') {
   return { segments, chars: Math.round(speech * paceOf(pace).cps) };
 }
 
+// ---- 원고 점검: 상품마다 이름·가격이 실제로 들어갔는지 (가격은 "삼천구백구십 원"처럼 한글로 읽는다) ----
+const DIGIT = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+const UNIT4 = ['', '십', '백', '천'];
+function under10000(n: number) {
+  let out = '';
+  [...String(n)].reverse().forEach((d, i) => {
+    const v = Number(d);
+    if (v) out = (v === 1 && i > 0 ? '' : DIGIT[v]) + UNIT4[i] + out;
+  });
+  return out;
+}
+/** 3990 → 삼천구백구십, 19900 → 만구천구백, 125000 → 십이만오천 */
+export function koreanNumber(n: number) {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const man = Math.floor(n / 10000), rest = n % 10000;
+  return (man ? (man === 1 ? '' : under10000(man)) + '만' : '') + under10000(rest);
+}
+const squash = (t: string) => t.replace(/[\s,]/g, '').replace(/일만/g, '만').replace(/일천/g, '천');
+/** 원고에 이 가격이 들어갔나 (한글 읽기 또는 숫자) */
+export const priceSpoken = (text: string, price: number) => {
+  const t = squash(text);
+  return t.includes(koreanNumber(price)) || t.includes(String(price));
+};
+/** 원고에 이 상품이 나오나: 상품명의 두 글자 이상 낱말 중 하나라도 */
+export function itemMentioned(text: string, name: string) {
+  const t = text.replace(/\s+/g, '');
+  const words = name.replace(/[()[\]/·,]/g, ' ').split(/\s+/).filter(w => w.length >= 2 && !/^\d/.test(w));
+  return (words.length ? words : [name]).some(w => t.includes(w.replace(/\s+/g, '')));
+}
+/** 빠진 것 목록: 나온 상품인데 가격이 없음 / (추리기 지시가 없으면) 아예 안 나온 상품 */
+export function scriptGaps(segments: BroadcastSegment[], items: FlyerItem[], expectAll: boolean) {
+  const all = segments.map(segmentText).join(' ');
+  const gaps: { name: string; problem: 'missing' | 'price'; price?: number }[] = [];
+  for (const it of items) {
+    if (!itemMentioned(all, it.name)) { if (expectAll) gaps.push({ name: it.name, problem: 'missing', price: it.price }); continue; }
+    if (it.price && !priceSpoken(all, it.price)) gaps.push({ name: it.name, problem: 'price', price: it.price });
+  }
+  return gaps;
+}
+
 // ---- 한 줄 입력 → 상품명·규격·행사가·정상가·혜택·기간 ("노르웨이 생연어 100g 5,990원→3,990원 엘포인트 30% 10/16~10/22") ----
 const AMOUNT = /(\d{1,3}(?:,\d{3})+|\d+)\s*원/g;
 const SPEC = /\d+(?:\.\d+)?\s*(?:kg|g|ml|l|리터|그램|킬로그램|킬로|개입|입|개|봉|팩|마리|미|구|송이|박스|판|포기|단|통|병|캔|인분|매|롤)(?:\s*[x×*]\s*\d+\s*(?:개|입|봉|팩|캔|병|ea)?)?(?:\s*\/\s*[가-힣a-z]+)*/i;
 const PERIOD = /\d{1,2}[./]\d{1,2}\s*(?:\([월화수목금토일]\))?\s*[~-]\s*(?:\d{1,2}[./])?\d{1,2}\s*(?:\([월화수목금토일]\))?/;
-const PROMO = /(?:\d+\s*\+\s*\d+|\d+\s*개\s*이상|엘\s*포인트|L\.?\s*POINT|엘포|행사\s*카드|[가-힣]+카드|\d+\s*%|\d+\s*천\s*원\s*할인|할인|증정|덤|교차|한정|단독|이상\s*구매)/i;
+const PROMO = /(?:\d+\s*\+\s*\d+|\d+\s*개\s*이상|(?:대한민국\s*)?수산\s*대전|농할|농축산물\s*할인|할인\s*지원|정부\s*할인|최종가|엘\s*포인트|L\.?\s*POINT|엘포|행사\s*카드|[가-힣]+카드|\d+\s*%|\d+\s*천\s*원\s*할인|할인|증정|덤|교차|한정|단독|이상\s*구매)/i;
 const num = (s: string) => Number(s.replace(/,/g, ''));
 
 export function parseItemLine(line: string): FlyerItem | null {

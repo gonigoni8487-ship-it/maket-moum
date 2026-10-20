@@ -1,7 +1,7 @@
 // 마트ON 행사 매장 방송: 행사상품 → 쇼호스트 원고(AI 작성) → 음성(Gemini TTS, 1인·2인 대화) + 배경음악(Lyria). 합치기는 기기에서 한다.
 import type { GoogleGenAI } from '@google/genai';
 import {
-  BRAND, BROADCAST_THEMES, THEME_STYLE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace, hostVoice, isVoiceStyle, type VoiceStyle,
+  BRAND, BROADCAST_THEMES, THEME_STYLE, SPEAKER_NAMES, MIN_SECONDS, MAX_SECONDS, scriptBudget, scriptGaps, koreanNumber, hasBrand, hasPlaceMention, PLACE_WORDS, isHost, hostLabel, isPace, paceOf, type Pace, hostVoice, isVoiceStyle, type VoiceStyle,
   type BroadcastScript, type BroadcastSegment, type BroadcastTheme, type BroadcastMusic, type BroadcastSpeech, type Host,
 } from '../src/marton/broadcast';
 import { matchProduct, storeDayStart, storeTime, type FlyerItem } from '../src/marton/shared';
@@ -71,7 +71,7 @@ function cleanItems(input: unknown): FlyerItem[] {
     const name = text(it?.name, 60);
     if (!name) return [];
     const n = (v: unknown) => (typeof v === 'number' && v > 0 && v < 1e8 ? Math.round(v) : undefined);
-    return [{ name, code: text(it?.code, 20) || undefined, spec: text(it?.spec, 40) || undefined, price: n(it?.price), originalPrice: n(it?.originalPrice), condition: text(it?.condition, 100) || undefined, period: text(it?.period, 40) || undefined }];
+    return [{ name, code: text(it?.code, 20) || undefined, spec: text(it?.spec, 40) || undefined, price: n(it?.price), originalPrice: n(it?.originalPrice), condition: text(it?.condition, 200) || undefined, period: text(it?.period, 40) || undefined }];
   });
 }
 
@@ -163,8 +163,14 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
         ? `진행자 2명이 주고받는 대화입니다. 진행자1(who 0)은 ${hostLabel(hosts[0])}, 진행자2(who 1)는 ${hostLabel(hosts[1])} 쇼호스트. 한 사람이 질문하거나 감탄하면 다른 사람이 받아서 혜택을 풀어 주는 식으로, 대사는 한 번에 1~2문장씩 번갈아. 서로 이름은 부르지 마세요.`
         : `진행자 1명(${hostLabel(hosts[0])} 쇼호스트)이 손님에게 직접 말을 거는 방송입니다. lines의 who는 모두 0.`,
       '',
+      '[필수 — 분량보다 우선]',
+      note ? '- 담당자 요청에 맞는 상품은 하나도 빠짐없이 모두 소개하세요.' : '- 아래 행사상품을 하나도 빠짐없이 모두 소개하세요.',
+      '- 소개하는 상품마다 가격(규격과 함께)을 반드시 한 번 이상 말하세요. 가격이 없는 상품만 혜택으로 소개.',
+      '- 상품마다 붙은 혜택(행사카드·카드사 할인, 대한민국 수산대전·정부 할인, 엘포인트, N+1, 덤)을 전부 말하세요. 혜택이 여러 개면 "행사카드로 오십 퍼센트, 거기에 수산대전 이십 퍼센트까지!"처럼 겹쳐서 받는다는 게 들리게.',
+      '- 상품이 많아 분량이 모자라면 상품당 한두 문장으로 짧게 줄이세요. 상품이나 가격을 빼서 분량을 맞추면 안 됩니다.',
+      '',
       '[분량]',
-      `- 공백 뺀 글자 수로 약 ${chars}자 (±10%). 방송 ${Math.round(seconds / 6) / 10}분에 맞춘 분량이니 꼭 지키세요.`,
+      `- 공백 뺀 글자 수로 약 ${chars}자 (±10%, 단 위 [필수]를 지키느라 길어지는 건 괜찮음). 방송 ${Math.round(seconds / 6) / 10}분 기준.`,
       `- ${segments}개 단락. 단락 사이에는 배경음악만 잠깐 나옵니다. 상품이 적으면 핵심 상품을 다른 각도로 한 번 더 짚는 단락을 넣으세요.`,
       '',
       `[${BRAND} — 반드시 지킬 것]`,
@@ -215,6 +221,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       list = await removePlaces(list, hosts.length);
       list = stripPlaces(await addBrand(list, hosts.length)); // 롯데마트 보완 후에도 위치가 다시 들어가지 않게
       if (!list.length) return res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 다시 시도해 주세요.' });
+      list = await fillGaps(list, items, !note, hosts.length);
       res.json({
         title: text(raw.title, 40) || `${theme} 안내 방송`,
         theme, hosts, pace, voiceStyle,
@@ -266,6 +273,32 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       console.error('MartON broadcast place fix error:', e);
     }
     return stripPlaces(out);
+  }
+
+  /** 빠진 상품·가격이 있으면 AI에게 한 번 채워 넣게 한다 (그래도 남으면 화면에서 표시) */
+  async function fillGaps(list: BroadcastSegment[], items: FlyerItem[], expectAll: boolean, hostCount: number) {
+    const gaps = scriptGaps(list, items, expectAll);
+    if (!gaps.length) return list;
+    const todo = gaps.map(g => {
+      const it = items.find(x => x.name === g.name)!;
+      const price = g.price ? `${it.spec ? `${it.spec} ` : ''}${koreanNumber(g.price)} 원` : '';
+      return g.problem === 'missing'
+        ? `- "${g.name}" 상품이 원고에 없습니다. 넣으세요: ${itemFacts(it)}${price ? ` (가격은 "${price}"처럼 한글로)` : ''}`
+        : `- "${g.name}"의 가격이 원고에 없습니다. 그 상품을 말하는 곳에 "${price}"를 넣으세요.${it.condition ? ` 혜택(${it.condition})도 빠졌으면 함께.` : ''}`;
+    });
+    try {
+      const response = await genAI.models.generateContent({
+        model: AI_MODEL,
+        config: { responseMimeType: 'application/json' },
+        contents: [{ parts: [{ text: `아래 매장 방송 원고를 고치세요. 빠진 것을 채우는 것 말고는 말맛·순서·who를 그대로 두고, 필요하면 대사나 단락을 덧붙여도 됩니다. 숫자는 한글로, "${BRAND}"는 단락마다 한 번, 점포명·매대 위치는 넣지 않기.\n${todo.join('\n')}\nJSON으로만: {"segments":[{"lines":[{"who":0,"text":""}]}]}\n\n${JSON.stringify({ segments: list })}` }] }],
+      });
+      const fixed = stripPlaces(cleanSegments(parseJson<{ segments?: unknown }>(response.text).segments, hostCount));
+      // 고친 원고가 더 나을 때만 바꾼다
+      return fixed.length && scriptGaps(fixed, items, expectAll).length < gaps.length ? await addBrand(fixed, hostCount) : list;
+    } catch (e) {
+      console.error('MartON broadcast gap fill error:', e);
+      return list;
+    }
   }
 
   /** "롯데마트"가 빠진 단락만 골라 자연스럽게 한 번 넣어 다시 쓰게 한다 (실패하면 그대로 두고 화면에서 표시) */

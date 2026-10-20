@@ -220,7 +220,7 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
                     <input className={cx(field, 'font-bold text-pink-700')} inputMode="numeric" value={r.price ? r.price.toLocaleString() : ''} onChange={e => edit(r.key, { price: numOrUndef(e.target.value) })} placeholder="원" />
                   </label>
                   <label className="col-span-2 space-y-0.5 text-[11px] font-semibold text-slate-500">행사 프로모션
-                    <textarea rows={2} className={cx(field, 'resize-none')} value={r.condition ?? ''} onChange={e => edit(r.key, { condition: e.target.value || undefined })} placeholder="L.POINT 40% 할인, 1+1, 행사카드 1천원 할인" maxLength={100} />
+                    <textarea rows={2} className={cx(field, 'resize-none')} value={r.condition ?? ''} onChange={e => edit(r.key, { condition: e.target.value || undefined })} placeholder="행사카드 50% 할인 + 대한민국 수산대전 20% 할인" maxLength={200} />
                   </label>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

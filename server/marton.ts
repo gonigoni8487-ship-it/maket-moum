@@ -318,7 +318,7 @@ function cleanFlyerItem(it: any, fallbackPeriod?: string): FlyerItem | null {
     spec: text(it?.spec, 40) || undefined,
     price: amount(it?.price),
     originalPrice: amount(it?.originalPrice),
-    condition: text(it?.condition ?? it?.promo, 100) || undefined,
+    condition: text(it?.condition ?? it?.promo, 200) || undefined,
     period: text(it?.period, 40) || fallbackPeriod || undefined,
   };
 }
@@ -727,13 +727,14 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
         '- name: 전단에 적힌 상품명 그대로 (브랜드 포함, "2종", "17종" 같은 묶음 표기 포함). 괄호 안 규격·원산지는 빼고',
         '- code: 판매코드·상품코드·바코드 숫자. 전단에 적혀 있을 때만, 없으면 null (지어내지 말 것)',
         '- spec: 상품명 옆 괄호의 규격·단위·포장·원산지 (예: "각 500g/냉장/원산지 별도표기", "3kg/박스/국산", "각 150g×2봉", "상품별 규격 상이"). 없으면 null',
-        '- price: 고객이 실제로 내는 행사가(원, 숫자). 여러 개면 첫 금액. "2개 이상 구매시 1개당 각 8,450원"이면 8450. 화살표 "16,900원→14,900원"이면 오른쪽 14900. 가격 없이 할인율만 있으면 null',
+        '- price: 고객이 모든 혜택을 받고 실제로 내는 최종가(원, 숫자). 전단에 "최종가", "최종 혜택가", "결제가"가 있으면 그 금액. 여러 개면 첫 금액. "2개 이상 구매시 1개당 각 8,450원"이면 8450. 화살표 "16,900원→14,900원"이면 오른쪽 14900. 가격 없이 할인율만 있으면 null',
         '- originalPrice: 할인 전 가격(숫자). 화살표 왼쪽 가격, 취소선 가격, "비회원가", "1개 구매시" 가격, 행사카드 할인 전 가격. 없으면 null',
-        '- condition: 행사 프로모션을 짧게. 종류를 앞에 쓰기: "L.POINT 40% 할인", "L.POINT 5천원 할인", "행사카드 1천원 할인", "1+1", "2+1", "2개 이상 50% 할인", "2팩 구매 시 9,900원", "가격할인 30%", "3만원 이상 구매 시 사은품 증정". 가격이 여러 개("2,950/4,950원", "69,000~99,000원")면 그대로 덧붙이고, "교차구매 가능", "한정수량", "신상품", "단독"이 있으면 쉼표로 덧붙이기. 행사 표시가 없으면 null',
+        '- condition: 그 상품에 붙은 행사 프로모션을 **하나도 빠짐없이 전부**, 적용 순서대로 " + "로 이어서. 특히 카드 행사(행사카드·롯데/삼성/신한/KB국민/현대/우리/하나/BC/NH농협카드 등 카드사 이름 포함), 대한민국 수산대전·해양수산부 할인, 농할(농축산물 할인지원)·정부 할인, 엘포인트(L.POINT) 회원가, N+1, 덤, 증정을 놓치지 마세요. 예: "행사카드 50% 할인 + 대한민국 수산대전 20% 할인", "롯데/삼성/신한카드 30% 할인 + L.POINT 1천원 할인". 각 종류를 앞에 쓰기: "L.POINT 40% 할인", "L.POINT 5천원 할인", "행사카드 1천원 할인", "1+1", "2+1", "2개 이상 50% 할인", "2팩 구매 시 9,900원", "가격할인 30%", "3만원 이상 구매 시 사은품 증정". 가격이 여러 개("2,950/4,950원", "69,000~99,000원")면 그대로 덧붙이고, "교차구매 가능", "한정수량", "신상품", "단독"이 있으면 쉼표로 덧붙이기. 행사 표시가 없으면 null',
         '- period: 그 상품에만 따로 적힌 기간(예: "※기간: 10/9(금)~10/11(일)")이 있으면 "10/9~10/11"처럼. 없으면 null',
         '전단 위쪽이나 아래쪽의 "전단적용기간"은 period 최상위에 "10/8~10/14"처럼 넣으세요. 하단 작은 글씨 안내문, 카드사 로고, 브랜드 로고만 있는 영역은 상품이 아닙니다.',
+        '- commonPromo: 한 면(또는 한 구역) 전체 상품에 함께 걸린 행사가 제목·띠·배너로 적혀 있으면(예: "대한민국 수산대전 20% 할인", "행사카드 결제 시 전 품목 30% 할인", "농할 20%") 짧게 적고, 각 상품 condition에도 함께 넣으세요. 없으면 null. 카드사 로고만 있고 글이 없으면 넣지 마세요.',
         '읽을 수 없거나 확실하지 않은 값은 지어내지 말고 null.',
-        'JSON: {"period":"전단 공통 행사기간 또는 null","items":[{"name":"","code":null,"spec":null,"price":0,"originalPrice":null,"condition":null,"period":null}]}',
+        'JSON: {"period":"전단 공통 행사기간 또는 null","commonPromo":"전체 공통 행사 또는 null","items":[{"name":"","code":null,"spec":null,"price":0,"originalPrice":null,"condition":null,"period":null}]}',
       ].join('\n'),
       price: '이 가격표(쇼카드/전자가격표) 사진에서 상품명과 표시 가격을 읽으세요. JSON: {"name":"상품명","price":숫자}',
       barcode: '이 사진에서 바코드 아래 숫자(EAN/UPC)와 상품명을 읽으세요. JSON: {"barcode":"숫자만","name":"보이는 상품명 또는 null"}',
@@ -750,9 +751,13 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
 
       if (mode === 'flyer') {
         const period = text(raw.period, 40) || undefined;
+        // 전단 전체에 걸린 행사(수산대전·카드 행사 등)가 상품 혜택에 빠졌으면 붙여 준다
+        const common = text(raw.commonPromo, 100);
+        const key = (v: string) => v.replace(/[\s·]/g, '').replace(/대한민국/g, '');
         const items = (Array.isArray(raw.items) ? raw.items : []).slice(0, 100)
           .map((it: unknown) => cleanFlyerItem(it, period))
           .filter((it: FlyerItem | null): it is FlyerItem => Boolean(it))
+          .map((it: FlyerItem) => (common && !key(it.condition ?? '').includes(key(common).slice(0, 6)) ? { ...it, condition: [it.condition, common].filter(Boolean).join(' + ').slice(0, 200) } : it))
           .map((it: FlyerItem) => ({ ...it, productId: matchProduct(it, db.products)?.id }));
         return res.json({ mode, items } satisfies VisionResult);
       }
