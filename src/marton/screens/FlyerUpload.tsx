@@ -6,6 +6,7 @@ import { FLYER_FILE_ACCEPT, flyerFileToDataUrl, isPdf } from '../camera';
 import { cx, won } from '../ui';
 import CameraView, { FLYER_MAX_SIDE } from './CameraView';
 import BroadcastMaker from './BroadcastMaker';
+import BroadcastNote, { useBroadcastNote } from './BroadcastNote';
 
 const MAX_PAGES = 4;
 
@@ -28,6 +29,9 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
   const [broadcast, setBroadcast] = useState<FlyerItem[] | null>(null);
   const albumRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 추가 지시사항 ("수산물 행사만" 등): 인식에 쓰고, 방송 만들기에도 그대로 넘어간다
+  const [note, saveNote] = useBroadcastNote();
+  const [readWith, setReadWith] = useState<string | null>(null);
   const seq = useRef(0);
   const room = MAX_PAGES - pages.length;
   const reading = pages.some(p => p.state === 'reading' || p.state === 'waiting');
@@ -40,7 +44,8 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
   const recognize = async (page: Page) => {
     updatePage(page.id, { state: 'reading', error: undefined });
     try {
-      const r = await api<VisionFlyerResult>('/ai/vision', { mode: 'flyer', image: page.src });
+      const r = await api<VisionFlyerResult>('/ai/vision', { mode: 'flyer', image: page.src, note: note.trim() || undefined });
+      setReadWith(note.trim());
       setRows(prev => {
         const next = prev.filter(x => x.page !== page.id); // 다시 인식하면 그 장의 결과를 바꾼다
         for (const it of r.items) {
@@ -152,6 +157,13 @@ export default function FlyerUpload({ aiEnabled, products, promotions, onError, 
         <input ref={albumRef} type="file" accept="image/*" multiple hidden onChange={e => { void pickFiles(e.target.files); e.target.value = ''; }} />
         <input ref={fileRef} type="file" accept={FLYER_FILE_ACCEPT} multiple hidden onChange={e => { void pickFiles(e.target.files); e.target.value = ''; }} />
         <p className="text-xs text-slate-500">전단 한 면이 화면에 꽉 차게, 글씨가 흔들리지 않게 찍어 주세요. 판매코드처럼 작은 글씨는 가까이서 나눠 찍으면 더 잘 읽힙니다.</p>
+        {aiEnabled && <BroadcastNote note={note} onChange={saveNote} />}
+        {aiEnabled && pages.length > 0 && !reading && readWith !== null && readWith !== note.trim() && (
+          <button type="button" onClick={() => void pages.reduce((chain, p) => chain.then(() => recognize(p)), Promise.resolve())}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-pink-600 py-3 text-sm font-bold text-white active:bg-pink-700">
+            <RotateCw className="size-4" />바뀐 지시사항대로 전단 다시 인식
+          </button>
+        )}
       </div>
 
       {aiEnabled && rows.length === 0 && pages.length === 0 && recent.length > 0 && (
