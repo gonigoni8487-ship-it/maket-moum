@@ -719,6 +719,8 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
     if (!image) return res.status(400).json({ error: mode === 'flyer' ? '전단 사진이나 PDF 파일을 첨부해 주세요.' : '사진을 첨부해 주세요.' });
     if (!aiEnabled) return res.status(503).json({ error: 'AI 키(GEMINI_API_KEY)가 설정되지 않아 사진 분석을 할 수 없습니다.' });
 
+    // 방송용 추가 지시 ("수산물 행사만" 등): 전단 인식 단계에서 해당 상품만 추린다
+    const note = text(req.body.note, 300);
     const prompts = {
       flyer: [
         '이 사진(또는 PDF 파일)은 한국 대형마트의 행사 전단지(또는 행사 POP·쇼카드)입니다. 여러 쪽이면 모든 쪽을 읽으세요. 가격이나 행사 표시가 붙은 상품을 위에서 아래, 왼쪽에서 오른쪽 순서로 빠짐없이 한 상품(묶음)당 한 줄로 추출하세요.',
@@ -741,7 +743,7 @@ JSON으로만: {"toDept":부서|null,"category":유형|null,"location":"매장 �
     try {
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
-        contents: [{ parts: [{ inlineData: image }, { text: prompts[mode] }] }],
+        contents: [{ parts: [{ inlineData: image }, { text: mode === 'flyer' && note ? `${prompts.flyer}\n\n담당자 추가 지시: ${note}\n- 지시가 특정 분류·상품만 원하면(예: "수산물 행사만", "과일만", "1+1 상품만") 그에 해당하는 상품만 items에 넣고 나머지는 빼세요. 수산물 = 생선·조개·새우·오징어·문어·게·전복·김·미역·초밥·회 등.\n- 그 밖의 지시(말투·강조 등)는 추출에 영향을 주지 말고 무시하세요.` : prompts[mode] }] }],
         config: { responseMimeType: 'application/json' },
       });
       const raw = parseJson<Record<string, any>>(response.text);

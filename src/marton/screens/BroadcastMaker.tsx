@@ -10,6 +10,7 @@ import {
 import { decodeMusic, decodeMusicFile, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
 import { deleteBroadcast, downloadBlob, listBroadcasts, safeFileName, saveBroadcast, type SavedBroadcast } from '../broadcast-library';
 import { api } from '../api';
+import BroadcastNote, { useBroadcastNote } from './BroadcastNote';
 import { Chip, cx, inputCls, won } from '../ui';
 
 type Item = FlyerItem & { key: string; include: boolean };
@@ -24,7 +25,6 @@ const HOST_TONE = ['bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700'];
 const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age: '40대' }];
 const NO_KEY = 'AI 키(GEMINI_API_KEY)가 서버에 없어 전단을 읽거나 방송을 만들 수 없습니다. Cloudflare → Workers → maket-moum → 설정 → 변수 및 비밀에 GEMINI_API_KEY를 넣어 주세요.';
 const REWRITE_EXAMPLES = ['더 짧게', '더 신나게', '가격 강조', '후크 넣기', '혜택 쉽게 풀어서', '마무리 멘트로'];
-const NOTE_EXAMPLES = ['수산물 행사만', '1+1 상품을 먼저', '행사카드 할인 강조', '오늘 하루만 강조', '가족 장보기 분위기로', '어르신도 알아듣게 또박또박', '신선함 강조'];
 const mb = (b: Blob) => `${(b.size / 1048576).toFixed(1)}MB`;
 
 /** 행사 매장 방송 만들기: 행사상품 → 쇼호스트 원고 → 음성 + 배경음악 → 1~3분 방송 파일 (MP3·WAV) */
@@ -59,8 +59,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('natural');
   const [editing, setEditing] = useState<string | null>(null);
   // 추가 요청사항: 원고 작가에게 주는 지시. 같은 기기에서는 마지막에 쓴 것을 기억한다
-  const [note, setNote] = useState(() => { try { return localStorage.getItem('marton-broadcast-note') ?? ''; } catch { return ''; } });
-  const saveNote = (v: string) => { setNote(v); try { localStorage.setItem('marton-broadcast-note', v); } catch { /* 저장 불가 */ } };
+  const [note, saveNote] = useBroadcastNote();
+  // 첨부한 전단은 바로 읽지 않고 기다린다 → 추가 지시사항을 적은 뒤 "인식하고 원고 만들기"에서 지시대로 인식
+  const [pending, setPending] = useState<File[]>([]);
   const [step, setStep] = useState<Step>(startInLibrary ? 'library' : 'setup');
   const [busy, setBusy] = useState(false);
   const [script, setScript] = useState<BroadcastScript | null>(null);
@@ -85,22 +86,32 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   });
 
   // 전단 사진을 여기서 바로 읽는다 (한 장씩 차례로)
-  const pickFlyers = async (files: FileList | null) => {
-    const list = [...(files ?? [])].filter(f => f.type.startsWith('image/') || isPdf(f)).slice(0, 4);
+  const pickFlyers = (files: FileList | null) => {
+    const list = [...(files ?? [])].filter(f => f.type.startsWith('image/') || isPdf(f));
     if (!list.length && files?.length) onError('사진(jpg·png 등)이나 PDF 파일만 올릴 수 있습니다.');
-    if (!list.length) return;
-    setReading(list.length);
-    for (const f of list) {
+    if (list.length) setPending(p => [...p, ...list].slice(0, 4));
+  };
+
+  /** 기다리던 전단을 추가 지시사항대로 인식해 상품 목록에 넣고, 새로 읽은 상품을 돌려준다 */
+  const recognizePending = async (): Promise<FlyerItem[]> => {
+    const files = pending;
+    if (!files.length) return [];
+    setReading(files.length);
+    const found: FlyerItem[] = [];
+    for (const f of files) {
       try {
-        const r = await api<VisionFlyerResult>('/ai/vision', { mode: 'flyer', image: await flyerFileToDataUrl(f, FLYER_MAX_SIDE) });
-        if (!r.items.length) onError('전단에서 행사상품을 찾지 못했습니다. 더 가까이, 밝은 곳에서 찍은 사진으로 다시 해 주세요.');
-        addItems(r.items);
+        const r = await api<VisionFlyerResult>('/ai/vision', { mode: 'flyer', image: await flyerFileToDataUrl(f, FLYER_MAX_SIDE), note: note.trim() || undefined });
+        if (!r.items.length) onError(note.trim() ? `${f.name}에서 지시사항에 맞는 행사상품을 찾지 못했습니다.` : '전단에서 행사상품을 찾지 못했습니다. 더 가까이, 밝은 곳에서 찍은 사진으로 다시 해 주세요.');
+        found.push(...r.items);
       } catch (e) {
         onError((e as Error).message);
       } finally {
         setReading(n => n - 1);
       }
     }
+    setPending([]);
+    addItems(found);
+    return found;
   };
 
   // 한 줄 입력: "노르웨이 생연어 100g 5,990원→3,990원 엘포인트 30%" → 상품명·규격·정상가·행사가·혜택으로 나눈다
@@ -115,11 +126,17 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const setHost = (i: number, patch: Partial<Host>) => setHosts(hs => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
   const writeScript = async () => {
-    if (!chosen.length) return onError('방송할 행사상품을 한 개 이상 골라 주세요.');
+    if (!aiEnabled) return onError(NO_KEY);
+    if (!chosen.length && !pending.length) return onError('방송할 행사상품을 한 개 이상 넣어 주세요. 전단을 첨부하거나 한 줄로 입력해 주세요.');
     setBusy(true);
     try {
+      // 1) 기다리던 전단이 있으면 먼저 지시사항대로 인식 → 2) 원고 작성
+      const fresh = await recognizePending();
+      const same = (a: FlyerItem, b: FlyerItem) => a.name.replace(/\s+/g, '') === b.name.replace(/\s+/g, '') && (a.spec ?? '') === (b.spec ?? '');
+      const use = [...chosen, ...fresh.filter(f => !chosen.some(c => same(c, f)))];
+      if (!use.length) return onError('방송할 행사상품이 없습니다. 지시사항을 확인하거나 다른 전단을 올려 주세요.');
       const s = await api<BroadcastScript>('/ai/broadcast/script', {
-        items: chosen.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
+        items: use.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
         seconds, theme, hosts, pace, voiceStyle, note: note.trim() || undefined,
       });
       setScript(s);
@@ -302,26 +319,26 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
             <button type="button" onClick={() => (aiEnabled ? albumRef.current?.click() : onError(NO_KEY))} disabled={reading > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-pink-200 bg-white py-3 text-sm font-bold text-pink-700 active:bg-pink-50 disabled:opacity-50">
               {reading > 0 ? <><Loader2 className="size-4 animate-spin" />전단 읽는 중… (한 장에 10~20초)</> : <><Paperclip className="size-4" />전단 파일 첨부 (사진·PDF · 찍기)</>}
             </button>
-            <input ref={albumRef} type="file" accept={FLYER_FILE_ACCEPT} multiple hidden onChange={e => { void pickFlyers(e.target.files); e.target.value = ''; }} />
+            <input ref={albumRef} type="file" accept={FLYER_FILE_ACCEPT} multiple hidden onChange={e => { pickFlyers(e.target.files); e.target.value = ''; }} />
+            {pending.length > 0 && (
+              <div className="space-y-1.5 rounded-xl bg-pink-50 px-3 py-2.5">
+                <p className="text-xs font-bold text-pink-700">첨부한 전단 {pending.length}개 · 아래 지시사항을 적고 "인식하고 원고 만들기"를 누르세요</p>
+                {pending.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-slate-700">
+                    <Paperclip className="size-3.5 shrink-0 text-pink-500" /><span className="min-w-0 flex-1 truncate">{f.name}</span>
+                    <button type="button" onClick={() => setPending(p => p.filter((_, j) => j !== i))} aria-label={`${f.name} 빼기`} className="rounded p-1 text-slate-400"><X className="size-4" /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => void recognizePending()} disabled={reading > 0} className="text-xs font-semibold text-pink-700 underline underline-offset-2 disabled:opacity-50">원고 없이 상품만 먼저 인식하기</button>
+              </div>
+            )}
+            <BroadcastNote note={note} onChange={saveNote} />
             <div className="flex gap-2">
               <input className={field} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraft(); } }} maxLength={160} placeholder="한 줄로: 생연어 100g 3,990원 엘포인트 30%" aria-label="상품 한 줄 입력" />
               <button type="button" onClick={addDraft} className="flex shrink-0 items-center justify-center gap-1 rounded-xl bg-slate-800 px-4 text-sm font-bold text-white"><Plus className="size-4" />추가</button>
             </div>
             <p className="text-xs text-slate-500">상품명·규격(그램 등)·가격·혜택을 한 줄로 쓰면 알아서 나눕니다. 정상가도 있으면 "5,990원→3,990원"처럼. 상품을 누르면 고칠 수 있어요.</p>
             <p className="text-xs text-slate-500">30초면 1~2개, 1분이면 3~5개, 3분이면 8~12개가 듣기 좋습니다.</p>
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Pencil className="size-4" />추가 요청사항 <span className="font-normal text-slate-400">(원고에 그대로 반영)</span></h2>
-            <textarea rows={3} className={cx(field, 'resize-none')} value={note} onChange={e => saveNote(e.target.value)} maxLength={500}
-              placeholder={'예: 한우를 제일 먼저, 가장 길게 소개해 줘\n행사카드 할인을 꼭 두 번 강조\n오늘 하루만 이 가격이라는 말 넣어 줘'} aria-label="추가 요청사항" />
-            <div className="flex flex-wrap gap-1.5">
-              {NOTE_EXAMPLES.map(x => (
-                <button key={x} type="button" onClick={() => saveNote(note.trim() ? `${note.trim()}\n${x}` : x)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 active:bg-slate-100">+ {x}</button>
-              ))}
-              {note && <button type="button" onClick={() => saveNote('')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-slate-400">지우기</button>}
-            </div>
-            <p className="text-xs text-slate-500">전단·상품과 함께 원하는 방향을 적으면 원고가 그대로 따릅니다. 가격을 지어내거나 점포명·매대 위치를 넣는 요청은 반영하지 않습니다.</p>
           </section>
 
           <section className="space-y-2">
@@ -389,8 +406,8 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
             )}
           </section>
 
-          <button type="button" onClick={() => (aiEnabled ? void writeScript() : onError(NO_KEY))} disabled={busy || !chosen.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
-            {busy ? <><Loader2 className="size-5 animate-spin" />쇼호스트 원고 쓰는 중…</> : <><Wand2 className="size-5" />방송 원고 만들기</>}
+          <button type="button" onClick={() => void writeScript()} disabled={busy || (!chosen.length && !pending.length)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">
+            {busy ? <><Loader2 className="size-5 animate-spin" />{reading > 0 ? '지시사항대로 전단 인식 중…' : '쇼호스트 원고 쓰는 중…'}</> : <><Wand2 className="size-5" />{pending.length ? '전단 인식하고 원고 만들기' : '방송 원고 만들기'}</>}
           </button>
         </>}
 
