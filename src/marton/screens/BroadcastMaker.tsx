@@ -72,6 +72,12 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [library, setLibrary] = useState<SavedBroadcast[]>([]);
   // 같은 원고·목소리는 다시 만들지 않는다 (요금 절약, 고친 단락만 새로)
   const speechCache = useRef(new Map<string, AudioBuffer>());
+  // AI가 쓴 대사 (이것과 다른 대사 = 담당자가 직접 고친 대사 → 원고를 다시 써도 그대로 살린다)
+  const aiLines = useRef(new Set<string>());
+  const rememberAi = (segs: BroadcastSegment[]) => segs.forEach(seg => seg.lines.forEach(l => aiLines.current.add(l.text.trim())));
+  const editedLines = () => (script?.segments ?? []).flatMap((seg, si) => seg.lines
+    .filter(l => l.text.trim() && !aiLines.current.has(l.text.trim()))
+    .map(l => ({ si, who: l.who, text: l.text.trim() })));
   const musicCache = useRef(new Map<string, AudioBuffer>());
   const chosen = items.filter(i => i.include);
 
@@ -127,7 +133,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
 
   const setHost = (i: number, patch: Partial<Host>) => setHosts(hs => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
-  const writeScript = async () => {
+  const writeScript = async (keepEdits = false) => {
     if (!aiEnabled) return onError(NO_KEY);
     if (!chosen.length && !pending.length) return onError('방송할 행사상품을 한 개 이상 넣어 주세요. 전단을 첨부하거나 한 줄로 입력해 주세요.');
     setBusy(true);
@@ -140,7 +146,10 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const s = await api<BroadcastScript>('/ai/broadcast/script', {
         items: use.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
         seconds, theme, hosts, pace, voiceStyle, note: note.trim() || undefined,
+        keep: keepEdits ? editedLines() : undefined,
       });
+      aiLines.current.clear();
+      rememberAi(s.segments);
       setScript(s);
       setScriptItems({ items: use, all: !note.trim() });
       setStep('script');
@@ -179,6 +188,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
         before: text(script.segments[si - 1]), after: text(script.segments[si + 1]),
         items: chosen.map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period })),
       });
+      rememberAi([fresh]);
       setSegments(segs => segs.map((seg, i) => (i === si ? fresh : seg)));
       setRewriting(null);
     } catch (e) {
@@ -188,6 +198,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   };
   const openSaved = (b: SavedBroadcast) => {
     if (!b.script) return onError('예전에 만든 방송이라 원고가 저장되어 있지 않습니다. 새로 만든 방송부터 원고를 다시 열 수 있어요.');
+    aiLines.current.clear();
+    const edited = new Set(b.edited ?? []);
+    rememberAi(b.script.segments.map(seg => ({ lines: seg.lines.filter(l => !edited.has(l.text.trim())) })));
     setScript(b.script);
     if (b.target) setSeconds(b.target);
     setStep('script');
@@ -238,7 +251,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const mp3 = await toMp3(mixed);
       const wav = toWav(mixed);
       const secs = Math.round(mixed.duration);
-      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
+      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, edited: editedLines().map(l => l.text), target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
       if (saved) void listBroadcasts().then(setLibrary);
       setResult({ url: URL.createObjectURL(mp3), mp3, wav, seconds: secs, musicFailed: withMusic && !music, saved });
       setStep('done');
@@ -502,8 +515,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
             </div>
           </details>
 
+          {editedLines().length > 0 && <p className="rounded-xl bg-pink-50 px-3 py-2 text-xs text-pink-800">직접 고친 문구 {editedLines().length}곳은 "다시 쓰기"를 눌러도 그대로 남깁니다. 고친 원고 그대로 방송을 만들려면 오른쪽 버튼을 누르세요.</p>}
           <div className="grid grid-cols-[auto_1fr] gap-2">
-            <button type="button" onClick={() => void writeScript()} disabled={busy} className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-pink-200 bg-white px-4 py-3.5 text-sm font-bold text-pink-700 disabled:opacity-50">
+            <button type="button" onClick={() => void writeScript(true)} disabled={busy} className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-pink-200 bg-white px-4 py-3.5 text-sm font-bold text-pink-700 disabled:opacity-50">
               {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}다시 쓰기
             </button>
             <button type="button" onClick={() => void make()} disabled={busy} className="flex items-center justify-center gap-2 rounded-xl bg-pink-600 py-3.5 text-[15px] font-bold text-white active:bg-pink-700 disabled:opacity-50">

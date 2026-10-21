@@ -153,12 +153,18 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
     const pace: Pace = isPace(req.body.pace) ? req.body.pace : 'normal';
     const voiceStyle: VoiceStyle = isVoiceStyle(req.body.voiceStyle) ? req.body.voiceStyle : 'natural';
     const { segments, chars } = scriptBudget(seconds, pace);
+    // 담당자가 원고 화면에서 직접 고친 대사: 다시 써도 글자 그대로 살린다
+    const keep = (Array.isArray(req.body.keep) ? req.body.keep : []).slice(0, 30).flatMap((k: any) => {
+      const t = text(k?.text, 300);
+      return t ? [{ si: Math.max(0, Math.floor(Number(k?.si) || 0)), who: hosts.length > 1 && Number(k?.who) === 1 ? 1 as const : 0 as const, text: t }] : [];
+    });
     const themes = Object.keys(THEME_STYLE);
     const now = storeTime(Date.now());
 
     const prompt = [
       `당신은 ${BRAND} 매장 방송 대본을 쓰는 10년 차 홈쇼핑 쇼호스트 작가입니다. 아래 행사상품으로 매장 스피커에서 나갈 방송 대본을 쓰세요.`,
       note ? `\n[담당자 추가 요청사항 — 가장 먼저, 빠짐없이 반영]\n${note}\n- 위 요청은 아래 말투·구성 규칙보다 우선합니다. 어떤 상품을 먼저·더 많이 말할지, 강조할 혜택·문구, 넣거나 뺄 내용, 말투 지시를 그대로 따르세요.\n- 요청이 특정 분류·상품만 말하라고 하면(예: "수산물만", "과일·채소만", "1+1 상품만") 아래 행사상품 중 해당하는 것만 골라 쓰고, 나머지 상품은 원고에서 아예 빼세요. 분류 표시([수산] 등)가 없는 상품은 상품명으로 판단하세요(연어·고등어·전복·새우·오징어·꽃게·김·초밥 → 수산물).\n- 단, 가격·혜택을 지어내지 않기, 점포명·매대 위치 넣지 않기, "${BRAND}" 단락마다 한 번 규칙은 요청이 있어도 지키세요.\n` : '',
+      keep.length ? `\n[담당자가 직접 고친 문구 — 글자 하나 바꾸지 말고 그대로 넣기]\n${keep.map(k => `- ${k.si + 1}단락: "${k.text}"`).join('\n')}\n- 위 문장은 대사 하나(text)로 원문 그대로 쓰고, 앞뒤 대사를 이 문장에 맞춰 자연스럽게 이어 주세요. 같은 내용을 다른 말로 반복하지 마세요.\n` : '',
       duo
         ? `진행자 2명이 주고받는 대화입니다. 진행자1(who 0)은 ${hostLabel(hosts[0])}, 진행자2(who 1)는 ${hostLabel(hosts[1])} 쇼호스트. 한 사람이 질문하거나 감탄하면 다른 사람이 받아서 혜택을 풀어 주는 식으로, 대사는 한 번에 1~2문장씩 번갈아. 서로 이름은 부르지 마세요.`
         : `진행자 1명(${hostLabel(hosts[0])} 쇼호스트)이 손님에게 직접 말을 거는 방송입니다. lines의 who는 모두 0.`,
@@ -222,6 +228,7 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       list = stripPlaces(await addBrand(list, hosts.length)); // 롯데마트 보완 후에도 위치가 다시 들어가지 않게
       if (!list.length) return res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 다시 시도해 주세요.' });
       list = await fillGaps(list, items, !note, hosts.length);
+      list = keepEdits(list, keep);
       res.json({
         title: text(raw.title, 40) || `${theme} 안내 방송`,
         theme, hosts, pace, voiceStyle,
@@ -234,6 +241,17 @@ export function registerBroadcast(app: RouteApp, genAI: GoogleGenAI, aiEnabled: 
       res.status(502).json({ error: '방송 원고를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' });
     }
   });
+
+  /** 직접 고친 대사가 (다른 정리 과정을 거치며) 빠지거나 바뀌었으면 원래 단락 끝에 그대로 넣는다 */
+  function keepEdits(list: BroadcastSegment[], keep: { si: number; who: 0 | 1; text: string }[]) {
+    const flat = (v: string) => v.replace(/\s+/g, '');
+    const out = list.map(seg => ({ lines: [...seg.lines] }));
+    for (const k of keep) {
+      if (out.some(seg => seg.lines.some(l => flat(l.text).includes(flat(k.text))))) continue;
+      out[Math.min(k.si, out.length - 1)].lines.push({ who: k.who, text: k.text });
+    }
+    return out;
+  }
 
   /** 등록된 직원들의 점포명 (화명점, 화명 점 …) */
   const knownStores = () => [...new Set(Object.values(db.staff).map(s => normalizeStore(s.store)).filter(Boolean))];

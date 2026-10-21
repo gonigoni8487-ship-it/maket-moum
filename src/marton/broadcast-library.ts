@@ -11,6 +11,8 @@ export interface SavedBroadcast {
   /** 원고와 목표 길이 (다시 열어 고치기). 예전에 저장한 방송에는 없다 */
   script?: BroadcastScript;
   target?: number;
+  /** 그중 담당자가 직접 고친 대사 (다시 열어 원고를 다시 써도 남긴다) */
+  edited?: string[];
 }
 
 const DB_NAME = 'marton-broadcasts';
