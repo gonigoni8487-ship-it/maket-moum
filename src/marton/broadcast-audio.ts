@@ -28,6 +28,18 @@ export function pcmToBuffer(b64: string, sampleRate: number): AudioBuffer {
   return buf;
 }
 
+/** 한 단락을 나눠 만든 음성 조각들을 짧은 숨 쉬는 틈을 두고 하나로 잇는다 */
+export function joinBuffers(parts: AudioBuffer[], gapS = 0.25): AudioBuffer {
+  if (parts.length === 1) return parts[0];
+  const rate = parts[0].sampleRate;
+  const gap = Math.round(gapS * rate);
+  const out = new AudioBuffer({ length: parts.reduce((n, b) => n + b.length, 0) + gap * (parts.length - 1), numberOfChannels: 1, sampleRate: rate });
+  const ch = out.getChannelData(0);
+  let at = 0;
+  for (const b of parts) { ch.set(b.getChannelData(0), at); at += b.length + gap; }
+  return out;
+}
+
 /** mp3·wav 배경음악 → AudioBuffer */
 export function decodeMusic(b64: string): Promise<AudioBuffer> {
   const bytes = base64ToBytes(b64);

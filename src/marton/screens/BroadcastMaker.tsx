@@ -7,7 +7,7 @@ import {
   BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, VOICE_STYLES, koreanNumber, scriptGaps, voiceStyleLabel, type VoiceStyle, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
-import { decodeMusic, decodeMusicFile, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
+import { decodeMusic, decodeMusicFile, joinBuffers, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
 import { deleteBroadcast, downloadBlob, listBroadcasts, safeFileName, saveBroadcast, type SavedBroadcast } from '../broadcast-library';
 import { api } from '../api';
 import BroadcastNote, { useBroadcastNote } from './BroadcastNote';
@@ -20,6 +20,8 @@ type Progress = { voice: number; voices: number; music: 'off' | State; mixing: S
 type Result = { url: string; mp3: Blob; wav: Blob; seconds: number; musicFailed: boolean; saved: boolean };
 
 const SPEECH_PARALLEL = 2;
+const SPEECH_CHUNK_CHARS = 500; // 서버 한 번 한도(단락 700자·대사 16개)보다 작게
+const SPEECH_CHUNK_LINES = 12;
 const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:border-pink-500';
 const HOST_TONE = ['bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700'];
 const DUO: Host[] = [{ gender: '여성', age: '30대' }, { gender: '남성', age: '40대' }];
@@ -215,7 +217,15 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     setStep('making');
     setResult(null);
     if (useFile && !musicFile) { setStep('script'); return onError('배경음악으로 쓸 음악 파일을 골라 주세요.'); }
-    setProgress({ voice: 0, voices: segments.length, music: withMusic ? 'making' : 'off', mixing: 'waiting' });
+    // 긴 단락은 몇 대사씩 나눠 음성을 만든다 (한 번에 보내면 서버 한도를 넘는 뒷부분 대사가 빠짐)
+    const chunks = segments.map(seg => seg.lines.reduce<BroadcastSegment['lines'][]>((acc, l) => {
+      const last = acc.at(-1);
+      if (last && last.length < SPEECH_CHUNK_LINES && last.reduce((n, x) => n + x.text.length, 0) + l.text.length <= SPEECH_CHUNK_CHARS) last.push(l);
+      else acc.push([l]);
+      return acc;
+    }, []));
+    const jobs = chunks.flatMap((cs, si) => cs.map((lines, ci) => ({ si, ci, lines })));
+    setProgress({ voice: 0, voices: jobs.length, music: withMusic ? 'making' : 'off', mixing: 'waiting' });
 
     const musicKey = `${script.music}|${seconds}`;
     const musicJob: Promise<AudioBuffer | null> = !withMusic ? Promise.resolve(null)
@@ -227,23 +237,24 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     musicJob.then(m => setProgress(p => ({ ...p, music: m ? 'done' : 'off' })), () => setProgress(p => ({ ...p, music: 'failed' })));
 
     try {
-      const voices: AudioBuffer[] = new Array(segments.length);
+      const parts: AudioBuffer[][] = chunks.map(cs => new Array(cs.length));
       let next = 0;
       const worker = async () => {
-        while (next < segments.length) {
-          const i = next++;
-          const key = JSON.stringify([script.hosts, script.voiceStyle, script.tone, script.pace, segments[i].lines]);
+        while (next < jobs.length) {
+          const { si, ci, lines } = jobs[next++];
+          const key = JSON.stringify([script.hosts, script.voiceStyle, script.tone, script.pace, lines]);
           let buf = speechCache.current.get(key);
           if (!buf) {
-            const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines: segments[i].lines, hosts: script.hosts, tone: script.tone, pace: script.pace, voiceStyle: script.voiceStyle });
+            const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines, hosts: script.hosts, tone: script.tone, pace: script.pace, voiceStyle: script.voiceStyle });
             buf = pcmToBuffer(r.audio, r.sampleRate);
             speechCache.current.set(key, buf);
           }
-          voices[i] = buf;
+          parts[si][ci] = buf;
           setProgress(p => ({ ...p, voice: p.voice + 1 }));
         }
       };
-      await Promise.all(Array.from({ length: Math.min(SPEECH_PARALLEL, segments.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(SPEECH_PARALLEL, jobs.length) }, worker));
+      const voices = parts.map(ps => joinBuffers(ps));
 
       const music = await musicJob.catch(() => null); // 음악이 안 되면 음성만으로
       setProgress(p => ({ ...p, mixing: 'making' }));
@@ -529,7 +540,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
         {step === 'making' && (
           <section className="space-y-3 rounded-2xl bg-white p-5">
             <p className="font-bold text-slate-900">방송을 만들고 있습니다</p>
-            <Row icon={<Mic className="size-4" />} label={`쇼호스트 음성 ${progress.voice} / ${progress.voices} 단락`} state={progress.voice >= progress.voices ? 'done' : 'making'} />
+            <Row icon={<Mic className="size-4" />} label={`쇼호스트 음성 ${progress.voice} / ${progress.voices}`} state={progress.voice >= progress.voices ? 'done' : 'making'} />
             {progress.music !== 'off' && <Row icon={<Music className="size-4" />} label={progress.music === 'failed' ? '배경음악 실패 · 음성만으로 만듭니다' : useFile ? '내 음악 파일 깔기' : '배경음악 작곡'} state={progress.music} />}
             <Row icon={<Download className="size-4" />} label="음성·음악 합치고 MP3 만들기" state={progress.mixing} />
             <p className="text-xs text-slate-500">1~2분쯤 걸립니다. 화면을 닫지 말고 기다려 주세요.</p>
