@@ -13,11 +13,15 @@ export interface SavedBroadcast {
   target?: number;
   /** 그중 담당자가 직접 고친 대사 (다시 열어 원고를 다시 써도 남긴다) */
   edited?: string[];
+  /** 만들 때 쓴 배경음악과 성우 녹음 (다시 열어 고치면 같은 음악·같은 녹음을 그대로 쓰고 고친 부분만 새로 녹음) */
+  music?: Blob;
+  voices?: { key: string; rate: number; pcm: Blob }[];
 }
 
 const DB_NAME = 'marton-broadcasts';
 const STORE = 'items';
 const KEEP = 20;
+const KEEP_AUDIO = 10; // 배경음악·녹음 원본은 용량이 커서 최근 10개만
 
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -51,8 +55,13 @@ export async function listBroadcasts(): Promise<SavedBroadcast[]> {
 export async function saveBroadcast(item: SavedBroadcast): Promise<boolean> {
   try {
     await run('readwrite', s => { s.put(item); });
-    const old = (await listBroadcasts()).slice(KEEP);
-    if (old.length) await run('readwrite', s => { old.forEach(o => s.delete(o.id)); });
+    const all = await listBroadcasts();
+    const old = all.slice(KEEP);
+    const slim = all.slice(KEEP_AUDIO, KEEP).filter(o => o.music || o.voices);
+    if (old.length || slim.length) await run('readwrite', s => {
+      old.forEach(o => s.delete(o.id));
+      slim.forEach(({ music: _m, voices: _v, ...o }) => s.put(o));
+    });
     return true;
   } catch {
     return false;

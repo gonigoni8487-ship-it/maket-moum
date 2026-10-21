@@ -7,7 +7,7 @@ import {
   BRAND, BROADCAST_THEMES, HOST_AGES, HOST_GENDERS, LENGTH_CHOICES, PACES, VOICE_STYLES, koreanNumber, scriptGaps, voiceStyleLabel, type VoiceStyle, hasBrand, hasPlaceMention, hostLabel, lengthLabel, paceOf, parseItemLine, type Pace,
   type BroadcastMusic, type BroadcastScript, type BroadcastSegment, type BroadcastSpeech, type BroadcastTheme, type Host,
 } from '../broadcast';
-import { decodeMusic, decodeMusicFile, joinBuffers, mixBroadcast, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
+import { bufferToPcm, decodeMusic, decodeMusicFile, joinBuffers, mixBroadcast, musicBlob, pcmBlobToBuffer, pcmToBuffer, toMp3, toWav } from '../broadcast-audio';
 import { deleteBroadcast, downloadBlob, listBroadcasts, safeFileName, saveBroadcast, type SavedBroadcast } from '../broadcast-library';
 import { api } from '../api';
 import BroadcastNote, { useBroadcastNote } from './BroadcastNote';
@@ -20,6 +20,7 @@ type Progress = { voice: number; voices: number; music: 'off' | State; mixing: S
 type Result = { url: string; mp3: Blob; wav: Blob; seconds: number; musicFailed: boolean; saved: boolean };
 
 const SPEECH_PARALLEL = 2;
+const KEPT_MUSIC = '기존 방송 배경음악';
 const SPEECH_CHUNK_CHARS = 500; // 서버 한 번 한도(단락 700자·대사 16개)보다 작게
 const SPEECH_CHUNK_LINES = 12;
 const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:border-pink-500';
@@ -44,13 +45,13 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const [withMusic, setWithMusic] = useState(true);
   // 배경음악: AI가 매번 새로 작곡 / 직접 고른 음악 파일 (Suno 등으로 만든 매장 음악)
   const [musicSource, setMusicSource] = useState<'ai' | 'file'>('ai');
-  const [musicFile, setMusicFile] = useState<{ name: string; buf: AudioBuffer } | null>(null);
+  const [musicFile, setMusicFile] = useState<{ name: string; buf: AudioBuffer; blob: Blob } | null>(null);
   const musicFileRef = useRef<HTMLInputElement>(null);
   const pickMusicFile = async (f: File | undefined) => {
     if (!f) return;
     if (f.size > 30 * 1048576) return onError('음악 파일이 너무 큽니다. 30MB 이하로 골라 주세요.');
     try {
-      setMusicFile({ name: f.name, buf: await decodeMusicFile(f) });
+      setMusicFile({ name: f.name, buf: await decodeMusicFile(f), blob: f });
       setMusicSource('file');
     } catch {
       onError('이 음악 파일을 읽지 못했습니다. mp3·wav·m4a 파일로 골라 주세요.');
@@ -80,7 +81,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
   const editedLines = () => (script?.segments ?? []).flatMap((seg, si) => seg.lines
     .filter(l => l.text.trim() && !aiLines.current.has(l.text.trim()))
     .map(l => ({ si, who: l.who, text: l.text.trim() })));
-  const musicCache = useRef(new Map<string, AudioBuffer>());
+  const musicCache = useRef(new Map<string, { buf: AudioBuffer; blob: Blob }>());
   const chosen = items.filter(i => i.include);
 
   useEffect(() => { void listBroadcasts().then(setLibrary); }, []);
@@ -206,6 +207,21 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
     setScript(b.script);
     if (b.target) setSeconds(b.target);
     setStep('script');
+    void restoreAudio(b);
+  };
+  // 만들 때 쓴 배경음악·성우 녹음을 되살린다 → 고친 단락만 새로 녹음하고 음악은 그대로
+  const restoreAudio = async (b: SavedBroadcast) => {
+    setBusy(true);
+    try {
+      for (const v of b.voices ?? []) speechCache.current.set(v.key, await pcmBlobToBuffer(v.pcm, v.rate));
+      if (b.music) {
+        setMusicFile({ name: KEPT_MUSIC, buf: await decodeMusicFile(new File([b.music], 'music')), blob: b.music });
+        setMusicSource('file');
+        setWithMusic(true);
+      } else if (b.voices) setWithMusic(false);
+    } catch { /* 되살리지 못하면 새로 만든다 */ } finally {
+      setBusy(false);
+    }
   };
 
   const make = async () => {
@@ -224,16 +240,16 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       else acc.push([l]);
       return acc;
     }, []));
-    const jobs = chunks.flatMap((cs, si) => cs.map((lines, ci) => ({ si, ci, lines })));
+    const jobs = chunks.flatMap((cs, si) => cs.map((lines, ci) => ({ si, ci, lines, key: JSON.stringify([script.hosts, script.voiceStyle, script.tone, script.pace, lines]) })));
     setProgress({ voice: 0, voices: jobs.length, music: withMusic ? 'making' : 'off', mixing: 'waiting' });
 
     const musicKey = `${script.music}|${seconds}`;
     const musicJob: Promise<AudioBuffer | null> = !withMusic ? Promise.resolve(null)
       : useFile ? Promise.resolve(musicFile!.buf)
-      : musicCache.current.has(musicKey) ? Promise.resolve(musicCache.current.get(musicKey)!)
+      : musicCache.current.has(musicKey) ? Promise.resolve(musicCache.current.get(musicKey)!.buf)
       : api<BroadcastMusic>('/ai/broadcast/music', { music: script.music, seconds })
-        .then(m => decodeMusic(m.audio))
-        .then(buf => { musicCache.current.set(musicKey, buf); return buf; });
+        .then(async m => ({ buf: await decodeMusic(m.audio), blob: musicBlob(m.audio) }))
+        .then(x => { musicCache.current.set(musicKey, x); return x.buf; });
     musicJob.then(m => setProgress(p => ({ ...p, music: m ? 'done' : 'off' })), () => setProgress(p => ({ ...p, music: 'failed' })));
 
     try {
@@ -241,8 +257,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       let next = 0;
       const worker = async () => {
         while (next < jobs.length) {
-          const { si, ci, lines } = jobs[next++];
-          const key = JSON.stringify([script.hosts, script.voiceStyle, script.tone, script.pace, lines]);
+          const { si, ci, lines, key } = jobs[next++];
           let buf = speechCache.current.get(key);
           if (!buf) {
             const r = await api<BroadcastSpeech>('/ai/broadcast/speech', { lines, hosts: script.hosts, tone: script.tone, pace: script.pace, voiceStyle: script.voiceStyle });
@@ -262,7 +277,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const mp3 = await toMp3(mixed);
       const wav = toWav(mixed);
       const secs = Math.round(mixed.duration);
-      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, edited: editedLines().map(l => l.text), target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3 });
+      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, edited: editedLines().map(l => l.text), target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3,
+        music: music ? (useFile ? musicFile?.blob : musicCache.current.get(musicKey)?.blob) : undefined,
+        voices: jobs.map(j => ({ key: j.key, rate: parts[j.si][j.ci].sampleRate, pcm: bufferToPcm(parts[j.si][j.ci]) })) });
       if (saved) void listBroadcasts().then(setLibrary);
       setResult({ url: URL.createObjectURL(mp3), mp3, wav, seconds: secs, musicFailed: withMusic && !music, saved });
       setStep('done');
@@ -453,6 +470,12 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
           <section className="space-y-3">
             <div>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700"><Pencil className="size-4" />방송 원고</h2>
+              {useFile && musicFile?.name === KEPT_MUSIC && (
+                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  보관함 방송을 고치는 중입니다. 배경음악과 성우 녹음은 그대로 두고, 고친 대사가 있는 부분만 같은 성우 목소리로 새로 녹음해 끼워 넣습니다.{' '}
+                  <button type="button" onClick={() => setMusicSource('ai')} className="font-bold underline">배경음악은 새로 만들기</button>
+                </p>
+              )}
               <p className="text-xs text-slate-500">글자를 눌러 바로 고치거나, ✨다시 쓰기로 한 단락만 AI에게 다시 맡길 수 있습니다. 고친 단락만 음성을 새로 만듭니다.{script.hosts.length > 1 && ' 진행자 이름표를 누르면 말하는 사람이 바뀝니다.'}</p>
             </div>
             {scriptItems.items.length > 0 && (() => {

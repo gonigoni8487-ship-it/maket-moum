@@ -18,8 +18,8 @@ function base64ToBytes(b64: string) {
 }
 
 /** Gemini TTS 결과(16비트 리틀엔디언 PCM) → AudioBuffer */
-export function pcmToBuffer(b64: string, sampleRate: number): AudioBuffer {
-  const bytes = base64ToBytes(b64);
+export function pcmToBuffer(b64: string | Uint8Array, sampleRate: number): AudioBuffer {
+  const bytes = typeof b64 === 'string' ? base64ToBytes(b64) : b64;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const n = Math.floor(bytes.byteLength / 2);
   const buf = new AudioBuffer({ length: Math.max(1, n), numberOfChannels: 1, sampleRate });
@@ -27,6 +27,12 @@ export function pcmToBuffer(b64: string, sampleRate: number): AudioBuffer {
   for (let i = 0; i < n; i++) ch[i] = view.getInt16(i * 2, true) / 32768;
   return buf;
 }
+
+/** 보관함에 넣을 음성: AudioBuffer ↔ 16비트 PCM 파일 (다시 열어 고칠 때 안 고친 단락은 같은 녹음을 그대로 쓴다) */
+export const bufferToPcm = (buf: AudioBuffer) => new Blob([toInt16(buf.getChannelData(0))], { type: 'application/octet-stream' });
+export const pcmBlobToBuffer = async (blob: Blob, sampleRate: number) => pcmToBuffer(new Uint8Array(await blob.arrayBuffer()), sampleRate);
+/** AI 배경음악(base64 mp3·wav) → 보관함에 넣을 파일 */
+export const musicBlob = (b64: string) => new Blob([base64ToBytes(b64) as BlobPart], { type: 'audio/mpeg' });
 
 /** 한 단락을 나눠 만든 음성 조각들을 짧은 숨 쉬는 틈을 두고 하나로 잇는다 */
 export function joinBuffers(parts: AudioBuffer[], gapS = 0.25): AudioBuffer {
