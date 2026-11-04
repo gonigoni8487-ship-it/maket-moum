@@ -277,7 +277,7 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
       const mp3 = await toMp3(mixed);
       const wav = toWav(mixed);
       const secs = Math.round(mixed.duration);
-      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, edited: editedLines().map(l => l.text), target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3,
+      const saved = await saveBroadcast({ id: crypto.randomUUID(), script: { ...script, segments }, edited: editedLines().map(l => l.text), target: seconds, title: script.title, theme: script.theme, hosts: [...script.hosts.map(hostLabel), ...(script.voiceStyle === 'lively' ? ['활기찬 목소리'] : script.voiceStyle === 'impact' ? ['임팩트 중년 목소리'] : [])].join(' · '), seconds: secs, createdAt: Date.now(), mp3,
         music: music ? (useFile ? musicFile?.blob : musicCache.current.get(musicKey)?.blob) : undefined,
         voices: jobs.map(j => ({ key: j.key, rate: parts[j.si][j.ci].sampleRate, pcm: bufferToPcm(parts[j.si][j.ci]) })) });
       if (saved) void listBroadcasts().then(setLibrary);
@@ -414,8 +414,9 @@ export default function BroadcastMaker({ items: source, aiEnabled, startInLibrar
             ))}
             <div className="space-y-1.5 rounded-2xl bg-white p-3.5">
               <span className="text-xs font-bold text-slate-500">목소리 느낌</span>
-              <div className="flex flex-wrap gap-2">{VOICE_STYLES.map(v => <Chip key={v.id} active={voiceStyle === v.id} onClick={() => setVoiceStyle(v.id)}>{v.id === 'lively' ? `🎉 ${v.label}` : v.label}</Chip>)}</div>
+              <div className="flex flex-wrap gap-2">{VOICE_STYLES.map(v => <Chip key={v.id} active={voiceStyle === v.id} onClick={() => setVoiceStyle(v.id)}>{v.id === 'lively' ? `🎉 ${v.label}` : v.id === 'impact' ? `💪 ${v.label}` : v.label}</Chip>)}</div>
               {voiceStyle === 'lively' && <p className="text-xs text-pink-700">밝고 통통 튀는 목소리로 바꾸고, 처음부터 끝까지 텐션 높게 진행합니다.</p>}
+              {voiceStyle === 'impact' && <p className="text-xs text-pink-700">고른 연령대와 상관없이 40~50대 베테랑 쇼호스트의 힘 있는 중저음으로, 가격·혜택을 확신 있게 꽂아 주듯 진행합니다.</p>}
             </div>
             <p className="text-xs text-slate-500">홈쇼핑 쇼호스트처럼 말합니다. 2인 대화는 두 사람이 주고받으며 맞장구치는 방송입니다.</p>
           </section>
