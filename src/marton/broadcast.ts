@@ -41,10 +41,11 @@ export const HOST_VOICE: Record<HostGender, Record<HostAge, { voice: string; per
 };
 export const hostLabel = (h: Host) => `${h.gender} ${h.age}`;
 
-/** 목소리 느낌: 자연스럽게(기본) / 활기차고 경쾌하게(밝고 통통 튀는 목소리로 바꾸고 텐션을 올린다) */
+/** 목소리 느낌: 자연스럽게(기본) / 활기차고 경쾌하게(밝고 통통 튀는 목소리로 바꾸고 텐션을 올린다) / 임팩트 있는 중년(힘 있는 중저음) */
 export const VOICE_STYLES = [
   { id: 'natural', label: '자연스럽게' },
   { id: 'lively', label: '활기차고 경쾌하게' },
+  { id: 'impact', label: '임팩트 있는 중년' },
 ] as const;
 export type VoiceStyle = (typeof VOICE_STYLES)[number]['id'];
 export const isVoiceStyle = (v: unknown): v is VoiceStyle => VOICE_STYLES.some(x => x.id === v);
@@ -55,10 +56,18 @@ const LIVELY_VOICE: Record<HostGender, Record<HostAge, string>> = {
   남성: { '20대': 'Fenrir', '30대': 'Puck', '40대': 'Sadachbia', '50대': 'Achird' },
 };
 const LIVELY_PERSONA = '평소보다 텐션을 한 단계 올린 활기차고 경쾌한 홈쇼핑 쇼호스트. 밝고 통통 튀는 목소리, 웃음이 섞인 하이텐션, 리듬감 있게 치고 나가는 진행';
+/** 임팩트 있는 중년 쇼호스트용 목소리 (Gemini TTS 기본 목소리 중 단단하고 힘 있는 것). 고른 연령대와 상관없이 중년 목소리로 */
+const IMPACT_VOICE: Record<HostGender, Record<HostAge, string>> = {
+  여성: { '20대': 'Pulcherrima', '30대': 'Kore', '40대': 'Gacrux', '50대': 'Schedar' },
+  남성: { '20대': 'Alnilam', '30대': 'Orus', '40대': 'Algenib', '50대': 'Charon' },
+};
+const IMPACT_PERSONA = '힘 있고 묵직한 중저음, 배에서 울리는 단단하고 또렷한 발성. 확신에 찬 목소리로 핵심을 꽂아 주는 임팩트 있는 진행, 가격·혜택은 한 마디씩 힘주어 강조';
 export const hostVoice = (h: Host, style: VoiceStyle = 'natural') =>
   style === 'lively'
     ? { voice: LIVELY_VOICE[h.gender][h.age], persona: `${HOST_VOICE[h.gender][h.age].persona.split('.')[0]}. ${LIVELY_PERSONA}` }
-    : HOST_VOICE[h.gender][h.age];
+    : style === 'impact'
+      ? { voice: IMPACT_VOICE[h.gender][h.age], persona: `${h.age === '50대' ? '50대' : '40대'} ${h.gender} 베테랑 쇼호스트. ${IMPACT_PERSONA}` }
+      : HOST_VOICE[h.gender][h.age];
 export const isHost = (v: any): v is Host => HOST_GENDERS.includes(v?.gender) && HOST_AGES.includes(v?.age);
 /** TTS 다중 화자 이름 (원고에는 나오지 않는다) */
 export const SPEAKER_NAMES = ['Speaker1', 'Speaker2'] as const;
