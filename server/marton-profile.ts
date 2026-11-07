@@ -110,6 +110,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
   app.post(`${api}/ai/profile/photo`, auth, async (req, res) => {
     if (!aiEnabled) return res.status(503).json(noKey);
     const image = parseImage(req.body.image);
+    const face = parseImage(req.body.face); // 얼굴 확대본 (얼굴을 더 정확히 따라 그리게)
     if (!image) return res.status(400).json({ error: '인물 사진을 올려 주세요.' });
     const use: ProfileUse = isProfileUse(req.body.use) ? req.body.use : 'id';
     const background = isProfileBackground(use, req.body.background) ? req.body.background : PROFILE_BACKGROUNDS[use][0].id;
@@ -127,10 +128,14 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
       try {
         const response = await genAI.models.generateContent({
           model,
-          contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit, retouch, gender, pose) }] }],
+          contents: [{ parts: [
+            { inlineData: image },
+            ...(face ? [{ text: 'IDENTITY REFERENCE — a full-resolution close-up of the same person\'s face from the photo above. Match this face exactly (every feature, proportion, eye shape, glasses, skin colour):' }, { inlineData: face }] : []),
+            { text: photoPrompt(use, background, outfit, retouch, gender, pose) },
+          ] }],
           config: {
             responseModalities: ['TEXT', 'IMAGE'],
-            temperature: 0.2, // 얼굴을 지어내지 않게 낮게
+            temperature: 0.1, // 얼굴을 지어내지 않게 낮게
             imageConfig: { aspectRatio: profileUse(use).aiRatio },
           },
         });
@@ -158,13 +163,16 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
         config: { responseMimeType: 'application/json', temperature: 0 },
-        contents: [{ parts: [{ inlineData: image }, { text: 'Find the main person\'s head (from the top of the hair to the bottom of the chin, ear to ear). Reply JSON only: {"found":true,"box_2d":[ymin,xmin,ymax,xmax]} with coordinates normalised to 0-1000. If there is no person, {"found":false}.' }] }],
+        contents: [{ parts: [{ inlineData: image }, { text: 'Find the main person. Reply JSON only: {"found":true,"box_2d":[ymin,xmin,ymax,xmax],"face_2d":[ymin,xmin,ymax,xmax]} with coordinates normalised to 0-1000. box_2d = the whole head from the top of the hair to the bottom of the chin, ear to ear. face_2d = the inner face only, from the top of the eyebrows to the bottom of the chin and from the outer edge of one cheek to the other (no hair, no ears). If there is no person, {"found":false}.' }] }],
       });
-      const raw = parseJson<{ found?: boolean; box_2d?: number[] }>(response.text);
-      const b = raw.box_2d;
-      const ok = raw.found !== false && Array.isArray(b) && b.length === 4 && b.every(n => Number.isFinite(n)) && b[2] > b[0] && b[3] > b[1];
+      const raw = parseJson<{ found?: boolean; box_2d?: number[]; face_2d?: number[] }>(response.text);
+      const valid = (b?: number[]): b is number[] => Array.isArray(b) && b.length === 4 && b.every(n => Number.isFinite(n)) && b[2] > b[0] && b[3] > b[1];
       const n = (v: number) => Math.min(1, Math.max(0, v / 1000));
-      res.json((ok ? { found: true, top: n(b![0]), left: n(b![1]), bottom: n(b![2]), right: n(b![3]) } : { found: false, top: 0, left: 0, bottom: 0, right: 0 }) satisfies ProfileFace);
+      const box = (b: number[]) => ({ top: n(b[0]), left: n(b[1]), bottom: n(b[2]), right: n(b[3]) });
+      const b = raw.box_2d;
+      res.json((raw.found !== false && valid(b)
+        ? { found: true, ...box(b), ...(valid(raw.face_2d) ? { inner: box(raw.face_2d) } : {}) }
+        : { found: false, top: 0, left: 0, bottom: 0, right: 0 }) satisfies ProfileFace);
     } catch (e) {
       console.error('MartON profile face error:', e);
       res.status(502).json({ error: '얼굴 위치를 찾지 못했습니다. 직접 위치를 맞춰 주세요.' });

@@ -5,7 +5,7 @@ import { toJpeg } from '../camera';
 import { cx } from '../ui';
 import {
   PROFILE_BACKGROUNDS, PROFILE_GENDERS, PROFILE_OUTFITS, PROFILE_POSES, PROFILE_RETOUCH, PROFILE_USES, profileUse,
-  type ProfileBackground, type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
+  type ProfileBackground, type ProfileBox, type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../profile';
 import { downloadBlob } from '../broadcast-library';
 
@@ -60,6 +60,58 @@ function fitToRatio(img: CanvasImageSource, w: number, h: number, ratio: number,
   return c;
 }
 
+/** 얼굴 확대본: 머리 영역을 여유 있게 잘라 AI에 따로 보낸다 (얼굴을 더 정확히 따라 그리게) */
+function faceCrop(bitmap: ImageBitmap, f: ProfileFace) {
+  const w = bitmap.width, h = bitmap.height;
+  const bw = (f.right - f.left) * w, bh = (f.bottom - f.top) * h;
+  const x = Math.max(0, f.left * w - bw * 0.15), y = Math.max(0, f.top * h - bh * 0.1);
+  const cw = Math.min(w - x, bw * 1.3), ch = Math.min(h - y, bh * 1.25);
+  const scale = Math.min(1, 1024 / Math.max(cw, ch));
+  const c = document.createElement('canvas');
+  c.width = Math.round(cw * scale); c.height = Math.round(ch * scale);
+  c.getContext('2d')!.drawImage(bitmap, x, y, cw, ch, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.92);
+}
+
+/**
+ * 원본 얼굴 붙이기: AI 결과의 얼굴 안쪽(눈썹~턱)을 원본 사진의 얼굴로 바꾼다.
+ * 크기·위치는 두 얼굴 상자에 맞추고, 색은 결과의 조명에 맞춘 뒤 가장자리를 부드럽게 섞는다.
+ */
+export function pasteFace(dst: HTMLCanvasElement, src: CanvasImageSource & { width: number; height: number }, s: ProfileBox, d: ProfileBox) {
+  const W = dst.width, H = dst.height;
+  const dx = Math.round(d.left * W), dy = Math.round(d.top * H);
+  const dw = Math.round((d.right - d.left) * W), dh = Math.round((d.bottom - d.top) * H);
+  if (dw < 8 || dh < 8) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = dw; tmp.height = dh;
+  const tg = tmp.getContext('2d', { willReadFrequently: true })!;
+  tg.imageSmoothingQuality = 'high';
+  tg.drawImage(src, s.left * src.width, s.top * src.height, (s.right - s.left) * src.width, (s.bottom - s.top) * src.height, 0, 0, dw, dh);
+  const sp = tg.getImageData(0, 0, dw, dh).data;
+  const g = dst.getContext('2d', { willReadFrequently: true })!;
+  const region = g.getImageData(dx, dy, dw, dh);
+  const dp = region.data;
+  // 얼굴 가운데(타원 안쪽)의 평균 색을 맞춘다
+  const rOf = (i: number) => { const px = (i / 4) % dw, py = Math.floor(i / 4 / dw); return Math.hypot((px + 0.5) / dw - 0.5, (py + 0.5) / dh - 0.5) * 2; };
+  const stat = (p: Uint8ClampedArray) => {
+    const sum = [0, 0, 0]; let n = 0;
+    for (let i = 0; i < p.length; i += 4) if (rOf(i) < 0.7) { for (let c = 0; c < 3; c++) sum[c] += p[i + c]; n++; }
+    return sum.map(v => ({ m: v / Math.max(1, n) }));
+  };
+  const S = stat(sp), D = stat(dp);
+  for (let i = 0; i < dp.length; i += 4) {
+    const r = rOf(i);
+    const a = r <= 0.72 ? 1 : r >= 1 ? 0 : 1 - ((r - 0.72) / 0.28) ** 2 * (3 - 2 * ((r - 0.72) / 0.28));
+    if (!a) continue;
+    for (let c = 0; c < 3; c++) {
+      // 밝기·색만 결과 조명에 맞추고 대비(이목구비의 진하기)는 원본 그대로
+      const v = sp[i + c] - S[c].m + D[c].m;
+      dp[i + c] = dp[i + c] * (1 - a) + v * a;
+    }
+  }
+  g.putImageData(region, dx, dy);
+}
+
 /** 흑백 사진인지: 픽셀 채도 평균이 아주 낮으면 흑백 */
 function isGrayscale(bitmap: ImageBitmap) {
   const c = document.createElement('canvas');
@@ -89,6 +141,8 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [gender, setGender] = useState<ProfileGender>('male');
   const [pose, setPose] = useState<ProfilePose>('front');
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
+  // 얼굴은 원본 그대로: AI 결과의 얼굴 안쪽을 원본 사진의 얼굴로 바꿔 붙인다 (같은 사람 보장)
+  const [keepFace, setKeepFace] = useState(true);
   const [aiError, setAiError] = useState<string | null>(null);
   // 다운로드 파일 이름: 사번_성명.jpg (사진마다 다른 사람이라 기기에 저장하지 않는다)
   const [staffNo, setStaffNo] = useState('');
@@ -142,6 +196,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     c.getContext('2d')!.drawImage(picked.bitmap, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
   }, [mode, picked, rect]);
 
+  const detectFace = (src: CanvasImageSource, w: number, h: number) => api<ProfileFace>('/ai/profile/face', { image: toJpeg(src, w, h, 1024, 0.85) });
   const findFace = async (bitmap = picked?.bitmap) => {
     if (!bitmap || (face && bitmap === picked?.bitmap)) return;
     if (!aiEnabled) return setFace({ found: false, top: 0, left: 0, bottom: 0, right: 0 });
@@ -168,8 +223,12 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     setAiError(null);
     let failed = false;
     try {
+      // 원본 얼굴 위치 (얼굴 확대본·원본 얼굴 붙이기에 쓴다). 못 찾아도 사진은 만든다
+      const src = face && bitmap === picked?.bitmap ? face : await detectFace(bitmap, bitmap.width, bitmap.height).catch(() => null);
+      if (src && bitmap === picked?.bitmap) setFace(src);
       const r = await api<ProfilePhotoResult>('/ai/profile/photo', {
         image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, gender, pose, retouch,
+        face: src?.found ? faceCrop(bitmap, src) : undefined,
       });
       // 54×86mm(사원증)·정사각형(SNS) 비율로 맞추고 최소 해상도 이상으로
       const img = new Image();
@@ -177,6 +236,10 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       await img.decode();
       const u = profileUse(use);
       const canvas = fitToRatio(img, img.naturalWidth, img.naturalHeight, u.ratio, u.minW, u.minH);
+      if (keepFace && src?.inner) {
+        const dst = await detectFace(canvas, canvas.width, canvas.height).catch(() => null);
+        if (dst?.inner) pasteFace(canvas, bitmap, src.inner, dst.inner);
+      }
       setResult(canvas);
       setResultUrl(canvas.toDataURL('image/jpeg', 0.95));
     } catch (e) {
@@ -246,7 +309,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <button type="button" onClick={() => albumRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-indigo-200 bg-white py-6 font-bold text-indigo-700"><ImagePlus className="size-7" />앨범에서 고르기</button>
             </div>
           )}
-          <p className="text-xs text-slate-500">사진을 올린 뒤 아래에서 용도·배경·피부 보정·자세·옷을 모두 고르고 마지막에 <b>"고른 대로 사진 만들기"</b>를 누르세요. 얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
+          <p className="text-xs text-slate-500">사진을 올린 뒤 아래에서 용도·배경·피부 보정·자세·옷을 모두 고르고 마지막에 <b>"생성하기"</b>를 누르세요. 얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-3">
             <label className="space-y-1 text-xs font-semibold text-slate-600">사번
               <input value={staffNo} onChange={e => setStaffNo(e.target.value)} inputMode="numeric" maxLength={20} placeholder="예: 12345678" aria-label="사번"
@@ -294,6 +357,10 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               {retouch === 'model' && <p className="text-xs text-slate-500">모델 화보처럼 얼굴 윤곽을 살리는 조명, 자신감 있는 자세, 윤기 나는 머리, 더 깨끗한 피부·핏 좋은 옷으로 가장 잘 나온 모습을 만듭니다. 얼굴형·눈·코·입은 그대로라 본인 그대로입니다.{use === 'id' && ' 사원증 가이드라인은 "과한 보정·이미지 합성 불가"라 재요청될 수 있으니, 너무 화보 같으면 "스튜디오 피부 보정"을 쓰세요.'}</p>}
               {retouch === 'natural' && <p className="text-xs text-slate-500">고급 스튜디오처럼 잡티·뾰루지·기미·붉은기·다크서클·번들거림을 지우고 피부톤을 고르게 합니다. 얼굴의 점·잡티도 깨끗하게 지우고(없던 점은 절대 만들지 않음), 모공 같은 진짜 피부결은 남겨 보정 티가 나지 않게 합니다. 얼굴형·눈·코·입은 바꾸지 않습니다.</p>}
             </div>
+            <label className="flex items-start gap-2 rounded-xl bg-indigo-50 px-3 py-2.5">
+              <input type="checkbox" checked={keepFace} onChange={e => setKeepFace(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-indigo-600" />
+              <span className="text-sm text-slate-700"><b>얼굴은 원본 그대로</b> (같은 사람 보장)<span className="block text-xs text-slate-500">AI가 만든 사진의 눈·코·입·얼굴형 부분을 올린 사진의 실제 얼굴로 바꿔 붙입니다. 얼굴이 한 치도 달라지지 않는 대신, 얼굴 안쪽의 잡티 보정은 약해집니다.</span></span>
+            </label>
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">자세</p>
               <div className="flex flex-wrap gap-2">{PROFILE_POSES.map(o => <Chip key={o.id} active={pose === o.id} onClick={() => setPose(o.id)}>{o.label}</Chip>)}</div>
@@ -313,7 +380,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             </div>
             <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
-              {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />{picked ? '고른 대로 사진 만들기' : '먼저 사진을 올려 주세요'}</>}
+              {busy ? <><Loader2 className="size-5 animate-spin" />생성 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 생성하기</> : <><Sparkles className="size-5" />{picked ? '생성하기' : '먼저 사진을 올려 주세요'}</>}
             </button>
           </section>
         )}

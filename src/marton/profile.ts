@@ -60,4 +60,6 @@ export const isProfileRetouch = (v: unknown): v is ProfileRetouch => PROFILE_RET
 
 export interface ProfilePhotoResult { image: string } // data:image/...;base64
 /** 얼굴(머리) 위치: 원본 사진 기준 0~1 비율 */
-export interface ProfileFace { found: boolean; top: number; left: number; bottom: number; right: number }
+export interface ProfileBox { top: number; left: number; bottom: number; right: number }
+/** 머리(정수리~턱) 위치 + 얼굴 안쪽(눈썹~턱, 양 볼) 위치 */
+export interface ProfileFace extends ProfileBox { found: boolean; inner?: ProfileBox }
