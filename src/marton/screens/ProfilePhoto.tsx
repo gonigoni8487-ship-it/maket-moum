@@ -87,6 +87,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [background, setBackground] = useState<ProfileBackground>('white');
   const [outfit, setOutfit] = useState<ProfileOutfit>('keep');
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
+  const [aiError, setAiError] = useState<string | null>(null);
   // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·잡티 보정)을 AI로 만든다
   const [mode, setMode] = useState<Mode>('ai');
   const [busy, setBusy] = useState(false);
@@ -154,9 +155,15 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
 
   const makeAi = async (bitmap = picked?.bitmap) => {
     if (!bitmap) return;
-    if (!aiEnabled) return onError('AI 키(GEMINI_API_KEY)가 서버에 없어 AI 프로필을 만들 수 없습니다. "원본 그대로 자르기"는 지금도 쓸 수 있습니다.');
+    if (!aiEnabled) {
+      setAiError('AI 키(GEMINI_API_KEY)가 서버에 없어 AI 프로필을 만들 수 없습니다. "원본 그대로 자르기"로 만들어 드렸습니다.');
+      setMode('crop');
+      return void findFace(bitmap);
+    }
     setBusy(true);
     setResult(null);
+    setAiError(null);
+    let failed = false;
     try {
       const r = await api<ProfilePhotoResult>('/ai/profile/photo', {
         image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, retouch,
@@ -170,10 +177,14 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       setResult(canvas);
       setResultUrl(canvas.toDataURL('image/jpeg', 0.95));
     } catch (e) {
+      // AI가 안 되면 바로 원본 그대로 자르기로 결과를 만들어 다운로드는 할 수 있게
+      failed = true;
+      setAiError((e as Error).message);
       onError((e as Error).message);
     } finally {
       setBusy(false);
     }
+    if (failed) { setMode('crop'); void findFace(bitmap); }
   };
 
   const toBlob = (c: HTMLCanvasElement | null) => new Promise<Blob | null>(resolve => (c ? c.toBlob(resolve, 'image/jpeg', 0.95) : resolve(null)))
@@ -297,6 +308,14 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               </ul>
             )}
           </section>
+        )}
+
+        {aiError && (
+          <div role="alert" className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-bold">AI 프로필을 만들지 못했습니다</p>
+            <p>{aiError}</p>
+            <button type="button" onClick={() => { setMode('ai'); void makeAi(); }} disabled={busy} className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-amber-800 disabled:opacity-50">AI로 다시 시도</button>
+          </div>
         )}
 
         {picked && (mode === 'crop' ? face : result) && (
