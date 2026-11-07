@@ -293,8 +293,10 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     if (failed) { setMode('crop'); void findFace(bitmap); }
   };
 
+  // 인쇄 해상도: 사원증은 파일을 열면 정확히 54×86mm로 나오게 (가로 픽셀 ÷ 54mm, 최소 300dpi)
+  const dpiFor = (w: number) => (use === 'id' ? Math.max(300, Math.round(w / (54 / 25.4))) : 300);
   const toBlob = (c: HTMLCanvasElement | null) => new Promise<Blob | null>(resolve => (c ? c.toBlob(resolve, 'image/jpeg', 0.95) : resolve(null)))
-    .then(b => b && withDpi(b));
+    .then(b => b && c && withDpi(b, dpiFor(c.width)));
   const fileName = (kind: string, ext: string) => `${picked?.name ?? '프로필'}_${PROFILE_USES.find(u => u.id === use)!.label.split('·')[0]}_${kind}.${ext}`;
   const outBlob = () => toBlob(mode === 'crop' ? cropCanvas.current : result);
   const clean = (v: string) => v.replace(/[\\/:*?"<>|\s]+/g, '').trim();
@@ -314,6 +316,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   };
 
   const ready = mode === 'crop' ? Boolean(picked && face) : Boolean(result);
+  const outSize = mode === 'crop' ? (rect ? { w: rect.w, h: rect.h } : null) : result ? { w: result.width, h: result.height } : null;
   const u = profileUse(use);
   // 사원증 가이드라인 점검 (원본 그대로 자르기)
   const gray = useMemo(() => (picked ? isGrayscale(picked.bitmap) : false), [picked]);
@@ -474,6 +477,13 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
                 <figcaption className="text-center text-xs text-slate-500">{mode === 'crop' ? '원본 그대로 자르기' : 'AI 프로필'}</figcaption>
               </figure>
             </div>
+            {outSize && (
+              <p className={cx('rounded-xl px-3 py-2 text-xs', use !== 'id' || (outSize.w >= 638 && outSize.h >= 1016) ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700')}>
+                {use === 'id'
+                  ? <>파일: {outSize.w}×{outSize.h}픽셀 · 54×86mm 비율 · {dpiFor(outSize.w)}dpi {outSize.w >= 638 && outSize.h >= 1016 ? '✓ 사원증 가이드라인(54×86mm, 300dpi 이상 = 638×1016픽셀 이상) 충족' : '✗ 해상도 부족 — 더 선명한 사진으로 다시 만들어 주세요'}</>
+                  : <>파일: {outSize.w}×{outSize.h}픽셀 · 정사각형</>}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => void save()} disabled={!ready} className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-50"><Download className="size-4" />다운로드 (JPG)</button>
               <button type="button" onClick={() => void share()} disabled={!ready} className="flex items-center justify-center gap-1.5 rounded-xl bg-white py-3 text-sm font-bold text-slate-700 disabled:opacity-50"><Share2 className="size-4" />공유</button>
