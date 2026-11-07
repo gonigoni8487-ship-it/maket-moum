@@ -41,10 +41,11 @@ export const PROFILE_GENDERS = [
 export type ProfileGender = (typeof PROFILE_GENDERS)[number]['id'];
 export const isProfileGender = (v: unknown): v is ProfileGender => PROFILE_GENDERS.some(x => x.id === v);
 
-/** 자세: 가이드 1순위처럼 정면 상반신 / 몸만 살짝 돌린 측면 상반신 (얼굴은 카메라를 본다) */
+/** 자세: 가이드 1순위처럼 정면 상반신 / 몸만 살짝 왼쪽·오른쪽으로 돌린 측면 상반신 (방향은 사진을 보는 사람 기준, 얼굴·시선은 카메라 정면) */
 export const PROFILE_POSES = [
   { id: 'front', label: '정면 상반신' },
-  { id: 'angle', label: '약간 측면 상반신' },
+  { id: 'left', label: '◀ 측면 (왼쪽)' },
+  { id: 'right', label: '측면 (오른쪽) ▶' },
 ] as const;
 export type ProfilePose = (typeof PROFILE_POSES)[number]['id'];
 export const isProfilePose = (v: unknown): v is ProfilePose => PROFILE_POSES.some(x => x.id === v);
