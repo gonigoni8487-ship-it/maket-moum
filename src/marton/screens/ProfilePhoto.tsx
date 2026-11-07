@@ -93,7 +93,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   // 다운로드 파일 이름: 사번_성명.jpg (사진마다 다른 사람이라 기기에 저장하지 않는다)
   const [staffNo, setStaffNo] = useState('');
   const [staffName, setStaffName] = useState('');
-  // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·스튜디오 조명·피부 보정)을 AI로 만든다
+  // 기본: 1순위 사진(흰 벽·허리 위 상반신·스튜디오 조명·피부 보정)을 AI로. 선택을 다 고른 뒤 버튼을 눌러야 만든다
   const [mode, setMode] = useState<Mode>('ai');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<HTMLCanvasElement | null>(null);
@@ -119,8 +119,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       // 미리보기는 파일 주소 대신 그린 그림(JPEG)으로: 올린 파일 내용이 화면에 그대로 해석되지 않게
       setPicked({ bitmap, url: toJpeg(bitmap, bitmap.width, bitmap.height, 1280, 0.9), name: f.name.replace(/\.[^.]+$/, '') || '프로필' });
       setResult(null); setFace(null); setZoom(1); setDx(0); setDy(0);
-      if (mode === 'crop') void findFace(bitmap);
-      else void makeAi(bitmap); // 올리면 바로 만든다
+      if (mode === 'crop') void findFace(bitmap); // 원본 자르기는 얼굴 위치만 찾는다 (AI 사진은 버튼을 눌러야 만든다)
     } catch {
       onError('이 사진을 열지 못했습니다. 다른 사진으로 골라 주세요.');
     }
@@ -247,7 +246,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <button type="button" onClick={() => albumRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-indigo-200 bg-white py-6 font-bold text-indigo-700"><ImagePlus className="size-7" />앨범에서 고르기</button>
             </div>
           )}
-          <p className="text-xs text-slate-500">얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
+          <p className="text-xs text-slate-500">사진을 올린 뒤 아래에서 용도·배경·피부 보정·자세·옷을 모두 고르고 마지막에 <b>"고른 대로 사진 만들기"</b>를 누르세요. 얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-3">
             <label className="space-y-1 text-xs font-semibold text-slate-600">사번
               <input value={staffNo} onChange={e => setStaffNo(e.target.value)} inputMode="numeric" maxLength={20} placeholder="예: 12345678" aria-label="사번"
@@ -293,7 +292,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <p className="text-sm font-semibold text-slate-700">피부 보정</p>
               <div className="flex flex-wrap gap-2">{PROFILE_RETOUCH.map(o => <Chip key={o.id} active={retouch === o.id} onClick={() => setRetouch(o.id)}>{o.label}</Chip>)}</div>
               {retouch === 'model' && <p className="text-xs text-slate-500">모델 화보처럼 얼굴 윤곽을 살리는 조명, 자신감 있는 자세, 윤기 나는 머리, 더 깨끗한 피부·핏 좋은 옷으로 가장 잘 나온 모습을 만듭니다. 얼굴형·눈·코·입은 그대로라 본인 그대로입니다.{use === 'id' && ' 사원증 가이드라인은 "과한 보정·이미지 합성 불가"라 재요청될 수 있으니, 너무 화보 같으면 "스튜디오 피부 보정"을 쓰세요.'}</p>}
-              {retouch === 'natural' && <p className="text-xs text-slate-500">고급 스튜디오처럼 잡티·뾰루지·기미·붉은기·다크서클·번들거림을 지우고 피부톤을 고르게 합니다. 모공 같은 진짜 피부결은 남겨 보정 티가 나지 않게 하고, 얼굴형·눈·코·입은 바꾸지 않습니다. 본인을 알아보는 큰 점·흉터는 남깁니다.</p>}
+              {retouch === 'natural' && <p className="text-xs text-slate-500">고급 스튜디오처럼 잡티·뾰루지·기미·붉은기·다크서클·번들거림을 지우고 피부톤을 고르게 합니다. 얼굴의 점·잡티도 깨끗하게 지우고(없던 점은 절대 만들지 않음), 모공 같은 진짜 피부결은 남겨 보정 티가 나지 않게 합니다. 얼굴형·눈·코·입은 바꾸지 않습니다.</p>}
             </div>
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">자세</p>
@@ -314,7 +313,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             </div>
             <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
-              {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />{use === 'id' ? '1순위 사진 만들기' : 'AI 프로필 사진 만들기'}</>}
+              {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />{picked ? '고른 대로 사진 만들기' : '먼저 사진을 올려 주세요'}</>}
             </button>
           </section>
         )}
