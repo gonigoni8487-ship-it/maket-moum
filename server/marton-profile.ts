@@ -9,7 +9,7 @@ import {
 } from '../src/marton/profile';
 import { platform } from './platform';
 import { AI_MODEL, auth, parseImage, parseJson, type RouteApp } from './marton';
-import { candidates, withModels } from './marton-broadcast';
+import { candidates } from './marton-broadcast';
 
 // 사람 얼굴을 가장 잘 지키는 모델부터 (모델이 없거나 못 쓰면 다음 후보). MARTON_IMAGE_MODEL로 바꿀 수 있다
 const IMAGE_MODELS = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'];
@@ -58,6 +58,29 @@ function imagePart(response: any): { data: string; mimeType: string } | undefine
   return undefined;
 }
 
+/** 이미지가 안 나온 이유 (로그·안내용) */
+function noImageReason(response: any): string {
+  const block = response?.promptFeedback?.blockReason;
+  const finish = response?.candidates?.[0]?.finishReason;
+  const said = (response?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join(' ').slice(0, 200);
+  return [block && `blocked:${block}`, finish && `finish:${finish}`, said && `text:${said}`].filter(Boolean).join(' ') || 'no-image';
+}
+
+type Failure = 'quota' | 'safety' | 'access' | 'other';
+/** Gemini 오류·응답을 사람이 알아들을 안내로 나눈다 */
+function classify(reason: string): Failure {
+  if (/429|RESOURCE_EXHAUSTED|quota|rate limit|billing|limit: 0|exceeded/i.test(reason)) return 'quota';
+  if (/SAFETY|PROHIBITED|blocked:|IMAGE_OTHER|RECITATION|policy/i.test(reason)) return 'safety';
+  if (/404|not found|not supported|unsupported|does not exist|permission|PERMISSION_DENIED|403|API key/i.test(reason)) return 'access';
+  return 'other';
+}
+const FAILURE_MESSAGE: Record<Failure, string> = {
+  quota: 'Gemini API 키의 이미지 생성 한도가 없거나 다 썼습니다. 이미지 모델은 무료 등급에서 쓸 수 없는 경우가 많아, Google AI Studio(aistudio.google.com) → 결제(Billing)에서 유료 등급을 켜야 합니다. 지금은 "원본 그대로 자르기"로 만들어 드렸습니다.',
+  safety: 'AI 안전 정책 때문에 이 사진으로는 AI 프로필을 만들지 못했습니다. 얼굴이 정면으로 잘 보이는 다른 사진으로 다시 해 보세요. 지금은 "원본 그대로 자르기"로 만들어 드렸습니다.',
+  access: '이 Gemini API 키로는 이미지 생성 모델을 쓸 수 없습니다(모델 권한 없음). 관리자가 키 권한·결제 설정을 확인해야 합니다. 지금은 "원본 그대로 자르기"로 만들어 드렸습니다.',
+  other: 'AI 프로필 사진을 만들지 못했습니다. 잠시 후 "다시 만들기"를 눌러 주세요. 지금은 "원본 그대로 자르기"로 만들어 드렸습니다.',
+};
+
 export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: boolean) {
   const api = '/api/marton';
   const noKey = { error: 'AI 키(GEMINI_API_KEY)가 설정되지 않아 프로필 사진을 만들 수 없습니다.' };
@@ -76,27 +99,32 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     if (used.day !== today) Object.assign(used, { day: today, count: 0 });
     if (used.count >= DAILY_LIMIT()) return res.status(429).json({ error: `프로필 사진은 하루 ${DAILY_LIMIT()}장까지 만들 수 있습니다. 내일 다시 만들거나 "원본 그대로 자르기"를 써 주세요.` });
     used.count++;
-    try {
-      const response = await withModels(candidates('MARTON_IMAGE_MODEL', IMAGE_MODELS), model => genAI.models.generateContent({
-        model,
-        contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit, retouch) }] }],
-        config: {
-          responseModalities: ['IMAGE'],
-          temperature: 0.2, // 얼굴을 지어내지 않게 낮게
-          imageConfig: { aspectRatio: profileUse(use).aiRatio },
-        },
-      }));
-      const part = imagePart(response);
-      if (!part) {
-        used.count--;
-        return res.status(502).json({ error: '프로필 사진을 만들지 못했습니다. 얼굴이 잘 보이는 다른 사진으로 다시 해 주세요.' });
+    // 모델마다 시도한다: 오류(한도·권한 등)든 이미지 없이 끝난 응답이든 다음 모델로
+    const reasons: string[] = [];
+    for (const model of candidates('MARTON_IMAGE_MODEL', IMAGE_MODELS)) {
+      try {
+        const response = await genAI.models.generateContent({
+          model,
+          contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit, retouch) }] }],
+          config: {
+            responseModalities: ['TEXT', 'IMAGE'],
+            temperature: 0.2, // 얼굴을 지어내지 않게 낮게
+            imageConfig: { aspectRatio: profileUse(use).aiRatio },
+          },
+        });
+        const part = imagePart(response);
+        if (part) return res.json({ image: `data:${part.mimeType};base64,${part.data}` } satisfies ProfilePhotoResult);
+        reasons.push(`${model}: ${noImageReason(response)}`);
+      } catch (e) {
+        reasons.push(`${model}: ${String((e as Error)?.message ?? e).slice(0, 300)}`);
       }
-      res.json({ image: `data:${part.mimeType};base64,${part.data}` } satisfies ProfilePhotoResult);
-    } catch (e) {
-      used.count--;
-      console.error('MartON profile photo error:', e);
-      res.status(502).json({ error: '프로필 사진을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' });
     }
+    used.count--;
+    console.error('MartON profile photo failed:', reasons.join(' | '));
+    // 한도·안전 문제가 하나라도 있으면 그 안내가, 모든 모델이 권한 문제면 권한 안내가 가장 쓸모 있다
+    const kinds = reasons.map(classify);
+    const kind: Failure = kinds.includes('quota') ? 'quota' : kinds.includes('safety') ? 'safety' : kinds.every(k => k === 'access') ? 'access' : 'other';
+    res.status(502).json({ error: FAILURE_MESSAGE[kind], reason: kind, detail: reasons.join(' | ').slice(0, 600) });
   });
 
   // 2) 원본 그대로 자르기용: 얼굴(머리) 위치만 찾아 준다. 자르기는 기기에서 원본 픽셀 그대로
