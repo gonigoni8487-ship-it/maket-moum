@@ -292,6 +292,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">피부 보정</p>
               <div className="flex flex-wrap gap-2">{PROFILE_RETOUCH.map(o => <Chip key={o.id} active={retouch === o.id} onClick={() => setRetouch(o.id)}>{o.label}</Chip>)}</div>
+              {retouch === 'model' && <p className="text-xs text-slate-500">모델 화보처럼 얼굴 윤곽을 살리는 조명, 자신감 있는 자세, 윤기 나는 머리, 더 깨끗한 피부·핏 좋은 옷으로 가장 잘 나온 모습을 만듭니다. 얼굴형·눈·코·입은 그대로라 본인 그대로입니다.{use === 'id' && ' 사원증 가이드라인은 "과한 보정·이미지 합성 불가"라 재요청될 수 있으니, 너무 화보 같으면 "스튜디오 피부 보정"을 쓰세요.'}</p>}
               {retouch === 'natural' && <p className="text-xs text-slate-500">고급 스튜디오처럼 잡티·뾰루지·기미·붉은기·다크서클·번들거림을 지우고 피부톤을 고르게 합니다. 모공 같은 진짜 피부결은 남겨 보정 티가 나지 않게 하고, 얼굴형·눈·코·입은 바꾸지 않습니다. 본인을 알아보는 큰 점·흉터는 남깁니다.</p>}
             </div>
             <div className="space-y-1.5">

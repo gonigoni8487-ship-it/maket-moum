@@ -52,6 +52,7 @@ export const isProfilePose = (v: unknown): v is ProfilePose => PROFILE_POSES.som
 /** 잡티 보정: 자연스럽게(기본) — 일시적인 잡티만 지우고 얼굴은 그대로 / 보정 안 함 */
 export const PROFILE_RETOUCH = [
   { id: 'natural', label: '스튜디오 피부 보정' },
+  { id: 'model', label: '✨ 모델 화보' },
   { id: 'none', label: '보정 안 함' },
 ] as const;
 export type ProfileRetouch = (typeof PROFILE_RETOUCH)[number]['id'];
