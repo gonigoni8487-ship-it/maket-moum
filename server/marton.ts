@@ -15,6 +15,7 @@ import { registerCare, pruneCare } from './marton-care';
 import { registerGuard } from './marton-guard';
 import { registerKpi, kpiAllowed } from './marton-kpi';
 import { registerBroadcast } from './marton-broadcast';
+import { registerProfile } from './marton-profile';
 import { normalizeStore, type KpiRecord } from '../src/marton/kpi';
 
 /** Express 앱과 Cloudflare용 라우터가 공통으로 가진 부분 */
@@ -23,7 +24,7 @@ export interface RouteApp {
   post(path: string, ...handlers: any[]): unknown;
 }
 
-const AI_MODEL = 'gemini-3.5-flash';
+export const AI_MODEL = 'gemini-3.5-flash';
 const PHOTO_ID = /^[a-f0-9-]{36}\.(jpg|png|webp)$/;
 const MAX_PHOTO_BYTES = 1.8 * 1024 * 1024; // Durable Object 저장 한도(행당 2MB) 안쪽
 
@@ -295,7 +296,7 @@ export function parseJson<T>(raw: string | undefined): T {
   return JSON.parse(t.trim()) as T;
 }
 
-function parseImage(dataUrl: unknown, allowPdf = false) {
+export function parseImage(dataUrl: unknown, allowPdf = false) {
   if (typeof dataUrl !== 'string') return null;
   const m = /^data:(image\/[a-z+]+|application\/pdf);base64,(.+)$/.exec(dataUrl);
   return m && (allowPdf || m[1] !== 'application/pdf') ? { mimeType: m[1], data: m[2] } : null;
@@ -411,6 +412,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   registerGuard(app);
   registerKpi(app, genAI, aiEnabled);
   registerBroadcast(app, genAI, aiEnabled);
+  registerProfile(app, genAI, aiEnabled);
 
   app.post(`${api}/logout`, auth, (req, res) => {
     const token = req.headers.authorization?.slice(7);

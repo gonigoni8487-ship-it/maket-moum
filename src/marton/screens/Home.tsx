@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
 import {
-  BellRing, CalendarDays, Camera, Radio, ChartColumn, Sunrise, ClipboardList, Coffee, HeartHandshake, LayoutDashboard, Megaphone, Mic, Search, Send, Settings, ShieldAlert, Siren, TimerReset, TrendingUp,
+  BellRing, CalendarDays, Camera, Radio, UserRound, ChartColumn, Sunrise, ClipboardList, Coffee, HeartHandshake, LayoutDashboard, Megaphone, Mic, Search, Send, Settings, ShieldAlert, Siren, TimerReset, TrendingUp,
 } from 'lucide-react';
 import { EMERGENCY_INFO, regularHolidays, storeTime, type Emergency, type Staff, type WorkSchedule } from '../shared';
 import { cx } from '../ui';
 
 export type HomeGo =
   | 'tasks' | 'request' | 'find' | 'photo' | 'complaint' | 'security' | 'manager'
-  | 'notice' | 'share' | 'schedule' | 'expiry' | 'voice' | 'wallet' | 'settings' | 'morning' | 'bell' | 'kpi' | 'broadcast';
+  | 'notice' | 'share' | 'schedule' | 'expiry' | 'voice' | 'wallet' | 'settings' | 'morning' | 'bell' | 'kpi' | 'broadcast' | 'profile';
 
 interface Counts { tasks: number; notices: number; share: number; expiry: number; complaints: number; incidents: number; coupons: number }
 
@@ -87,6 +87,14 @@ export default function Home({ me, kpi, counts, schedules, emergencies, onGo, on
         <span className="min-w-0">
           <span className="block text-lg font-black">행사 방송 만들기 (TTS)</span>
           <span className="block text-sm text-pink-50">전단 사진 → 쇼호스트 음성 + 배경음악 → MP3</span>
+        </span>
+      </button>
+
+      <button onClick={() => onGo('profile')} className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 p-4 text-left text-white shadow-sm active:opacity-90">
+        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-white/20"><UserRound className="size-7" /></span>
+        <span className="min-w-0">
+          <span className="block text-lg font-black">프로필 사진 만들기</span>
+          <span className="block text-sm text-indigo-50">인물 사진 → 사원증·증명사진 / SNS 프로필 (상반신)</span>
         </span>
       </button>
 

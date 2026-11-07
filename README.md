@@ -45,6 +45,8 @@ View your app in AI Studio: https://ai.studio/apps/d6b10975-14b0-404f-bb66-12015
 - `MARTON_DATA_FILE`: 데이터 저장 파일 (기본 `data/marton-db.json`)
 - `MARTON_TTS_MODEL` / `MARTON_MUSIC_MODEL`: 매장 방송 음성·음악 모델 (기본 `gemini-3.1-flash-tts-preview` / `lyria-3.5`, 쓸 수 없으면 `gemini-2.5-flash-preview-tts` / `lyria-3-pro-preview`로 자동 전환)
 - `MARTON_MUSIC_DAILY_LIMIT`: 매장 방송 배경음악 하루 생성 한도 (기본 30곡, 곡당 요금이 붙음)
+- `MARTON_IMAGE_MODEL`: 프로필 사진 모델 (기본 `gemini-3-pro-image-preview`, 쓸 수 없으면 `gemini-2.5-flash-image`로 자동 전환)
+- `MARTON_PROFILE_DAILY_LIMIT`: AI 프로필 사진 하루 생성 한도 (기본 50장, 장당 요금이 붙음)
 
 실시간 기능은 Express 서버(`npm run build && npm start`)에서 동작합니다. 정적 호스팅(Cloudflare assets)만으로는 `/api/marton` 이 없어 로그인할 수 없습니다.
 

@@ -27,11 +27,11 @@ const cleanHosts = (v: unknown): Host[] => {
   return list.length ? list : [DEFAULT_HOST];
 };
 
-const candidates = (envName: string, defaults: string[]) => [...new Set([platform().env(envName), ...defaults].filter((m): m is string => Boolean(m)))];
+export const candidates = (envName: string, defaults: string[]) => [...new Set([platform().env(envName), ...defaults].filter((m): m is string => Boolean(m)))];
 /** 모델이 없거나(404) 이 키로 못 쓰는 경우만 다음 후보로 */
 const modelMissing = (e: unknown) => /not found|404|not supported|unsupported|does not exist|permission/i.test(String((e as Error)?.message ?? e));
 
-async function withModels<T>(models: string[], run: (model: string) => Promise<T>): Promise<T> {
+export async function withModels<T>(models: string[], run: (model: string) => Promise<T>): Promise<T> {
   let last: unknown;
   for (const model of models) {
     try { return await run(model); } catch (e) {

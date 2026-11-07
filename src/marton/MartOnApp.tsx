@@ -25,6 +25,7 @@ import { EmergencyDetail, EmergencySheet } from './screens/Emergency';
 import { BellKiosk, BellSheet } from './screens/Bell';
 import MorningCards, { REOPEN_AFTER_MS } from './screens/MorningCards';
 import BroadcastMaker from './screens/BroadcastMaker';
+import ProfilePhoto from './screens/ProfilePhoto';
 
 const CACHE_KEY = 'marton-cache';
 
@@ -64,7 +65,7 @@ export default function MartOnApp() {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(Boolean(session.token));
   const [connected, setConnected] = useState(false);
-  // 홈 화면 바로가기: /marton/?tab=security, /marton/?voice=1, /marton/?broadcast=1
+  // 홈 화면 바로가기: /marton/?tab=security, /marton/?voice=1, /marton/?broadcast=1, /marton/?profile=1
   const params = new URLSearchParams(window.location.search);
   const [tab, setTab] = useState<Tab>(() => {
     const t = params.get('tab') as Tab | null;
@@ -81,6 +82,7 @@ export default function MartOnApp() {
   const [bellSheet, setBellSheet] = useState(false);
   const [morningOpen, setMorningOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(() => params.get('broadcast') === '1');
+  const [profileOpen, setProfileOpen] = useState(() => params.get('profile') === '1');
   // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
   const [kiosk, setKiosk] = useState<string | null>(() => { try { return localStorage.getItem('marton-kiosk'); } catch { return null; } });
   const kioskRef = useRef(kiosk);
@@ -492,6 +494,7 @@ export default function MartOnApp() {
     if (to === 'settings') return setShowSettings(true);
     if (to === 'morning') return setMorningOpen(true);
     if (to === 'broadcast') return setBroadcastOpen(true);
+    if (to === 'profile') return setProfileOpen(true);
     if (to === 'bell') return setBellSheet(true);
     if (to === 'notice' || to === 'share' || to === 'schedule' || to === 'expiry') { setBoardSection(to); return setTab('notices'); }
     setTab(to);
@@ -643,6 +646,7 @@ export default function MartOnApp() {
         <BroadcastMaker aiEnabled={aiEnabled} onClose={() => setBroadcastOpen(false)} onError={onError}
           items={[...promotions].sort((a, b) => b.createdAt - a.createdAt).slice(0, 40).map(({ name, code, spec, price, originalPrice, condition, period }) => ({ name, code, spec, price, originalPrice, condition, period }))} />
       )}
+      {profileOpen && <ProfilePhoto aiEnabled={aiEnabled} onClose={() => setProfileOpen(false)} onError={onError} />}
       {bellSheet && <BellSheet onClose={() => setBellSheet(false)} onKiosk={pl => { setBellSheet(false); openKiosk(pl); }} onError={onError} onToast={showToast} />}
       {kiosk && <BellKiosk place={kiosk} bells={data.bells ?? []} onExit={() => openKiosk(null)} onError={onError} />}
 
