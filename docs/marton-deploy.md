@@ -26,6 +26,7 @@
    | `MARTON_VAPID_SUBJECT` | 권장 | `mailto:담당자@회사메일` (푸시 발신자) |
    | `GEMINI_API_KEY` | 선택 | 사진 AI·AI 답변·행사 매장 방송(음성·배경음악) |
    | `MARTON_MUSIC_DAILY_LIMIT` | 선택 | 매장 방송 배경음악 하루 생성 한도 (기본 30곡) |
+   | `MARTON_PROFILE_DAILY_LIMIT` | 선택 | AI 프로필 사진 하루 생성 한도 (기본 50장) |
    | `MARTON_INTEGRATION_KEY` | 선택 | 센서·CCTV 경보 웹훅 키 |
    | `MARTON_HOME_REDIRECT` | 선택 | `1`이면 주소 첫 화면에서 바로 마트ON으로 이동 |
 
