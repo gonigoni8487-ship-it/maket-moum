@@ -1,12 +1,13 @@
 // 기다리는 동안 나오는 뉴에이지 배경음악 (기기에서 바로 연주: 파일·저작권·요금 없음)
 // 부드러운 패드 화음이 천천히 바뀌고, 그 위로 맑은 벨 소리가 가끔 울린다
+// 휴대폰 스피커는 300Hz 아래가 거의 안 나와서, 화음을 가운데~높은 음역(약 260~990Hz)에 둔다
 const CHORDS = [
-  [48, 55, 59, 64, 67], // Cmaj7
-  [45, 52, 57, 60, 64], // Am(add9)
-  [41, 48, 52, 57, 60], // Fmaj7
-  [43, 50, 55, 59, 62], // G
+  [60, 67, 71, 76, 79], // Cmaj7
+  [57, 64, 69, 72, 76], // Am(add9)
+  [53, 60, 64, 69, 72], // Fmaj7
+  [55, 62, 67, 71, 74], // G
 ];
-const BELL_NOTES = [72, 74, 76, 79, 81, 84, 86, 88]; // C 펜타토닉
+const BELL_NOTES = [76, 79, 81, 84, 86, 88, 91, 93]; // C 펜타토닉 (높고 맑게)
 const CHORD_S = 6; // 화음 하나 길이(초)
 const hz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
@@ -24,7 +25,7 @@ function reverb(ctx: AudioContext) {
 }
 
 /** 음악을 시작하고, 멈추는 함수를 돌려준다 (멈출 때는 2초에 걸쳐 작아진다) */
-export function startAmbient(volume = 0.22): () => void {
+export function startAmbient(volume = 0.8): () => void {
   const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return () => {};
   const ctx = new AC();
@@ -34,21 +35,25 @@ export function startAmbient(volume = 0.22): () => void {
   master.gain.linearRampToValueAtTime(volume, ctx.currentTime + 3);
   const tone = ctx.createBiquadFilter();
   tone.type = 'lowpass';
-  tone.frequency.value = 2200;
+  tone.frequency.value = 5000;
   const wet = ctx.createGain();
   wet.gain.value = 0.55;
   const rev = reverb(ctx);
   tone.connect(master);
   tone.connect(rev).connect(wet).connect(master);
-  master.connect(ctx.destination);
+  // 벨과 화음이 겹쳐도 소리가 깨지지 않게
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -6;
+  limiter.ratio.value = 8;
+  master.connect(limiter).connect(ctx.destination);
 
   // 패드: 음마다 살짝 어긋난 두 오실레이터를 천천히 부풀렸다 줄인다
   const pad = (at: number, notes: number[]) => {
     for (const m of notes) {
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, at);
-      g.gain.linearRampToValueAtTime(0.06, at + 2);
-      g.gain.setValueAtTime(0.06, at + CHORD_S - 1);
+      g.gain.linearRampToValueAtTime(0.09, at + 2);
+      g.gain.setValueAtTime(0.09, at + CHORD_S - 1);
       g.gain.linearRampToValueAtTime(0, at + CHORD_S + 1.5);
       g.connect(tone);
       for (const [type, detune] of [['sine', -6], ['triangle', 6]] as const) {
@@ -67,7 +72,7 @@ export function startAmbient(volume = 0.22): () => void {
     const m = BELL_NOTES[Math.floor(Math.random() * BELL_NOTES.length)];
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(0.05, at + 0.02);
+    g.gain.linearRampToValueAtTime(0.22, at + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0005, at + 3.5);
     g.connect(tone);
     for (const mult of [1, 2.01]) {

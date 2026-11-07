@@ -163,15 +163,18 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
       const response = await genAI.models.generateContent({
         model: AI_MODEL,
         config: { responseMimeType: 'application/json', temperature: 0 },
-        contents: [{ parts: [{ inlineData: image }, { text: 'Find the main person. Reply JSON only: {"found":true,"box_2d":[ymin,xmin,ymax,xmax],"face_2d":[ymin,xmin,ymax,xmax]} with coordinates normalised to 0-1000. box_2d = the whole head from the top of the hair to the bottom of the chin, ear to ear. face_2d = the inner face only, from the top of the eyebrows to the bottom of the chin and from the outer edge of one cheek to the other (no hair, no ears). If there is no person, {"found":false}.' }] }],
+        contents: [{ parts: [{ inlineData: image }, { text: 'Find the main person. Reply JSON only: {"found":true,"box_2d":[ymin,xmin,ymax,xmax],"face_2d":[ymin,xmin,ymax,xmax],"left_eye":[y,x],"right_eye":[y,x],"mouth":[y,x]} with coordinates normalised to 0-1000. box_2d = the whole head from the top of the hair to the bottom of the chin, ear to ear. face_2d = the inner face only, from the top of the eyebrows to the bottom of the chin and from the outer edge of one cheek to the other (no hair, no ears). left_eye = centre of the pupil of the eye that appears on the LEFT side of the image, right_eye = the one on the RIGHT side of the image, mouth = centre of the mouth. If there is no person, {"found":false}.' }] }],
       });
-      const raw = parseJson<{ found?: boolean; box_2d?: number[]; face_2d?: number[] }>(response.text);
+      const raw = parseJson<{ found?: boolean; box_2d?: number[]; face_2d?: number[]; left_eye?: number[]; right_eye?: number[]; mouth?: number[] }>(response.text);
+      const pt = (p?: number[]) => (Array.isArray(p) && p.length === 2 && p.every(v => Number.isFinite(v)) ? { x: Math.min(1, Math.max(0, p[1] / 1000)), y: Math.min(1, Math.max(0, p[0] / 1000)) } : null);
+      const [le, re, mo] = [pt(raw.left_eye), pt(raw.right_eye), pt(raw.mouth)];
+      const marks = le && re && mo && re.x > le.x ? { left: le, right: re, mouth: mo } : undefined;
       const valid = (b?: number[]): b is number[] => Array.isArray(b) && b.length === 4 && b.every(n => Number.isFinite(n)) && b[2] > b[0] && b[3] > b[1];
       const n = (v: number) => Math.min(1, Math.max(0, v / 1000));
       const box = (b: number[]) => ({ top: n(b[0]), left: n(b[1]), bottom: n(b[2]), right: n(b[3]) });
       const b = raw.box_2d;
       res.json((raw.found !== false && valid(b)
-        ? { found: true, ...box(b), ...(valid(raw.face_2d) ? { inner: box(raw.face_2d) } : {}) }
+        ? { found: true, ...box(b), ...(valid(raw.face_2d) ? { inner: box(raw.face_2d) } : {}), ...(marks ? { marks } : {}) }
         : { found: false, top: 0, left: 0, bottom: 0, right: 0 }) satisfies ProfileFace);
     } catch (e) {
       console.error('MartON profile face error:', e);

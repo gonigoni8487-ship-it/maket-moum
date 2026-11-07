@@ -62,4 +62,6 @@ export interface ProfilePhotoResult { image: string } // data:image/...;base64
 /** 얼굴(머리) 위치: 원본 사진 기준 0~1 비율 */
 export interface ProfileBox { top: number; left: number; bottom: number; right: number }
 /** 머리(정수리~턱) 위치 + 얼굴 안쪽(눈썹~턱, 양 볼) 위치 */
-export interface ProfileFace extends ProfileBox { found: boolean; inner?: ProfileBox }
+export interface ProfilePoint { x: number; y: number }
+/** 머리(정수리~턱) 위치 + 얼굴 안쪽 상자 + 두 눈·입 가운데 (모두 0~1 비율). 눈은 사진에서 왼쪽에 있는 눈이 left */
+export interface ProfileFace extends ProfileBox { found: boolean; inner?: ProfileBox; marks?: { left: ProfilePoint; right: ProfilePoint; mouth: ProfilePoint } }

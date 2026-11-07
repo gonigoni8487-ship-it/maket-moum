@@ -5,7 +5,7 @@ import { toJpeg } from '../camera';
 import { cx } from '../ui';
 import {
   PROFILE_BACKGROUNDS, PROFILE_GENDERS, PROFILE_OUTFITS, PROFILE_POSES, PROFILE_RETOUCH, PROFILE_USES, profileUse,
-  type ProfileBackground, type ProfileBox, type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
+  type ProfileBackground, type ProfileFace, type ProfilePoint, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../profile';
 import { downloadBlob } from '../broadcast-library';
 import { startAmbient } from '../ambient';
@@ -79,42 +79,70 @@ function faceCrop(bitmap: ImageBitmap, f: ProfileFace) {
 }
 
 /**
- * 원본 얼굴 붙이기: AI 결과의 얼굴 안쪽(눈썹~턱)을 원본 사진의 얼굴로 바꾼다.
- * 크기·위치는 두 얼굴 상자에 맞추고, 색은 결과의 조명에 맞춘 뒤 가장자리를 부드럽게 섞는다.
+ * 원본 얼굴 붙이기: AI 결과의 얼굴 안쪽(눈·코·입)을 원본 사진의 얼굴로 바꾼다.
+ * 두 눈 위치로 크기·기울기·위치를 정확히 맞춰 겹침(이중 눈썹·안경)이 없게 하고, 입 위치까지 맞지 않으면
+ * (고개 각도가 다르면) 붙이지 않는다. 밝기·색은 결과 조명에 맞추고 가장자리는 부드럽게 섞는다.
+ * 붙였으면 true
  */
-export function pasteFace(dst: HTMLCanvasElement, src: CanvasImageSource & { width: number; height: number }, s: ProfileBox, d: ProfileBox) {
+export function pasteFace(dst: HTMLCanvasElement, src: CanvasImageSource & { width: number; height: number }, s: NonNullable<ProfileFace['marks']>, d: NonNullable<ProfileFace['marks']>) {
   const W = dst.width, H = dst.height;
-  const dx = Math.round(d.left * W), dy = Math.round(d.top * H);
-  const dw = Math.round((d.right - d.left) * W), dh = Math.round((d.bottom - d.top) * H);
-  if (dw < 8 || dh < 8) return;
+  const P = (p: ProfilePoint, w: number, h: number) => ({ x: p.x * w, y: p.y * h });
+  const [sl, sr, sm] = [P(s.left, src.width, src.height), P(s.right, src.width, src.height), P(s.mouth, src.width, src.height)];
+  const [dl, dr, dm] = [P(d.left, W, H), P(d.right, W, H), P(d.mouth, W, H)];
+  const sEye = Math.hypot(sr.x - sl.x, sr.y - sl.y), dEye = Math.hypot(dr.x - dl.x, dr.y - dl.y);
+  if (sEye < 4 || dEye < 8) return false;
+  const k = dEye / sEye;
+  const rot = Math.atan2(dr.y - dl.y, dr.x - dl.x) - Math.atan2(sr.y - sl.y, sr.x - sl.x);
+  const map = (p: { x: number; y: number }) => {
+    const x = (p.x - sl.x) * k, y = (p.y - sl.y) * k;
+    return { x: dl.x + x * Math.cos(rot) - y * Math.sin(rot), y: dl.y + x * Math.sin(rot) + y * Math.cos(rot) };
+  };
+  // 입 위치가 어긋나면 고개 각도·표정이 달라진 것 → 붙이면 겹쳐 보이므로 건너뛴다
+  const pm = map(sm);
+  if (Math.hypot(pm.x - dm.x, pm.y - dm.y) > dEye * 0.22) return false;
+  // 원본을 결과 좌표로 옮겨 그린다
   const tmp = document.createElement('canvas');
-  tmp.width = dw; tmp.height = dh;
+  tmp.width = W; tmp.height = H;
   const tg = tmp.getContext('2d', { willReadFrequently: true })!;
   tg.imageSmoothingQuality = 'high';
-  tg.drawImage(src, s.left * src.width, s.top * src.height, (s.right - s.left) * src.width, (s.bottom - s.top) * src.height, 0, 0, dw, dh);
-  const sp = tg.getImageData(0, 0, dw, dh).data;
+  tg.translate(dl.x, dl.y);
+  tg.rotate(rot);
+  tg.scale(k, k);
+  tg.translate(-sl.x, -sl.y);
+  tg.drawImage(src, 0, 0);
+  // 섞을 영역: 눈 가운데와 입 사이를 중심으로 한 타원 (눈썹~턱 위, 양 볼 안쪽)
+  const eyeMid = { x: (dl.x + dr.x) / 2, y: (dl.y + dr.y) / 2 };
+  const cx = (eyeMid.x + dm.x) / 2, cy = (eyeMid.y + dm.y) / 2;
+  const ang = Math.atan2(dr.y - dl.y, dr.x - dl.x);
+  const rx = dEye * 1.05, ry = Math.hypot(dm.x - eyeMid.x, dm.y - eyeMid.y) * 1.25;
+  const pad = Math.max(rx, ry);
+  const x0 = Math.max(0, Math.floor(cx - pad)), y0 = Math.max(0, Math.floor(cy - pad));
+  const w = Math.min(W, Math.ceil(cx + pad)) - x0, h = Math.min(H, Math.ceil(cy + pad)) - y0;
+  if (w < 8 || h < 8) return false;
+  const sp = tg.getImageData(x0, y0, w, h).data;
   const g = dst.getContext('2d', { willReadFrequently: true })!;
-  const region = g.getImageData(dx, dy, dw, dh);
+  const region = g.getImageData(x0, y0, w, h);
   const dp = region.data;
-  // 얼굴 가운데(타원 안쪽)의 평균 색을 맞춘다
-  const rOf = (i: number) => { const px = (i / 4) % dw, py = Math.floor(i / 4 / dw); return Math.hypot((px + 0.5) / dw - 0.5, (py + 0.5) / dh - 0.5) * 2; };
-  const stat = (p: Uint8ClampedArray) => {
-    const sum = [0, 0, 0]; let n = 0;
-    for (let i = 0; i < p.length; i += 4) if (rOf(i) < 0.7) { for (let c = 0; c < 3; c++) sum[c] += p[i + c]; n++; }
-    return sum.map(v => ({ m: v / Math.max(1, n) }));
+  const cos = Math.cos(-ang), sin = Math.sin(-ang);
+  const rOf = (i: number) => {
+    const px = x0 + (i / 4) % w - cx, py = y0 + Math.floor(i / 4 / w) - cy;
+    const u = px * cos - py * sin, v = px * sin + py * cos;
+    return Math.hypot(u / rx, v / ry);
   };
-  const S = stat(sp), D = stat(dp);
+  // 얼굴 가운데의 평균 색을 맞춘다 (원본이 없는 곳은 빼고)
+  const S = [0, 0, 0], D = [0, 0, 0]; let n = 0;
+  for (let i = 0; i < dp.length; i += 4) if (sp[i + 3] > 250 && rOf(i) < 0.6) { for (let c = 0; c < 3; c++) { S[c] += sp[i + c]; D[c] += dp[i + c]; } n++; }
+  if (n < 50) return false;
   for (let i = 0; i < dp.length; i += 4) {
+    if (sp[i + 3] < 250) continue;
     const r = rOf(i);
-    const a = r <= 0.72 ? 1 : r >= 1 ? 0 : 1 - ((r - 0.72) / 0.28) ** 2 * (3 - 2 * ((r - 0.72) / 0.28));
+    const t = (r - 0.65) / 0.35;
+    const a = r <= 0.65 ? 1 : r >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
     if (!a) continue;
-    for (let c = 0; c < 3; c++) {
-      // 밝기·색만 결과 조명에 맞추고 대비(이목구비의 진하기)는 원본 그대로
-      const v = sp[i + c] - S[c].m + D[c].m;
-      dp[i + c] = dp[i + c] * (1 - a) + v * a;
-    }
+    for (let c = 0; c < 3; c++) dp[i + c] = dp[i + c] * (1 - a) + (sp[i + c] + (D[c] - S[c]) / n) * a;
   }
-  g.putImageData(region, dx, dy);
+  g.putImageData(region, x0, y0);
+  return true;
 }
 
 /** 흑백 사진인지: 픽셀 채도 평균이 아주 낮으면 흑백 */
@@ -147,7 +175,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [pose, setPose] = useState<ProfilePose>('front');
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
   // 얼굴은 원본 그대로: AI 결과의 얼굴 안쪽을 원본 사진의 얼굴로 바꿔 붙인다 (같은 사람 보장)
-  const [keepFace, setKeepFace] = useState(true);
+  const [keepFace, setKeepFace] = useState(false);
   const [music, setMusic] = useState(loadMusic);
   const toggleMusic = (on: boolean) => { setMusic(on); try { localStorage.setItem(MUSIC_KEY, on ? 'on' : 'off'); } catch { /* 저장 불가 */ } };
   const stopMusic = useRef<(() => void) | null>(null);
@@ -246,9 +274,9 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       await img.decode();
       const u = profileUse(use);
       const canvas = fitToRatio(img, img.naturalWidth, img.naturalHeight, u.ratio, u.minW, u.minH);
-      if (keepFace && src?.inner) {
+      if (keepFace && src?.marks) {
         const dst = await detectFace(canvas, canvas.width, canvas.height).catch(() => null);
-        if (dst?.inner) pasteFace(canvas, bitmap, src.inner, dst.inner);
+        if (dst?.marks && !pasteFace(canvas, bitmap, src.marks, dst.marks)) onError('고개 각도가 달라 원본 얼굴은 붙이지 않았습니다. 정면 사진으로 다시 해 보세요.');
       }
       setResult(canvas);
       setResultUrl(canvas.toDataURL('image/jpeg', 0.95));
@@ -371,7 +399,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             </div>
             <label className="flex items-start gap-2 rounded-xl bg-indigo-50 px-3 py-2.5">
               <input type="checkbox" checked={keepFace} onChange={e => setKeepFace(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-indigo-600" />
-              <span className="text-sm text-slate-700"><b>얼굴은 원본 그대로</b> (같은 사람 보장)<span className="block text-xs text-slate-500">AI가 만든 사진의 눈·코·입·얼굴형 부분을 올린 사진의 실제 얼굴로 바꿔 붙입니다. 얼굴이 한 치도 달라지지 않는 대신, 얼굴 안쪽의 잡티 보정은 약해집니다.</span></span>
+              <span className="text-sm text-slate-700"><b>얼굴은 원본 그대로</b> (실험 기능)<span className="block text-xs text-slate-500">AI가 만든 사진의 눈·코·입·얼굴형 부분을 올린 사진의 실제 얼굴로 바꿔 붙입니다. 두 눈·입 위치로 맞춰 붙이고, 고개 각도가 달라 겹칠 것 같으면 붙이지 않습니다. 정면을 보고 밝게 찍은 사진일 때만 켜세요. 얼굴 안쪽의 잡티 보정은 약해집니다.</span></span>
             </label>
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">자세</p>
