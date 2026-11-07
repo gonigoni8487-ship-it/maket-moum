@@ -4,8 +4,8 @@
 import type { GoogleGenAI } from '@google/genai';
 import { storeDayStart } from '../src/marton/shared';
 import {
-  PROFILE_BACKGROUNDS, isProfileBackground, isProfileRetouch, profileUse, isProfileOutfit, isProfileUse,
-  type ProfileFace, type ProfileOutfit, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
+  PROFILE_BACKGROUNDS, isProfileBackground, isProfileGender, isProfilePose, isProfileRetouch, profileUse, isProfileOutfit, isProfileUse,
+  type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../src/marton/profile';
 import { platform } from './platform';
 import { AI_MODEL, auth, parseImage, parseJson, type RouteApp } from './marton';
@@ -15,7 +15,19 @@ import { candidates } from './marton-broadcast';
 const IMAGE_MODELS = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'];
 const DAILY_LIMIT = () => Number(platform().env('MARTON_PROFILE_DAILY_LIMIT')) || 50;
 
-function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch) {
+// 옷차림 (사원증 가이드 1순위 예시처럼 단정하게, 흰 벽과 비슷한 흰색 상의는 피한다)
+const OUTFIT_PROMPT: Record<Exclude<ProfileOutfit, 'keep'>, Record<ProfileGender, string>> = {
+  suit: {
+    male: 'a neat dark navy suit jacket over a plain light-blue or white shirt with an open collar (no tie)',
+    female: 'a neat black or navy tailored blazer over a simple ivory or soft-blue blouse',
+  },
+  casual: {
+    male: 'a clean, plain dark navy or charcoal crew-neck knit sweater (smart casual, no logos, no prints)',
+    female: 'a clean, plain soft beige or light camel round-neck knit sweater (smart casual, no logos, no prints)',
+  },
+};
+
+function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch, gender: ProfileGender, pose: ProfilePose) {
   const bg = (PROFILE_BACKGROUNDS[use] as readonly { id: string; prompt: string }[]).find(b => b.id === background)?.prompt ?? PROFILE_BACKGROUNDS[use][0].prompt;
   return [
     use === 'id'
@@ -25,7 +37,9 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     'IDENTITY LOCK — the most important rule, above everything else:',
     '- This must be the exact same real person, recognisable instantly by family and coworkers. Treat the face as untouchable pixels: reproduce it exactly as in the input photo.',
     `- Keep EXACTLY: face shape and proportions, eyes (shape, size, spacing, eyelids, colour), eyebrows, nose, mouth and lips, teeth, ears, jawline, chin, skin tone, ${retouch === 'natural' ? 'real skin texture (pores), distinctive moles and scars, wrinkles' : 'skin texture, moles, freckles, scars, wrinkles'}, facial hair, glasses, makeup, hairstyle, hair length, hair colour, hairline, parting, age and body build.`,
-    '- Keep the same facial expression and head angle. Do not make the person smile more or less.',
+    pose === 'front'
+      ? '- Keep the same facial expression and head angle. Do not make the person smile more or less.'
+      : '- Keep the same facial expression, and keep the face exactly as it is, still facing the camera with both eyes clearly visible. Do not make the person smile more or less.',
     retouch === 'natural'
       ? '- Apart from the light blemish clean-up below, do NOT beautify, slim, enlarge eyes, reshape, change makeup, whiten teeth, de-age or re-age. No AI-face look, no plastic or airbrushed skin.'
       : '- Do NOT beautify, slim, smooth skin, enlarge eyes, change makeup, whiten teeth, de-age, re-age, or "improve" the face in any way. No AI-face look, no plastic skin.',
@@ -37,11 +51,14 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     use === 'id'
       ? '- Framing: an employee ID-card photo (Korean company badge, 54x86 mm portrait). Centred, facing the camera, upper body from the top of the head down to the waist, the whole head and hair fully inside the frame with a small margin above, both shoulders and arms fully visible, the face clearly visible and not too small (head about a quarter of the image height). Portrait 2:3.'
       : '- Framing: centred head-and-shoulders portrait, eyes at about 40% from the top, a little space above the hair. Square 1:1.',
+    pose === 'front'
+      ? '- Pose: frontal upper body, shoulders square to the camera, standing straight and relaxed, arms naturally down at the sides (like the 1st-priority guide example).'
+      : '- Pose: slightly angled upper body — turn the shoulders and torso about 20-30 degrees to one side while the head and face stay turned toward the camera exactly as in the input; relaxed, natural posture, arms down. Both shoulders stay inside the frame.',
     '- Lighting: soft, even, flattering studio light on the face with natural shadows; correct white balance and exposure only.',
     retouch === 'natural' && '- Light natural blemish clean-up (like a professional ID-photo studio, subtle): remove temporary blemishes only — acne, pimples, small red or dark spots, small scabs, uneven redness and blotches; slightly soften dark under-eye shadows; tidy stray flyaway hairs; remove lint and dust on the clothes. Keep real skin texture and pores, keep distinctive moles, scars and wrinkles, keep the natural skin tone. It must still look unretouched to a casual viewer.',
-    outfit === 'suit'
-      ? '- Clothing: change ONLY the clothing to a neat dark navy suit jacket with a plain white shirt (no tie), fitted naturally to the same body and neck. Do not alter the neck, shoulders width or body shape.'
-      : '- Clothing: keep the clothes exactly as they are (same garment, colour, pattern, collar). Only extend them naturally if the crop needs more of the shoulders.',
+    outfit === 'keep'
+      ? '- Clothing: keep the clothes exactly as they are (same garment, colour, pattern, collar). Only extend them naturally if the crop needs more of the shoulders.'
+      : `- Clothing: change ONLY the clothing to ${OUTFIT_PROMPT[outfit][gender]} — ${gender === 'male' ? "men's" : "women's"} wear, fitted naturally to the same body, neck and shoulder width. Do not alter the neck, shoulders width or body shape.`,
     '- If the input crops off part of the shoulders, extend them naturally and consistently with the visible clothing.',
     '- If the clothing is white or very close to the background colour, keep a soft natural shadow so the outline of the shoulders stays clear.',
     '',
@@ -93,7 +110,9 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     if (!image) return res.status(400).json({ error: '인물 사진을 올려 주세요.' });
     const use: ProfileUse = isProfileUse(req.body.use) ? req.body.use : 'id';
     const background = isProfileBackground(use, req.body.background) ? req.body.background : PROFILE_BACKGROUNDS[use][0].id;
-    const outfit: ProfileOutfit = use === 'id' && isProfileOutfit(req.body.outfit) ? req.body.outfit : 'keep';
+    const outfit: ProfileOutfit = isProfileOutfit(req.body.outfit) ? req.body.outfit : 'keep';
+    const gender: ProfileGender = isProfileGender(req.body.gender) ? req.body.gender : 'male';
+    const pose: ProfilePose = isProfilePose(req.body.pose) ? req.body.pose : 'front';
     const retouch: ProfileRetouch = isProfileRetouch(req.body.retouch) ? req.body.retouch : 'natural';
     const today = storeDayStart(Date.now());
     if (used.day !== today) Object.assign(used, { day: today, count: 0 });
@@ -105,7 +124,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
       try {
         const response = await genAI.models.generateContent({
           model,
-          contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit, retouch) }] }],
+          contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit, retouch, gender, pose) }] }],
           config: {
             responseModalities: ['TEXT', 'IMAGE'],
             temperature: 0.2, // 얼굴을 지어내지 않게 낮게

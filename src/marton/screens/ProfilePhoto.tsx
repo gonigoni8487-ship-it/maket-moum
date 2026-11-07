@@ -4,8 +4,8 @@ import { api } from '../api';
 import { toJpeg } from '../camera';
 import { cx } from '../ui';
 import {
-  PROFILE_BACKGROUNDS, PROFILE_OUTFITS, PROFILE_RETOUCH, PROFILE_USES, profileUse,
-  type ProfileBackground, type ProfileFace, type ProfileOutfit, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
+  PROFILE_BACKGROUNDS, PROFILE_GENDERS, PROFILE_OUTFITS, PROFILE_POSES, PROFILE_RETOUCH, PROFILE_USES, profileUse,
+  type ProfileBackground, type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../profile';
 import { downloadBlob } from '../broadcast-library';
 
@@ -86,6 +86,8 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [use, setUse] = useState<ProfileUse>('id');
   const [background, setBackground] = useState<ProfileBackground>('white');
   const [outfit, setOutfit] = useState<ProfileOutfit>('keep');
+  const [gender, setGender] = useState<ProfileGender>('male');
+  const [pose, setPose] = useState<ProfilePose>('front');
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
   const [aiError, setAiError] = useState<string | null>(null);
   // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·잡티 보정)을 AI로 만든다
@@ -124,7 +126,6 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const chooseUse = (u: ProfileUse) => {
     setUse(u);
     setBackground(PROFILE_BACKGROUNDS[u][0].id);
-    if (u === 'sns') setOutfit('keep');
     setResult(null);
     setZoom(1); setDx(0); setDy(0);
   };
@@ -166,7 +167,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     let failed = false;
     try {
       const r = await api<ProfilePhotoResult>('/ai/profile/photo', {
-        image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, retouch,
+        image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, gender, pose, retouch,
       });
       // 54×86mm(사원증)·정사각형(SNS) 비율로 맞추고 최소 해상도 이상으로
       const img = new Image();
@@ -275,12 +276,23 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <div className="flex flex-wrap gap-2">{PROFILE_RETOUCH.map(o => <Chip key={o.id} active={retouch === o.id} onClick={() => setRetouch(o.id)}>{o.label}</Chip>)}</div>
               {retouch === 'natural' && <p className="text-xs text-slate-500">여드름·뾰루지·작은 점 같은 일시적인 잡티와 붉은기, 잔머리, 옷 먼지만 자연스럽게 지웁니다. 피부결·특징적인 점·흉터·주름은 남겨 본인 그대로 보이게 합니다 (가이드라인: 과한 보정 불가).</p>}
             </div>
-            {use === 'id' && (
-              <div className="space-y-1.5">
-                <p className="text-sm font-semibold text-slate-700">옷</p>
-                <div className="flex flex-wrap gap-2">{PROFILE_OUTFITS.map(o => <Chip key={o.id} active={outfit === o.id} onClick={() => setOutfit(o.id)}>{o.label}</Chip>)}</div>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-slate-700">자세</p>
+              <div className="flex flex-wrap gap-2">{PROFILE_POSES.map(o => <Chip key={o.id} active={pose === o.id} onClick={() => setPose(o.id)}>{o.label}</Chip>)}</div>
+              {pose === 'angle' && <p className="text-xs text-slate-500">몸(어깨)만 20~30도 살짝 돌리고, 얼굴은 원본 그대로 카메라를 봅니다.</p>}
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-slate-700">옷</p>
+              <div className="flex flex-wrap gap-2">{PROFILE_OUTFITS.map(o => <Chip key={o.id} active={outfit === o.id} onClick={() => setOutfit(o.id)}>{o.label}</Chip>)}</div>
+              {outfit !== 'keep' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500">옷차림</span>
+                  {PROFILE_GENDERS.map(g => <Chip key={g.id} active={gender === g.id} onClick={() => setGender(g.id)}>{g.label}</Chip>)}
+                </div>
+              )}
+              {outfit === 'suit' && <p className="text-xs text-slate-500">{gender === 'male' ? '남성: 남색 정장 재킷 + 하늘색·흰 셔츠 (노타이)' : '여성: 검정·남색 블레이저 + 아이보리·하늘색 블라우스'}</p>}
+              {outfit === 'casual' && <p className="text-xs text-slate-500">{gender === 'male' ? '남성: 남색·차콜 라운드 니트 (무늬·로고 없음)' : '여성: 베이지·카멜 라운드 니트 (무늬·로고 없음)'} — 흰 벽에 묻히지 않는 색</p>}
+            </div>
             <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
               {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />{use === 'id' ? '1순위 사진 만들기' : 'AI 프로필 사진 만들기'}</>}
