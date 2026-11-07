@@ -27,7 +27,7 @@ const OUTFIT_PROMPT: Record<Exclude<ProfileOutfit, 'keep'>, Record<ProfileGender
   },
 };
 
-function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch, gender: ProfileGender, pose: ProfilePose) {
+function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch, gender: ProfileGender, pose: ProfilePose, slimJaw = false) {
   const bg = (PROFILE_BACKGROUNDS[use] as readonly { id: string; prompt: string }[]).find(b => b.id === background)?.prompt ?? PROFILE_BACKGROUNDS[use][0].prompt;
   return [
     use === 'id'
@@ -40,7 +40,7 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     '- NEVER add new moles, dark dots, spots, freckles, marks or blemishes anywhere on the face or neck. Do not darken or enlarge existing small spots.',
     '- Keep the same facial expression. Do not make the person smile more or less.',
     retouch !== 'none'
-      ? '- Apart from the studio skin retouch below, do NOT slim the face, enlarge eyes, reshape the nose/jaw/lips, change makeup, whiten teeth unnaturally, de-age or re-age. No AI-face look, no plastic, waxy or airbrushed skin.'
+      ? `- Apart from the studio skin retouch${slimJaw ? ' and the very subtle jawline refinement' : ''} below, do NOT slim the face, enlarge eyes, reshape the nose/jaw/lips, change makeup, whiten teeth unnaturally, de-age or re-age. No AI-face look, no plastic, waxy or airbrushed skin.`
       : '- Do NOT beautify, slim, smooth skin, enlarge eyes, change makeup, whiten teeth, de-age, re-age, or "improve" the face in any way. No AI-face look, no plastic skin.',
     '- Do not change gender presentation, ethnicity, or accessories (earrings, glasses, piercings) that are visible.',
     '- Keep it a natural colour photo: no black-and-white, no beauty-app filters, no artistic colour grading.',
@@ -62,6 +62,7 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     outfit === 'keep'
       ? '- Clothing: keep the clothes exactly as they are (same garment, colour, pattern, collar). Only extend them naturally if the crop needs more of the shoulders.'
       : `- Clothing: change ONLY the clothing to ${OUTFIT_PROMPT[outfit][gender]} — ${gender === 'male' ? "men's" : "women's"} wear, fitted naturally to the same body, neck and shoulder width. Do not alter the neck, shoulders width or body shape.`,
+    slimJaw && '- Jawline refinement (very subtle, like a professional retoucher): make the jawline and chin line look slightly sharper and more defined — tighten any soft area under the chin and along the lower jaw by only about 3-5%, and add a soft natural contour shadow under the jaw. The face must remain clearly the same person: do not change the face width, chin length, cheekbones or overall face shape noticeably.',
     retouch === 'model' && '- MODEL / MAGAZINE LOOK (make the SAME person look their absolute best, like a professional model photoshoot — never a different face): beauty-dish or clamshell key light that sculpts the cheekbones and jawline with soft natural contour shadows, bright catchlights, a clean rim light; a confident model posture — shoulders back and relaxed, chest open, neck long, chin very slightly forward and down for a defined jawline; neatly styled, glossy, voluminous hair with no flyaways (same hairstyle, length and colour); flawless but real skin with a healthy glow (pores still visible up close); crisp, well-fitted, wrinkle-free clothes; refined, slightly richer but natural colour grading. Keep the face shape, features and expression of the input — do not reshape, slim or enlarge anything.',
     '- If the input crops off part of the shoulders, extend them naturally and consistently with the visible clothing.',
     '- If the clothing is white or very close to the background colour, keep a soft natural shadow so the outline of the shoulders stays clear.',
@@ -119,6 +120,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     const gender: ProfileGender = isProfileGender(req.body.gender) ? req.body.gender : 'male';
     const pose: ProfilePose = isProfilePose(req.body.pose) ? req.body.pose : 'front';
     const retouch: ProfileRetouch = isProfileRetouch(req.body.retouch) ? req.body.retouch : 'natural';
+    const slimJaw = req.body.slimJaw === true && retouch !== 'none'; // 턱선 살짝 날렵하게 (보정 안 함이면 하지 않음)
     const today = storeDayStart(Date.now());
     if (used.day !== today) Object.assign(used, { day: today, count: 0 });
     if (used.count >= DAILY_LIMIT()) return res.status(429).json({ error: `프로필 사진은 하루 ${DAILY_LIMIT()}장까지 만들 수 있습니다. 내일 다시 만들거나 "원본 그대로 자르기"를 써 주세요.` });
@@ -132,7 +134,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
           contents: [{ parts: [
             { inlineData: image },
             ...(face ? [{ text: 'IDENTITY REFERENCE — a full-resolution close-up of the same person\'s face from the photo above. Match this face exactly (every feature, proportion, eye shape, glasses, skin colour):' }, { inlineData: face }] : []),
-            { text: photoPrompt(use, background, outfit, retouch, gender, pose) },
+            { text: photoPrompt(use, background, outfit, retouch, gender, pose, slimJaw) },
           ] }],
           config: {
             responseModalities: ['TEXT', 'IMAGE'],
