@@ -407,7 +407,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">자세</p>
               <div className="flex flex-wrap gap-2">{PROFILE_POSES.map(o => <Chip key={o.id} active={pose === o.id} onClick={() => setPose(o.id)}>{o.label}</Chip>)}</div>
-              {pose === 'angle' && <p className="text-xs text-slate-500">몸(어깨)만 20~30도 살짝 돌리고, 얼굴은 원본 그대로 카메라를 봅니다.</p>}
+              <p className="text-xs text-slate-500">{pose === 'front' ? '어깨가 정면을 보는 1순위 자세입니다.' : `몸(어깨)만 ${pose === 'left' ? '왼쪽' : '오른쪽'}으로 20~30도 살짝 돌립니다(사진을 보는 사람 기준).`} 어느 자세든 얼굴과 시선은 자연스럽게 카메라 정면을 봅니다.</p>
             </div>
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">옷</p>
