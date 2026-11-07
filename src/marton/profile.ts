@@ -25,13 +25,29 @@ export const PROFILE_BACKGROUNDS = {
 export type ProfileBackground = (typeof PROFILE_BACKGROUNDS)[ProfileUse][number]['id'];
 export const isProfileBackground = (use: ProfileUse, v: unknown): v is ProfileBackground => PROFILE_BACKGROUNDS[use].some(x => x.id === v);
 
-/** 옷: 기본은 올린 사진 그대로. 사원증용으로만 정장 셔츠를 고를 수 있다 */
+/** 옷: 기본은 올린 사진 그대로. 정장·캐주얼은 남성/여성 옷차림으로 (흰 벽에 묻히지 않는 색) */
 export const PROFILE_OUTFITS = [
   { id: 'keep', label: '입은 옷 그대로' },
-  { id: 'suit', label: '단정한 정장·셔츠' },
+  { id: 'suit', label: '정장·셔츠' },
+  { id: 'casual', label: '캐주얼' },
 ] as const;
 export type ProfileOutfit = (typeof PROFILE_OUTFITS)[number]['id'];
 export const isProfileOutfit = (v: unknown): v is ProfileOutfit => PROFILE_OUTFITS.some(x => x.id === v);
+
+export const PROFILE_GENDERS = [
+  { id: 'male', label: '남성' },
+  { id: 'female', label: '여성' },
+] as const;
+export type ProfileGender = (typeof PROFILE_GENDERS)[number]['id'];
+export const isProfileGender = (v: unknown): v is ProfileGender => PROFILE_GENDERS.some(x => x.id === v);
+
+/** 자세: 가이드 1순위처럼 정면 상반신 / 몸만 살짝 돌린 측면 상반신 (얼굴은 카메라를 본다) */
+export const PROFILE_POSES = [
+  { id: 'front', label: '정면 상반신' },
+  { id: 'angle', label: '약간 측면 상반신' },
+] as const;
+export type ProfilePose = (typeof PROFILE_POSES)[number]['id'];
+export const isProfilePose = (v: unknown): v is ProfilePose => PROFILE_POSES.some(x => x.id === v);
 
 /** 잡티 보정: 자연스럽게(기본) — 일시적인 잡티만 지우고 얼굴은 그대로 / 보정 안 함 */
 export const PROFILE_RETOUCH = [
