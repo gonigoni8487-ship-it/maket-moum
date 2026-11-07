@@ -27,7 +27,7 @@ const OUTFIT_PROMPT: Record<Exclude<ProfileOutfit, 'keep'>, Record<ProfileGender
   },
 };
 
-function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch, gender: ProfileGender, pose: ProfilePose) {
+function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch, gender: ProfileGender, pose: ProfilePose, slimJaw = false) {
   const bg = (PROFILE_BACKGROUNDS[use] as readonly { id: string; prompt: string }[]).find(b => b.id === background)?.prompt ?? PROFILE_BACKGROUNDS[use][0].prompt;
   return [
     use === 'id'
@@ -40,7 +40,7 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     '- NEVER add new moles, dark dots, spots, freckles, marks or blemishes anywhere on the face or neck. Do not darken or enlarge existing small spots.',
     '- Keep the same facial expression. Do not make the person smile more or less.',
     retouch !== 'none'
-      ? '- Apart from the studio skin retouch below, do NOT slim the face, enlarge eyes, reshape the nose/jaw/lips, change makeup, whiten teeth unnaturally, de-age or re-age. No AI-face look, no plastic, waxy or airbrushed skin.'
+      ? `- Apart from the studio skin retouch${slimJaw ? ' and the very subtle jawline refinement' : ''} below, do NOT slim the face, enlarge eyes, reshape the nose/jaw/lips, change makeup, whiten teeth unnaturally, de-age or re-age. No AI-face look, no plastic, waxy or airbrushed skin.`
       : '- Do NOT beautify, slim, smooth skin, enlarge eyes, change makeup, whiten teeth, de-age, re-age, or "improve" the face in any way. No AI-face look, no plastic skin.',
     '- Do not change gender presentation, ethnicity, or accessories (earrings, glasses, piercings) that are visible.',
     '- Keep it a natural colour photo: no black-and-white, no beauty-app filters, no artistic colour grading.',
@@ -55,11 +55,14 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
       : `- Pose: slightly angled upper body — turn the shoulders and torso about 20-30 degrees so the body points toward the ${pose === 'left' ? 'LEFT' : 'RIGHT'} side of the image (as seen by the viewer), while the head turns back so the face looks at the camera; relaxed, natural posture, arms down. Both shoulders stay inside the frame.`,
     '- Gaze: the head faces the camera and the eyes look straight into the camera lens — a natural, relaxed, confident eye contact with the viewer (both pupils centred, not looking up, down or sideways, no squinting). Change only the head direction and eye direction needed for this; keep the eye shape, eyelids and face exactly the same.',
     '- Look: a premium Korean photo-studio profile portrait (high-end 프로필 스튜디오), shot on a full-frame camera with an 85mm portrait lens at about f/5.6 — tack-sharp eyes, the whole upper body in focus, clean natural colours, true-to-life skin colour and correct white balance.',
+    use === 'id' && '- Corporate badge style: like the employee ID photo of a top Korean conglomerate (대기업 사원증) shot in a premium studio — polished, neat and trustworthy, clean seamless backdrop with perfectly even light, crisp edges between hair, shoulders and background, professional and confident impression.',
+    '- Sharpness: ultra-sharp, high-resolution detail like a professional camera — individual eyelashes, eyebrow hairs, hair strands and fabric texture clearly visible; crisp glasses frames and lenses with no smudges or glare; no blur, no softness, no noise, no compression artifacts, no painterly or AI-smoothed look.',
     '- Lighting: professional studio lighting — a large soft key light from the front-side (about 30-45 degrees) with a gentle fill so shadows stay soft, a subtle hair/rim light that separates the hair and shoulders from the background, clean natural catchlights in both eyes, evenly lit background without hot spots. No harsh shadows, no dramatic or coloured lighting.',
     retouch !== 'none' && '- Skin retouch (high-end studio retoucher, natural — it must NOT look retouched): remove all blemishes — acne, pimples, red or dark spots, small pigmentation spots, scabs, enlarged-pore patches, redness and blotchiness; even out the skin tone; gently reduce dark circles and under-eye bags; remove oily shine and keep a soft natural glow; very lightly soften (do not erase) fine lines. Use a frequency-separation style retouch so real skin texture and fine pores remain visible up close — never blurred, smooth plastic or doll-like skin. Also remove moles, dark dots, freckles and age spots on the face and neck (the skin should be clean and spot-free). NEVER add any mole, dot, freckle, spot or mark that is not clearly in the input photo — if unsure, leave the skin clean. Also tidy stray flyaway hairs, smooth clothing wrinkles slightly and remove lint and dust.',
     outfit === 'keep'
       ? '- Clothing: keep the clothes exactly as they are (same garment, colour, pattern, collar). Only extend them naturally if the crop needs more of the shoulders.'
       : `- Clothing: change ONLY the clothing to ${OUTFIT_PROMPT[outfit][gender]} — ${gender === 'male' ? "men's" : "women's"} wear, fitted naturally to the same body, neck and shoulder width. Do not alter the neck, shoulders width or body shape.`,
+    slimJaw && '- Jawline refinement (very subtle, like a professional retoucher): make the jawline and chin line look slightly sharper and more defined — tighten any soft area under the chin and along the lower jaw by only about 3-5%, and add a soft natural contour shadow under the jaw. The face must remain clearly the same person: do not change the face width, chin length, cheekbones or overall face shape noticeably.',
     retouch === 'model' && '- MODEL / MAGAZINE LOOK (make the SAME person look their absolute best, like a professional model photoshoot — never a different face): beauty-dish or clamshell key light that sculpts the cheekbones and jawline with soft natural contour shadows, bright catchlights, a clean rim light; a confident model posture — shoulders back and relaxed, chest open, neck long, chin very slightly forward and down for a defined jawline; neatly styled, glossy, voluminous hair with no flyaways (same hairstyle, length and colour); flawless but real skin with a healthy glow (pores still visible up close); crisp, well-fitted, wrinkle-free clothes; refined, slightly richer but natural colour grading. Keep the face shape, features and expression of the input — do not reshape, slim or enlarge anything.',
     '- If the input crops off part of the shoulders, extend them naturally and consistently with the visible clothing.',
     '- If the clothing is white or very close to the background colour, keep a soft natural shadow so the outline of the shoulders stays clear.',
@@ -117,6 +120,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     const gender: ProfileGender = isProfileGender(req.body.gender) ? req.body.gender : 'male';
     const pose: ProfilePose = isProfilePose(req.body.pose) ? req.body.pose : 'front';
     const retouch: ProfileRetouch = isProfileRetouch(req.body.retouch) ? req.body.retouch : 'natural';
+    const slimJaw = req.body.slimJaw === true && retouch !== 'none'; // 턱선 살짝 날렵하게 (보정 안 함이면 하지 않음)
     const today = storeDayStart(Date.now());
     if (used.day !== today) Object.assign(used, { day: today, count: 0 });
     if (used.count >= DAILY_LIMIT()) return res.status(429).json({ error: `프로필 사진은 하루 ${DAILY_LIMIT()}장까지 만들 수 있습니다. 내일 다시 만들거나 "원본 그대로 자르기"를 써 주세요.` });
@@ -130,12 +134,13 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
           contents: [{ parts: [
             { inlineData: image },
             ...(face ? [{ text: 'IDENTITY REFERENCE — a full-resolution close-up of the same person\'s face from the photo above. Match this face exactly (every feature, proportion, eye shape, glasses, skin colour):' }, { inlineData: face }] : []),
-            { text: photoPrompt(use, background, outfit, retouch, gender, pose) },
+            { text: photoPrompt(use, background, outfit, retouch, gender, pose, slimJaw) },
           ] }],
           config: {
             responseModalities: ['TEXT', 'IMAGE'],
             temperature: 0.1, // 얼굴을 지어내지 않게 낮게
-            imageConfig: { aspectRatio: profileUse(use).aiRatio },
+            // Pro 이미지 모델은 2K로 받아 더 선명하게 (다른 모델은 기본 크기)
+            imageConfig: { aspectRatio: profileUse(use).aiRatio, ...(/pro-image/.test(model) ? { imageSize: '2K' } : {}) },
           },
         });
         const part = imagePart(response);

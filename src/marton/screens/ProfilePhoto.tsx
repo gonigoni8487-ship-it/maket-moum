@@ -176,6 +176,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
   // 얼굴은 원본 그대로: AI 결과의 얼굴 안쪽을 원본 사진의 얼굴로 바꿔 붙인다 (같은 사람 보장)
   const [keepFace, setKeepFace] = useState(false);
+  const [slimJaw, setSlimJaw] = useState(true); // 턱선 살짝 날렵하게 (피부 보정을 켰을 때만)
   const [music, setMusic] = useState(loadMusic);
   const toggleMusic = (on: boolean) => { setMusic(on); try { localStorage.setItem(MUSIC_KEY, on ? 'on' : 'off'); } catch { /* 저장 불가 */ } };
   const stopMusic = useRef<(() => void) | null>(null);
@@ -265,7 +266,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       const src = face && bitmap === picked?.bitmap ? face : await detectFace(bitmap, bitmap.width, bitmap.height).catch(() => null);
       if (src && bitmap === picked?.bitmap) setFace(src);
       const r = await api<ProfilePhotoResult>('/ai/profile/photo', {
-        image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, gender, pose, retouch,
+        image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, gender, pose, retouch, slimJaw,
         face: src?.found ? faceCrop(bitmap, src) : undefined,
       });
       // 54×86mm(사원증)·정사각형(SNS) 비율로 맞추고 최소 해상도 이상으로
@@ -404,6 +405,12 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <input type="checkbox" checked={keepFace} onChange={e => setKeepFace(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-indigo-600" />
               <span className="text-sm text-slate-700"><b>얼굴은 원본 그대로</b> (실험 기능)<span className="block text-xs text-slate-500">AI가 만든 사진의 눈·코·입·얼굴형 부분을 올린 사진의 실제 얼굴로 바꿔 붙입니다. 두 눈·입 위치로 맞춰 붙이고, 고개 각도가 달라 겹칠 것 같으면 붙이지 않습니다. 정면을 보고 밝게 찍은 사진일 때만 켜세요. 얼굴 안쪽의 잡티 보정은 약해집니다.</span></span>
             </label>
+            {retouch !== 'none' && (
+              <label className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                <input type="checkbox" checked={slimJaw} onChange={e => setSlimJaw(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-indigo-600" />
+                <span className="text-sm text-slate-700"><b>턱선 살짝 날렵하게</b><span className="block text-xs text-slate-500">턱 아래·턱선만 3~5% 정도 또렷하게 다듬습니다. 얼굴 폭·턱 길이·얼굴형은 그대로라 본인 그대로 보입니다.</span></span>
+              </label>
+            )}
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">자세</p>
               <div className="flex flex-wrap gap-2">{PROFILE_POSES.map(o => <Chip key={o.id} active={pose === o.id} onClick={() => setPose(o.id)}>{o.label}</Chip>)}</div>
