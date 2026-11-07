@@ -55,6 +55,8 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
       : `- Pose: slightly angled upper body — turn the shoulders and torso about 20-30 degrees so the body points toward the ${pose === 'left' ? 'LEFT' : 'RIGHT'} side of the image (as seen by the viewer), while the head turns back so the face looks at the camera; relaxed, natural posture, arms down. Both shoulders stay inside the frame.`,
     '- Gaze: the head faces the camera and the eyes look straight into the camera lens — a natural, relaxed, confident eye contact with the viewer (both pupils centred, not looking up, down or sideways, no squinting). Change only the head direction and eye direction needed for this; keep the eye shape, eyelids and face exactly the same.',
     '- Look: a premium Korean photo-studio profile portrait (high-end 프로필 스튜디오), shot on a full-frame camera with an 85mm portrait lens at about f/5.6 — tack-sharp eyes, the whole upper body in focus, clean natural colours, true-to-life skin colour and correct white balance.',
+    use === 'id' && '- Corporate badge style: like the employee ID photo of a top Korean conglomerate (대기업 사원증) shot in a premium studio — polished, neat and trustworthy, clean seamless backdrop with perfectly even light, crisp edges between hair, shoulders and background, professional and confident impression.',
+    '- Sharpness: ultra-sharp, high-resolution detail like a professional camera — individual eyelashes, eyebrow hairs, hair strands and fabric texture clearly visible; crisp glasses frames and lenses with no smudges or glare; no blur, no softness, no noise, no compression artifacts, no painterly or AI-smoothed look.',
     '- Lighting: professional studio lighting — a large soft key light from the front-side (about 30-45 degrees) with a gentle fill so shadows stay soft, a subtle hair/rim light that separates the hair and shoulders from the background, clean natural catchlights in both eyes, evenly lit background without hot spots. No harsh shadows, no dramatic or coloured lighting.',
     retouch !== 'none' && '- Skin retouch (high-end studio retoucher, natural — it must NOT look retouched): remove all blemishes — acne, pimples, red or dark spots, small pigmentation spots, scabs, enlarged-pore patches, redness and blotchiness; even out the skin tone; gently reduce dark circles and under-eye bags; remove oily shine and keep a soft natural glow; very lightly soften (do not erase) fine lines. Use a frequency-separation style retouch so real skin texture and fine pores remain visible up close — never blurred, smooth plastic or doll-like skin. Also remove moles, dark dots, freckles and age spots on the face and neck (the skin should be clean and spot-free). NEVER add any mole, dot, freckle, spot or mark that is not clearly in the input photo — if unsure, leave the skin clean. Also tidy stray flyaway hairs, smooth clothing wrinkles slightly and remove lint and dust.',
     outfit === 'keep'
@@ -135,7 +137,8 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
           config: {
             responseModalities: ['TEXT', 'IMAGE'],
             temperature: 0.1, // 얼굴을 지어내지 않게 낮게
-            imageConfig: { aspectRatio: profileUse(use).aiRatio },
+            // Pro 이미지 모델은 2K로 받아 더 선명하게 (다른 모델은 기본 크기)
+            imageConfig: { aspectRatio: profileUse(use).aiRatio, ...(/pro-image/.test(model) ? { imageSize: '2K' } : {}) },
           },
         });
         const part = imagePart(response);
