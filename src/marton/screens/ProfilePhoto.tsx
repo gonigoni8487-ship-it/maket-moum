@@ -90,6 +90,9 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [pose, setPose] = useState<ProfilePose>('front');
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
   const [aiError, setAiError] = useState<string | null>(null);
+  // 다운로드 파일 이름: 사번_성명.jpg (사진마다 다른 사람이라 기기에 저장하지 않는다)
+  const [staffNo, setStaffNo] = useState('');
+  const [staffName, setStaffName] = useState('');
   // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·스튜디오 조명·피부 보정)을 AI로 만든다
   const [mode, setMode] = useState<Mode>('ai');
   const [busy, setBusy] = useState(false);
@@ -192,7 +195,11 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     .then(b => b && withDpi(b));
   const fileName = (kind: string, ext: string) => `${picked?.name ?? '프로필'}_${PROFILE_USES.find(u => u.id === use)!.label.split('·')[0]}_${kind}.${ext}`;
   const outBlob = () => toBlob(mode === 'crop' ? cropCanvas.current : result);
-  const outName = () => fileName(mode === 'crop' ? '원본' : use === 'id' ? '1순위' : 'AI', 'jpg');
+  const clean = (v: string) => v.replace(/[\\/:*?"<>|\s]+/g, '').trim();
+  const outName = () => {
+    const named = [clean(staffNo), clean(staffName)].filter(Boolean).join('_');
+    return named ? `${named}.jpg` : fileName(mode === 'crop' ? '원본' : use === 'id' ? '1순위' : 'AI', 'jpg');
+  };
   const save = async () => { const b = await outBlob(); if (b) downloadBlob(b, outName()); };
   const share = async () => {
     const b = await outBlob();
@@ -241,6 +248,17 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             </div>
           )}
           <p className="text-xs text-slate-500">얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-3">
+            <label className="space-y-1 text-xs font-semibold text-slate-600">사번
+              <input value={staffNo} onChange={e => setStaffNo(e.target.value)} inputMode="numeric" maxLength={20} placeholder="예: 12345678" aria-label="사번"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] font-normal text-slate-900 outline-none focus:border-indigo-500" />
+            </label>
+            <label className="space-y-1 text-xs font-semibold text-slate-600">성명
+              <input value={staffName} onChange={e => setStaffName(e.target.value)} maxLength={20} placeholder="예: 홍길동" aria-label="성명"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] font-normal text-slate-900 outline-none focus:border-indigo-500" />
+            </label>
+            <p className="col-span-2 text-xs text-slate-500">다운로드 파일 이름: <span className="font-semibold text-slate-700">{[clean(staffNo), clean(staffName)].filter(Boolean).join('_') || '사번_성명'}.jpg</span></p>
+          </div>
           <input ref={cameraRef} type="file" accept="image/*" capture="user" hidden onChange={e => { void pick(e.target.files?.[0]); e.target.value = ''; }} />
           <input ref={albumRef} type="file" accept="image/*" hidden onChange={e => { void pick(e.target.files?.[0]); e.target.value = ''; }} />
         </section>
