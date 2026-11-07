@@ -36,15 +36,15 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     '',
     'IDENTITY LOCK — the most important rule, above everything else:',
     '- This must be the exact same real person, recognisable instantly by family and coworkers. Treat the face as untouchable pixels: reproduce it exactly as in the input photo.',
-    `- Keep EXACTLY: face shape and proportions, eyes (shape, size, spacing, eyelids, colour), eyebrows, nose, mouth and lips, teeth, ears, jawline, chin, skin tone, ${retouch === 'natural' ? 'real skin texture (pores), distinctive moles and scars, wrinkles' : 'skin texture, moles, freckles, scars, wrinkles'}, facial hair, glasses, makeup, hairstyle, hair length, hair colour, hairline, parting, age and body build.`,
+    `- Keep EXACTLY: face shape and proportions, eyes (shape, size, spacing, eyelids, colour), eyebrows, nose, mouth and lips, teeth, ears, jawline, chin, ${retouch === 'natural' ? 'natural skin colour, real skin texture (visible fine pores), large distinctive moles and scars, expression lines' : 'skin tone, skin texture, moles, freckles, scars, wrinkles'}, facial hair, glasses, makeup, hairstyle, hair length, hair colour, hairline, parting, age and body build.`,
     pose === 'front'
       ? '- Keep the same facial expression and head angle. Do not make the person smile more or less.'
       : '- Keep the same facial expression, and keep the face exactly as it is, still facing the camera with both eyes clearly visible. Do not make the person smile more or less.',
     retouch === 'natural'
-      ? '- Apart from the light blemish clean-up below, do NOT beautify, slim, enlarge eyes, reshape, change makeup, whiten teeth, de-age or re-age. No AI-face look, no plastic or airbrushed skin.'
+      ? '- Apart from the studio skin retouch below, do NOT slim the face, enlarge eyes, reshape the nose/jaw/lips, change makeup, whiten teeth unnaturally, de-age or re-age. No AI-face look, no plastic, waxy or airbrushed skin.'
       : '- Do NOT beautify, slim, smooth skin, enlarge eyes, change makeup, whiten teeth, de-age, re-age, or "improve" the face in any way. No AI-face look, no plastic skin.',
     '- Do not change gender presentation, ethnicity, or accessories (earrings, glasses, piercings) that are visible.',
-    '- Keep it a natural colour photo: no black-and-white, no filters, no heavy retouching, no artistic colour grading.',
+    '- Keep it a natural colour photo: no black-and-white, no beauty-app filters, no artistic colour grading.',
     '',
     'WHAT YOU MAY CHANGE (only these):',
     `- Background: replace it with ${bg}.`,
@@ -54,8 +54,9 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit,
     pose === 'front'
       ? '- Pose: frontal upper body, shoulders square to the camera, standing straight and relaxed, arms naturally down at the sides (like the 1st-priority guide example).'
       : '- Pose: slightly angled upper body — turn the shoulders and torso about 20-30 degrees to one side while the head and face stay turned toward the camera exactly as in the input; relaxed, natural posture, arms down. Both shoulders stay inside the frame.',
-    '- Lighting: soft, even, flattering studio light on the face with natural shadows; correct white balance and exposure only.',
-    retouch === 'natural' && '- Light natural blemish clean-up (like a professional ID-photo studio, subtle): remove temporary blemishes only — acne, pimples, small red or dark spots, small scabs, uneven redness and blotches; slightly soften dark under-eye shadows; tidy stray flyaway hairs; remove lint and dust on the clothes. Keep real skin texture and pores, keep distinctive moles, scars and wrinkles, keep the natural skin tone. It must still look unretouched to a casual viewer.',
+    '- Look: a premium Korean photo-studio profile portrait (high-end 프로필 스튜디오), shot on a full-frame camera with an 85mm portrait lens at about f/5.6 — tack-sharp eyes, the whole upper body in focus, clean natural colours, true-to-life skin colour and correct white balance.',
+    '- Lighting: professional studio lighting — a large soft key light from the front-side (about 30-45 degrees) with a gentle fill so shadows stay soft, a subtle hair/rim light that separates the hair and shoulders from the background, clean natural catchlights in both eyes, evenly lit background without hot spots. No harsh shadows, no dramatic or coloured lighting.',
+    retouch === 'natural' && '- Skin retouch (high-end studio retoucher, natural — it must NOT look retouched): remove all blemishes — acne, pimples, red or dark spots, small pigmentation spots, scabs, enlarged-pore patches, redness and blotchiness; even out the skin tone; gently reduce dark circles and under-eye bags; remove oily shine and keep a soft natural glow; very lightly soften (do not erase) fine lines. Use a frequency-separation style retouch so real skin texture and fine pores remain visible up close — never blurred, smooth plastic or doll-like skin. Keep large distinctive moles and scars that identify the person. Also tidy stray flyaway hairs, smooth clothing wrinkles slightly and remove lint and dust.',
     outfit === 'keep'
       ? '- Clothing: keep the clothes exactly as they are (same garment, colour, pattern, collar). Only extend them naturally if the crop needs more of the shoulders.'
       : `- Clothing: change ONLY the clothing to ${OUTFIT_PROMPT[outfit][gender]} — ${gender === 'male' ? "men's" : "women's"} wear, fitted naturally to the same body, neck and shoulder width. Do not alter the neck, shoulders width or body shape.`,
