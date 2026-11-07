@@ -90,7 +90,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [pose, setPose] = useState<ProfilePose>('front');
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
   const [aiError, setAiError] = useState<string | null>(null);
-  // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·잡티 보정)을 AI로 만든다
+  // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·스튜디오 조명·피부 보정)을 AI로 만든다
   const [mode, setMode] = useState<Mode>('ai');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<HTMLCanvasElement | null>(null);
@@ -256,7 +256,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setMode('ai')} aria-pressed={mode === 'ai'} className={cx('rounded-2xl border-2 p-3 text-left', mode === 'ai' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white')}>
               <span className="flex items-center gap-1 font-bold text-slate-900"><Sparkles className="size-4 text-indigo-600" />{use === 'id' ? '1순위 사진 자동' : 'AI 프로필'}<span className="rounded bg-emerald-100 px-1.5 text-xs text-emerald-700">추천</span></span>
-              <span className="mt-1 block text-xs text-slate-600">{use === 'id' ? '흰 벽 배경 · 허리 위 상반신 · 잡티 자동 보정' : '얼굴은 그대로, 배경·조명 정리 · 잡티 자동 보정'}</span>
+              <span className="mt-1 block text-xs text-slate-600">{use === 'id' ? '흰 벽 · 허리 위 · 스튜디오 조명 · 피부 보정' : '얼굴은 그대로 · 스튜디오 조명 · 피부 보정'}</span>
             </button>
             <button type="button" onClick={() => { setMode('crop'); void findFace(); }} aria-pressed={mode === 'crop'} className={cx('rounded-2xl border-2 p-3 text-left', mode === 'crop' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white')}>
               <span className="flex items-center gap-1 font-bold text-slate-900"><Crop className="size-4 text-indigo-600" />원본 그대로 자르기</span>
@@ -272,9 +272,9 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <div className="flex flex-wrap gap-2">{PROFILE_BACKGROUNDS[use].map(b => <Chip key={b.id} active={background === b.id} onClick={() => setBackground(b.id)}>{b.label}</Chip>)}</div>
             </div>
             <div className="space-y-1.5">
-              <p className="text-sm font-semibold text-slate-700">잡티 보정</p>
+              <p className="text-sm font-semibold text-slate-700">피부 보정</p>
               <div className="flex flex-wrap gap-2">{PROFILE_RETOUCH.map(o => <Chip key={o.id} active={retouch === o.id} onClick={() => setRetouch(o.id)}>{o.label}</Chip>)}</div>
-              {retouch === 'natural' && <p className="text-xs text-slate-500">여드름·뾰루지·작은 점 같은 일시적인 잡티와 붉은기, 잔머리, 옷 먼지만 자연스럽게 지웁니다. 피부결·특징적인 점·흉터·주름은 남겨 본인 그대로 보이게 합니다 (가이드라인: 과한 보정 불가).</p>}
+              {retouch === 'natural' && <p className="text-xs text-slate-500">고급 스튜디오처럼 잡티·뾰루지·기미·붉은기·다크서클·번들거림을 지우고 피부톤을 고르게 합니다. 모공 같은 진짜 피부결은 남겨 보정 티가 나지 않게 하고, 얼굴형·눈·코·입은 바꾸지 않습니다. 본인을 알아보는 큰 점·흉터는 남깁니다.</p>}
             </div>
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-slate-700">자세</p>
