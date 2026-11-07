@@ -8,6 +8,11 @@ import {
   type ProfileBackground, type ProfileBox, type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../profile';
 import { downloadBlob } from '../broadcast-library';
+import { startAmbient } from '../ambient';
+
+// 생성하는 동안 뉴에이지 음악 (켜고 끈 것을 이 기기에 기억)
+const MUSIC_KEY = 'marton-profile-music';
+const loadMusic = () => { try { return localStorage.getItem(MUSIC_KEY) !== 'off'; } catch { return true; } };
 
 // 인물 사진 → 상반신 프로필 사진
 // - AI 프로필: 얼굴·머리·체형은 그대로, 배경·구도·조명만 정리 (Gemini 이미지 편집)
@@ -143,6 +148,10 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
   // 얼굴은 원본 그대로: AI 결과의 얼굴 안쪽을 원본 사진의 얼굴로 바꿔 붙인다 (같은 사람 보장)
   const [keepFace, setKeepFace] = useState(true);
+  const [music, setMusic] = useState(loadMusic);
+  const toggleMusic = (on: boolean) => { setMusic(on); try { localStorage.setItem(MUSIC_KEY, on ? 'on' : 'off'); } catch { /* 저장 불가 */ } };
+  const stopMusic = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopMusic.current?.(), []);
   const [aiError, setAiError] = useState<string | null>(null);
   // 다운로드 파일 이름: 사번_성명.jpg (사진마다 다른 사람이라 기기에 저장하지 않는다)
   const [staffNo, setStaffNo] = useState('');
@@ -221,6 +230,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     setBusy(true);
     setResult(null);
     setAiError(null);
+    if (music) stopMusic.current = startAmbient(); // '생성하기'를 누른 순간이라 소리를 낼 수 있다
     let failed = false;
     try {
       // 원본 얼굴 위치 (얼굴 확대본·원본 얼굴 붙이기에 쓴다). 못 찾아도 사진은 만든다
@@ -249,6 +259,8 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       onError((e as Error).message);
     } finally {
       setBusy(false);
+      stopMusic.current?.();
+      stopMusic.current = null;
     }
     if (failed) { setMode('crop'); void findFace(bitmap); }
   };
@@ -379,6 +391,10 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               {outfit === 'casual' && <p className="text-xs text-slate-500">{gender === 'male' ? '남성: 남색·차콜 라운드 니트 (무늬·로고 없음)' : '여성: 베이지·카멜 라운드 니트 (무늬·로고 없음)'} — 흰 벽에 묻히지 않는 색</p>}
             </div>
             <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" checked={music} onChange={e => { toggleMusic(e.target.checked); if (!e.target.checked) { stopMusic.current?.(); stopMusic.current = null; } }} className="size-4 accent-indigo-600" />
+              🎵 생성하는 동안 잔잔한 뉴에이지 음악 듣기
+            </label>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
               {busy ? <><Loader2 className="size-5 animate-spin" />생성 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 생성하기</> : <><Sparkles className="size-5" />{picked ? '생성하기' : '먼저 사진을 올려 주세요'}</>}
             </button>
