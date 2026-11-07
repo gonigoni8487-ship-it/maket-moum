@@ -246,7 +246,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <button type="button" onClick={() => albumRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-indigo-200 bg-white py-6 font-bold text-indigo-700"><ImagePlus className="size-7" />앨범에서 고르기</button>
             </div>
           )}
-          <p className="text-xs text-slate-500">사진을 올린 뒤 아래에서 용도·배경·피부 보정·자세·옷을 모두 고르고 마지막에 <b>"고른 대로 사진 만들기"</b>를 누르세요. 얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
+          <p className="text-xs text-slate-500">사진을 올린 뒤 아래에서 용도·배경·피부 보정·자세·옷을 모두 고르고 마지막에 <b>"생성하기"</b>를 누르세요. 얼굴이 정면으로 또렷하게, 밝은 곳에서 찍은 사진일수록 똑같이 나옵니다. 사진은 이 기기와 AI 처리에만 쓰고 서버에 보관하지 않습니다.</p>
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-3">
             <label className="space-y-1 text-xs font-semibold text-slate-600">사번
               <input value={staffNo} onChange={e => setStaffNo(e.target.value)} inputMode="numeric" maxLength={20} placeholder="예: 12345678" aria-label="사번"
@@ -313,7 +313,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             </div>
             <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
-              {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />{picked ? '고른 대로 사진 만들기' : '먼저 사진을 올려 주세요'}</>}
+              {busy ? <><Loader2 className="size-5 animate-spin" />생성 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 생성하기</> : <><Sparkles className="size-5" />{picked ? '생성하기' : '먼저 사진을 올려 주세요'}</>}
             </button>
           </section>
         )}
