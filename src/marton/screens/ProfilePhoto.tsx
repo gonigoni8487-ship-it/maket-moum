@@ -104,14 +104,14 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   // 완성되면 결과(다운로드 버튼)가 보이게 내려 준다
   useEffect(() => { if (resultUrl) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [resultUrl]);
 
-  useEffect(() => () => { if (picked) URL.revokeObjectURL(picked.url); }, [picked]);
 
   const pick = async (f: File | undefined) => {
     if (!f) return;
     if (!f.type.startsWith('image/')) return onError('사진 파일(JPG·PNG 등)을 골라 주세요.');
     try {
       const bitmap = await createImageBitmap(f);
-      setPicked({ bitmap, url: URL.createObjectURL(f), name: f.name.replace(/\.[^.]+$/, '') || '프로필' });
+      // 미리보기는 파일 주소 대신 그린 그림(JPEG)으로: 올린 파일 내용이 화면에 그대로 해석되지 않게
+      setPicked({ bitmap, url: toJpeg(bitmap, bitmap.width, bitmap.height, 1280, 0.9), name: f.name.replace(/\.[^.]+$/, '') || '프로필' });
       setResult(null); setFace(null); setZoom(1); setDx(0); setDy(0);
       if (mode === 'crop') void findFace(bitmap);
       else void makeAi(bitmap); // 올리면 바로 만든다
