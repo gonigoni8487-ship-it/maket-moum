@@ -4,8 +4,8 @@
 import type { GoogleGenAI } from '@google/genai';
 import { storeDayStart } from '../src/marton/shared';
 import {
-  PROFILE_BACKGROUNDS, isProfileBackground, profileUse, isProfileOutfit, isProfileUse,
-  type ProfileFace, type ProfileOutfit, type ProfilePhotoResult, type ProfileUse,
+  PROFILE_BACKGROUNDS, isProfileBackground, isProfileRetouch, profileUse, isProfileOutfit, isProfileUse,
+  type ProfileFace, type ProfileOutfit, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../src/marton/profile';
 import { platform } from './platform';
 import { AI_MODEL, auth, parseImage, parseJson, type RouteApp } from './marton';
@@ -15,7 +15,7 @@ import { candidates, withModels } from './marton-broadcast';
 const IMAGE_MODELS = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'];
 const DAILY_LIMIT = () => Number(platform().env('MARTON_PROFILE_DAILY_LIMIT')) || 50;
 
-function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit) {
+function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit, retouch: ProfileRetouch) {
   const bg = (PROFILE_BACKGROUNDS[use] as readonly { id: string; prompt: string }[]).find(b => b.id === background)?.prompt ?? PROFILE_BACKGROUNDS[use][0].prompt;
   return [
     use === 'id'
@@ -24,9 +24,11 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit)
     '',
     'IDENTITY LOCK — the most important rule, above everything else:',
     '- This must be the exact same real person, recognisable instantly by family and coworkers. Treat the face as untouchable pixels: reproduce it exactly as in the input photo.',
-    '- Keep EXACTLY: face shape and proportions, eyes (shape, size, spacing, eyelids, colour), eyebrows, nose, mouth and lips, teeth, ears, jawline, chin, skin tone, skin texture, moles, freckles, scars, wrinkles, facial hair, glasses, makeup, hairstyle, hair length, hair colour, hairline, parting, age and body build.',
+    `- Keep EXACTLY: face shape and proportions, eyes (shape, size, spacing, eyelids, colour), eyebrows, nose, mouth and lips, teeth, ears, jawline, chin, skin tone, ${retouch === 'natural' ? 'real skin texture (pores), distinctive moles and scars, wrinkles' : 'skin texture, moles, freckles, scars, wrinkles'}, facial hair, glasses, makeup, hairstyle, hair length, hair colour, hairline, parting, age and body build.`,
     '- Keep the same facial expression and head angle. Do not make the person smile more or less.',
-    '- Do NOT beautify, slim, smooth skin, enlarge eyes, change makeup, whiten teeth, de-age, re-age, or "improve" the face in any way. No AI-face look, no plastic skin.',
+    retouch === 'natural'
+      ? '- Apart from the light blemish clean-up below, do NOT beautify, slim, enlarge eyes, reshape, change makeup, whiten teeth, de-age or re-age. No AI-face look, no plastic or airbrushed skin.'
+      : '- Do NOT beautify, slim, smooth skin, enlarge eyes, change makeup, whiten teeth, de-age, re-age, or "improve" the face in any way. No AI-face look, no plastic skin.',
     '- Do not change gender presentation, ethnicity, or accessories (earrings, glasses, piercings) that are visible.',
     '- Keep it a natural colour photo: no black-and-white, no filters, no heavy retouching, no artistic colour grading.',
     '',
@@ -36,13 +38,15 @@ function photoPrompt(use: ProfileUse, background: string, outfit: ProfileOutfit)
       ? '- Framing: an employee ID-card photo (Korean company badge, 54x86 mm portrait). Centred, facing the camera, upper body from the top of the head down to the waist, the whole head and hair fully inside the frame with a small margin above, both shoulders and arms fully visible, the face clearly visible and not too small (head about a quarter of the image height). Portrait 2:3.'
       : '- Framing: centred head-and-shoulders portrait, eyes at about 40% from the top, a little space above the hair. Square 1:1.',
     '- Lighting: soft, even, flattering studio light on the face with natural shadows; correct white balance and exposure only.',
+    retouch === 'natural' && '- Light natural blemish clean-up (like a professional ID-photo studio, subtle): remove temporary blemishes only — acne, pimples, small red or dark spots, small scabs, uneven redness and blotches; slightly soften dark under-eye shadows; tidy stray flyaway hairs; remove lint and dust on the clothes. Keep real skin texture and pores, keep distinctive moles, scars and wrinkles, keep the natural skin tone. It must still look unretouched to a casual viewer.',
     outfit === 'suit'
       ? '- Clothing: change ONLY the clothing to a neat dark navy suit jacket with a plain white shirt (no tie), fitted naturally to the same body and neck. Do not alter the neck, shoulders width or body shape.'
       : '- Clothing: keep the clothes exactly as they are (same garment, colour, pattern, collar). Only extend them naturally if the crop needs more of the shoulders.',
     '- If the input crops off part of the shoulders, extend them naturally and consistently with the visible clothing.',
+    '- If the clothing is white or very close to the background colour, keep a soft natural shadow so the outline of the shoulders stays clear.',
     '',
     'Output: one photorealistic, high-resolution photo that looks like it was taken with a real camera. No text, no watermark, no borders, no extra people.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function imagePart(response: any): { data: string; mimeType: string } | undefined {
@@ -67,6 +71,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     const use: ProfileUse = isProfileUse(req.body.use) ? req.body.use : 'id';
     const background = isProfileBackground(use, req.body.background) ? req.body.background : PROFILE_BACKGROUNDS[use][0].id;
     const outfit: ProfileOutfit = use === 'id' && isProfileOutfit(req.body.outfit) ? req.body.outfit : 'keep';
+    const retouch: ProfileRetouch = isProfileRetouch(req.body.retouch) ? req.body.retouch : 'natural';
     const today = storeDayStart(Date.now());
     if (used.day !== today) Object.assign(used, { day: today, count: 0 });
     if (used.count >= DAILY_LIMIT()) return res.status(429).json({ error: `프로필 사진은 하루 ${DAILY_LIMIT()}장까지 만들 수 있습니다. 내일 다시 만들거나 "원본 그대로 자르기"를 써 주세요.` });
@@ -74,7 +79,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     try {
       const response = await withModels(candidates('MARTON_IMAGE_MODEL', IMAGE_MODELS), model => genAI.models.generateContent({
         model,
-        contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit) }] }],
+        contents: [{ parts: [{ inlineData: image }, { text: photoPrompt(use, background, outfit, retouch) }] }],
         config: {
           responseModalities: ['IMAGE'],
           temperature: 0.2, // 얼굴을 지어내지 않게 낮게

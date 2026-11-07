@@ -4,8 +4,8 @@ import { api } from '../api';
 import { toJpeg } from '../camera';
 import { cx } from '../ui';
 import {
-  PROFILE_BACKGROUNDS, PROFILE_OUTFITS, PROFILE_USES, profileUse,
-  type ProfileBackground, type ProfileFace, type ProfileOutfit, type ProfilePhotoResult, type ProfileUse,
+  PROFILE_BACKGROUNDS, PROFILE_OUTFITS, PROFILE_RETOUCH, PROFILE_USES, profileUse,
+  type ProfileBackground, type ProfileFace, type ProfileOutfit, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../profile';
 import { downloadBlob } from '../broadcast-library';
 
@@ -86,8 +86,9 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const [use, setUse] = useState<ProfileUse>('id');
   const [background, setBackground] = useState<ProfileBackground>('white');
   const [outfit, setOutfit] = useState<ProfileOutfit>('keep');
-  // 사원증은 가이드라인상 이미지 합성·과한 보정이 안 되므로 원본 그대로 자르기가 기본
-  const [mode, setMode] = useState<Mode>('crop');
+  const [retouch, setRetouch] = useState<ProfileRetouch>('natural');
+  // 기본: 올리면 바로 1순위 사진(흰 벽·허리 위 상반신·잡티 보정)을 AI로 만든다
+  const [mode, setMode] = useState<Mode>('ai');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<HTMLCanvasElement | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -99,6 +100,9 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   const cameraRef = useRef<HTMLInputElement>(null);
   const albumRef = useRef<HTMLInputElement>(null);
   const cropCanvas = useRef<HTMLCanvasElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
+  // 완성되면 결과(다운로드 버튼)가 보이게 내려 준다
+  useEffect(() => { if (resultUrl) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [resultUrl]);
 
   useEffect(() => () => { if (picked) URL.revokeObjectURL(picked.url); }, [picked]);
 
@@ -110,6 +114,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
       setPicked({ bitmap, url: URL.createObjectURL(f), name: f.name.replace(/\.[^.]+$/, '') || '프로필' });
       setResult(null); setFace(null); setZoom(1); setDx(0); setDy(0);
       if (mode === 'crop') void findFace(bitmap);
+      else void makeAi(bitmap); // 올리면 바로 만든다
     } catch {
       onError('이 사진을 열지 못했습니다. 다른 사진으로 골라 주세요.');
     }
@@ -147,14 +152,14 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     }
   };
 
-  const makeAi = async () => {
-    if (!picked) return;
+  const makeAi = async (bitmap = picked?.bitmap) => {
+    if (!bitmap) return;
     if (!aiEnabled) return onError('AI 키(GEMINI_API_KEY)가 서버에 없어 AI 프로필을 만들 수 없습니다. "원본 그대로 자르기"는 지금도 쓸 수 있습니다.');
     setBusy(true);
     setResult(null);
     try {
       const r = await api<ProfilePhotoResult>('/ai/profile/photo', {
-        image: toJpeg(picked.bitmap, picked.bitmap.width, picked.bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit,
+        image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, retouch,
       });
       // 54×86mm(사원증)·정사각형(SNS) 비율로 맞추고 최소 해상도 이상으로
       const img = new Image();
@@ -175,7 +180,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
     .then(b => b && withDpi(b));
   const fileName = (kind: string, ext: string) => `${picked?.name ?? '프로필'}_${PROFILE_USES.find(u => u.id === use)!.label.split('·')[0]}_${kind}.${ext}`;
   const outBlob = () => toBlob(mode === 'crop' ? cropCanvas.current : result);
-  const outName = () => fileName(mode === 'crop' ? '원본' : 'AI', 'jpg');
+  const outName = () => fileName(mode === 'crop' ? '원본' : use === 'id' ? '1순위' : 'AI', 'jpg');
   const save = async () => { const b = await outBlob(); if (b) downloadBlob(b, outName()); };
   const share = async () => {
     const b = await outBlob();
@@ -237,13 +242,13 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
         <section className="space-y-2">
           <h2 className="font-bold text-slate-800">3. 만드는 방식</h2>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => { setMode('crop'); void findFace(); }} aria-pressed={mode === 'crop'} className={cx('rounded-2xl border-2 p-3 text-left', mode === 'crop' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white')}>
-              <span className="flex items-center gap-1 font-bold text-slate-900"><Crop className="size-4 text-indigo-600" />원본 그대로 자르기{use === 'id' && <span className="rounded bg-emerald-100 px-1.5 text-xs text-emerald-700">권장</span>}</span>
-              <span className="mt-1 block text-xs text-slate-600">원본 픽셀 그대로 상반신만 잘라 오차 0 (배경은 원래대로)</span>
-            </button>
             <button type="button" onClick={() => setMode('ai')} aria-pressed={mode === 'ai'} className={cx('rounded-2xl border-2 p-3 text-left', mode === 'ai' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white')}>
-              <span className="flex items-center gap-1 font-bold text-slate-900"><Sparkles className="size-4 text-indigo-600" />AI 프로필</span>
-              <span className="mt-1 block text-xs text-slate-600">얼굴·머리는 그대로 두고 배경·구도·조명만 깔끔하게</span>
+              <span className="flex items-center gap-1 font-bold text-slate-900"><Sparkles className="size-4 text-indigo-600" />{use === 'id' ? '1순위 사진 자동' : 'AI 프로필'}<span className="rounded bg-emerald-100 px-1.5 text-xs text-emerald-700">추천</span></span>
+              <span className="mt-1 block text-xs text-slate-600">{use === 'id' ? '흰 벽 배경 · 허리 위 상반신 · 잡티 자동 보정' : '얼굴은 그대로, 배경·조명 정리 · 잡티 자동 보정'}</span>
+            </button>
+            <button type="button" onClick={() => { setMode('crop'); void findFace(); }} aria-pressed={mode === 'crop'} className={cx('rounded-2xl border-2 p-3 text-left', mode === 'crop' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white')}>
+              <span className="flex items-center gap-1 font-bold text-slate-900"><Crop className="size-4 text-indigo-600" />원본 그대로 자르기</span>
+              <span className="mt-1 block text-xs text-slate-600">보정 없이 원본 픽셀 그대로 상반신만 자르기 (배경도 원래대로)</span>
             </button>
           </div>
         </section>
@@ -254,16 +259,20 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               <p className="text-sm font-semibold text-slate-700">배경</p>
               <div className="flex flex-wrap gap-2">{PROFILE_BACKGROUNDS[use].map(b => <Chip key={b.id} active={background === b.id} onClick={() => setBackground(b.id)}>{b.label}</Chip>)}</div>
             </div>
-            {use === 'id' && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">⚠️ 사원증 가이드라인은 이미지 합성을 허용하지 않아, AI로 배경을 바꾼 사진은 재요청될 수 있습니다. 흰 벽 앞에서 찍은 사진을 "원본 그대로 자르기"로 만드는 것을 권장합니다.</p>}
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-slate-700">잡티 보정</p>
+              <div className="flex flex-wrap gap-2">{PROFILE_RETOUCH.map(o => <Chip key={o.id} active={retouch === o.id} onClick={() => setRetouch(o.id)}>{o.label}</Chip>)}</div>
+              {retouch === 'natural' && <p className="text-xs text-slate-500">여드름·뾰루지·작은 점 같은 일시적인 잡티와 붉은기, 잔머리, 옷 먼지만 자연스럽게 지웁니다. 피부결·특징적인 점·흉터·주름은 남겨 본인 그대로 보이게 합니다 (가이드라인: 과한 보정 불가).</p>}
+            </div>
             {use === 'id' && (
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-slate-700">옷</p>
                 <div className="flex flex-wrap gap-2">{PROFILE_OUTFITS.map(o => <Chip key={o.id} active={outfit === o.id} onClick={() => setOutfit(o.id)}>{o.label}</Chip>)}</div>
               </div>
             )}
-            <p className="text-xs text-slate-500">얼굴 생김새·피부·머리 모양·표정은 절대 바꾸지 말고 그대로 두라고 지시합니다(보정·성형 효과 없음). 그래도 AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요. 한 점도 달라지면 안 되면 "원본 그대로 자르기"를 쓰세요.</p>
+            <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
-              {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />AI 프로필 사진 만들기</>}
+              {busy ? <><Loader2 className="size-5 animate-spin" />만드는 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 만들기</> : <><Sparkles className="size-5" />{use === 'id' ? '1순위 사진 만들기' : 'AI 프로필 사진 만들기'}</>}
             </button>
           </section>
         )}
@@ -291,7 +300,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
         )}
 
         {picked && (mode === 'crop' ? face : result) && (
-          <section className="space-y-3">
+          <section ref={resultRef} className="scroll-mt-16 space-y-3">
             <h2 className="font-bold text-slate-800">결과 — 원본과 비교</h2>
             <div className="grid grid-cols-2 gap-2">
               <figure className="space-y-1">
@@ -306,7 +315,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
               </figure>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => void save()} disabled={!ready} className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-50"><Download className="size-4" />저장</button>
+              <button type="button" onClick={() => void save()} disabled={!ready} className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-50"><Download className="size-4" />다운로드 (JPG)</button>
               <button type="button" onClick={() => void share()} disabled={!ready} className="flex items-center justify-center gap-1.5 rounded-xl bg-white py-3 text-sm font-bold text-slate-700 disabled:opacity-50"><Share2 className="size-4" />공유</button>
             </div>
           </section>

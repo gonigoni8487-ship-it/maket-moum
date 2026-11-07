@@ -12,7 +12,7 @@ export const isProfileUse = (v: unknown): v is ProfileUse => PROFILE_USES.some(x
 /** 배경: 증명사진은 단색, SNS는 부드러운 배경 */
 export const PROFILE_BACKGROUNDS = {
   id: [
-    { id: 'white', label: '흰색', prompt: 'a perfectly plain, evenly lit pure white (#FFFFFF) studio background' },
+    { id: 'white', label: '흰 벽 (1순위)', prompt: 'a clean, plain, evenly lit white wall (like the 1st-priority example: a smartphone photo taken in front of a white wall), pure white to very light off-white, no texture, no objects' },
     { id: 'sky', label: '하늘색', prompt: 'a perfectly plain, evenly lit light sky-blue (#DCEBF7) studio background' },
     { id: 'gray', label: '연회색', prompt: 'a perfectly plain, evenly lit light gray (#E6E6E6) studio background' },
   ],
@@ -32,6 +32,14 @@ export const PROFILE_OUTFITS = [
 ] as const;
 export type ProfileOutfit = (typeof PROFILE_OUTFITS)[number]['id'];
 export const isProfileOutfit = (v: unknown): v is ProfileOutfit => PROFILE_OUTFITS.some(x => x.id === v);
+
+/** 잡티 보정: 자연스럽게(기본) — 일시적인 잡티만 지우고 얼굴은 그대로 / 보정 안 함 */
+export const PROFILE_RETOUCH = [
+  { id: 'natural', label: '잡티 자동 보정' },
+  { id: 'none', label: '보정 안 함' },
+] as const;
+export type ProfileRetouch = (typeof PROFILE_RETOUCH)[number]['id'];
+export const isProfileRetouch = (v: unknown): v is ProfileRetouch => PROFILE_RETOUCH.some(x => x.id === v);
 
 export interface ProfilePhotoResult { image: string } // data:image/...;base64
 /** 얼굴(머리) 위치: 원본 사진 기준 0~1 비율 */
