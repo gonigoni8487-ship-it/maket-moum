@@ -10,7 +10,7 @@ import {
 import { downloadBlob } from '../broadcast-library';
 import { startAmbient } from '../ambient';
 
-// 생성하는 동안 뉴에이지 음악 (켜고 끈 것을 이 기기에 기억)
+// 생성하는 동안 밝은 배경음악 (켜고 끈 것을 이 기기에 기억)
 const MUSIC_KEY = 'marton-profile-music';
 const loadMusic = () => { try { return localStorage.getItem(MUSIC_KEY) !== 'off'; } catch { return true; } };
 
@@ -421,7 +421,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
             <p className="text-xs text-slate-500">얼굴 생김새·머리 모양·표정·체형은 절대 바꾸지 말라고 지시합니다(성형·필터 효과 없음). AI가 만든 사진이라 아주 작은 차이가 생길 수 있으니 아래에서 원본과 꼭 비교해 보세요.</p>
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input type="checkbox" checked={music} onChange={e => { toggleMusic(e.target.checked); if (!e.target.checked) { stopMusic.current?.(); stopMusic.current = null; } }} className="size-4 accent-indigo-600" />
-              🎵 생성하는 동안 잔잔한 뉴에이지 음악 듣기
+              🎵 생성하는 동안 밝은 음악 듣기
             </label>
             <button type="button" onClick={() => void makeAi()} disabled={!picked || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-[15px] font-bold text-white active:bg-indigo-700 disabled:opacity-50">
               {busy ? <><Loader2 className="size-5 animate-spin" />생성 중… (10~30초)</> : result ? <><RotateCw className="size-5" />다시 생성하기</> : <><Sparkles className="size-5" />{picked ? '생성하기' : '먼저 사진을 올려 주세요'}</>}
