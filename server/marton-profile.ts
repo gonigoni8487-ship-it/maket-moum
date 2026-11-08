@@ -7,6 +7,7 @@ import {
   PROFILE_BACKGROUNDS, isProfileBackground, isProfileGender, isProfilePose, isProfileRetouch, profileUse, isProfileOutfit, isProfileUse,
   type ProfileFace, type ProfileGender, type ProfileOutfit, type ProfilePose, type ProfileRetouch, type ProfilePhotoResult, type ProfileUse,
 } from '../src/marton/profile';
+import { Buffer } from 'node:buffer';
 import { platform } from './platform';
 import { AI_MODEL, auth, parseImage, parseJson, type RouteApp } from './marton';
 import { candidates } from './marton-broadcast';
@@ -204,4 +205,28 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
   };
   app.post(`${api}/ai/profile/face`, auth, face);
   app.post(`${api}/public/profile/face`, publicLimit(0.2), face);
+
+  // 3) 카카오톡 등 앱 안 브라우저용 다운로드: 화면에서 만든 파일(blob·data 주소)은 저장하지 못하므로
+  //    사진을 서버에 잠깐(10분) 맡기고 진짜 파일 주소로 내려준다. 메모리에만, 최대 40장
+  const held = new Map<string, { bytes: Uint8Array; name: string; until: number }>();
+  const HOLD_MS = 10 * 60_000;
+  app.post(`${api}/public/profile/hold`, (req: any, res: any) => {
+    const image = parseImage(req.body.image);
+    if (!image || image.mimeType !== 'image/jpeg' || image.data.length > 8_000_000) return res.status(400).json({ error: '사진 파일이 올바르지 않습니다.' });
+    const now = Date.now();
+    for (const [k, v] of held) if (v.until < now) held.delete(k);
+    while (held.size >= 40) held.delete(held.keys().next().value!);
+    const bytes = Buffer.from(image.data, 'base64'); // Express·Worker 모두 바이너리로 보낸다
+    const name = String(req.body.name || '프로필.jpg').replace(/[\\/:*?"<>|\r\n]+/g, '').slice(0, 80) || '프로필.jpg';
+    const id = crypto.randomUUID().replace(/-/g, '');
+    held.set(id, { bytes, name: /\.jpe?g$/i.test(name) ? name : `${name}.jpg`, until: now + HOLD_MS });
+    res.json({ url: `${api}/public/profile/file/${id}` });
+  });
+  app.get(`${api}/public/profile/file/:id`, (req: any, res: any) => {
+    const file = held.get(String(req.params.id));
+    if (!file || file.until < Date.now()) return res.status(404).type('text/plain; charset=utf-8').send('파일이 만료되었습니다. 화면에서 다시 다운로드를 눌러 주세요.');
+    res.setHeader('Content-Disposition', `attachment; filename="profile.jpg"; filename*=UTF-8''${encodeURIComponent(file.name)}`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.type('image/jpeg').send(file.bytes);
+  });
 }
