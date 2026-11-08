@@ -166,7 +166,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
-export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnabled: boolean; onClose: () => void; onError: (m: string) => void }) {
+export default function ProfilePhoto({ aiEnabled, standalone, onClose, onError }: { aiEnabled: boolean; standalone?: boolean; onClose: () => void; onError: (m: string) => void }) {
   const [picked, setPicked] = useState<Picked | null>(null);
   const [use, setUse] = useState<ProfileUse>('id');
   const [background, setBackground] = useState<ProfileBackground>('white');
@@ -330,7 +330,7 @@ export default function ProfilePhoto({ aiEnabled, onClose, onError }: { aiEnable
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-50" role="dialog" aria-modal="true" aria-label="프로필 사진 만들기">
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-white px-3 pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top))]">
-        <button type="button" onClick={onClose} disabled={busy} aria-label="뒤로" className="rounded-lg p-2 text-slate-600 active:bg-slate-100 disabled:opacity-40"><ArrowLeft className="size-5" /></button>
+        {!standalone && <button type="button" onClick={onClose} disabled={busy} aria-label="뒤로" className="rounded-lg p-2 text-slate-600 active:bg-slate-100 disabled:opacity-40"><ArrowLeft className="size-5" /></button>}
         <UserRound className="size-5 shrink-0 text-indigo-600" />
         <h1 className="min-w-0 flex-1 truncate text-[16px] font-bold text-slate-900">프로필 사진 만들기</h1>
       </div>

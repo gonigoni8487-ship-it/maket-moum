@@ -83,6 +83,13 @@ export default function MartOnApp() {
   const [morningOpen, setMorningOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(() => params.get('broadcast') === '1');
   const [profileOpen, setProfileOpen] = useState(() => params.get('profile') === '1');
+  // 프로필 사진 전용 화면: /marton/?app=profile (로그인 뒤 프로필 사진 화면만, 홈 화면에 따로 추가 가능)
+  const profileOnly = params.get('app') === 'profile';
+  useEffect(() => {
+    if (!profileOnly) return;
+    document.title = '프로필 사진 만들기';
+    document.querySelector('link[rel="manifest"]')?.setAttribute('href', '/marton/profile.webmanifest');
+  }, [profileOnly]);
   // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
   const [kiosk, setKiosk] = useState<string | null>(() => { try { return localStorage.getItem('marton-kiosk'); } catch { return null; } });
   const kioskRef = useRef(kiosk);
@@ -468,6 +475,16 @@ export default function MartOnApp() {
   );
 
   const { me, tasks, notices, products, promotions, incidents, patrols, reports, handovers, online, aiEnabled } = data;
+  if (profileOnly) return (
+    <>
+      <ProfilePhoto aiEnabled={aiEnabled} standalone onClose={() => { window.location.href = '/marton/'; }} onError={onError} />
+      {toast && (
+        <div className={cx('fixed inset-x-4 bottom-6 z-50 mx-auto max-w-md rounded-xl px-4 py-3 text-center text-sm font-semibold text-white shadow-lg', toast.error ? 'bg-red-600' : 'bg-slate-900')}>
+          {toast.msg}
+        </div>
+      )}
+    </>
+  );
   const emergencies = data.emergencies ?? [];
   const complaints = data.complaints ?? [];
   const openIncidents = incidents.filter(i => i.status !== '종결' && (canHandleIncident(me) || i.reportedBy.id === me.id || i.dept === me.dept)).length;
