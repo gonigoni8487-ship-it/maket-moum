@@ -307,14 +307,28 @@ export default function ProfilePhoto({ aiEnabled, standalone, onClose, onError }
     const named = [clean(staffNo), clean(staffName)].filter(Boolean).join('_');
     return named ? `${named}.jpg` : fileName(mode === 'crop' ? '원본' : use === 'id' ? '1순위' : 'AI', 'jpg');
   };
-  const save = async () => { const b = await outBlob(); if (b) downloadBlob(b, outName()); };
+  // 카카오톡·네이버·인스타그램 등 앱 안 브라우저는 화면에서 만든 파일을 저장하지 못한다 → 서버에 잠깐 맡겨 진짜 파일 주소로 받는다
+  const inApp = /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|BAND\//i.test(navigator.userAgent);
+  const deliver = async (b: Blob, name: string) => {
+    if (!inApp) return downloadBlob(b, name);
+    try {
+      const image = await new Promise<string>((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = reject; r.readAsDataURL(b); });
+      const res = await fetch('/api/marton/public/profile/hold', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image, name }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.url) throw new Error(out.error || '다운로드 준비에 실패했습니다.');
+      window.location.href = out.url;
+    } catch (e) {
+      onError(`${(e as Error).message} 사진을 길게 눌러 저장하거나, 오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 해 주세요.`);
+    }
+  };
+  const save = async () => { const b = await outBlob(); if (b) await deliver(b, outName()); };
   const share = async () => {
     const b = await outBlob();
     if (!b) return;
     const file = new File([b], outName(), { type: b.type });
     try {
       if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: '프로필 사진' });
-      else downloadBlob(b, file.name);
+      else await deliver(b, file.name);
     } catch { /* 공유 취소 */ }
   };
 
