@@ -253,11 +253,13 @@ async function startServer() {
         else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       },
     }));
-    const marton = martonHtml(fs.readFileSync(path.join(distPath, 'index.html'), 'utf8'));
+    const indexHtml = fs.readFileSync(path.join(distPath, 'index.html'), 'utf8');
+    const marton = martonHtml(indexHtml);
+    const martonProfile = martonHtml(indexHtml, true);
     app.get('*', (req, res) => {
       if (req.path === '/marton' || req.path.startsWith('/marton/')) {
         res.setHeader('Cache-Control', 'no-cache');
-        return res.type('html').send(marton);
+        return res.type('html').send(req.query.app === 'profile' ? martonProfile : marton);
       }
       res.sendFile(path.join(distPath, 'index.html'));
     });

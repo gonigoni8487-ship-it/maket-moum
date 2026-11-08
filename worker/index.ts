@@ -76,7 +76,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
   if (isMartonPage(url.pathname)) {
     const index = await env.ASSETS.fetch(new URL('/', url));
-    return new Response(martonHtml(await index.text()), {
+    return new Response(martonHtml(await index.text(), url.searchParams.get('app') === 'profile'), {
       headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
     });
   }

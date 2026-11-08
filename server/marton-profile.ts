@@ -109,7 +109,22 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
   const used = { day: 0, count: 0 };
 
   // 1) AI 프로필 사진 만들기
-  app.post(`${api}/ai/profile/photo`, auth, async (req, res) => {
+  // 로그인 없이 링크만으로 쓰는 공개 주소(/marton/?app=profile)용: IP마다 하루 횟수 제한
+  const publicUsed = new Map<string, number>();
+  let publicDay = 0;
+  const PUBLIC_PER_IP = () => Number(platform().env('MARTON_PROFILE_PUBLIC_PER_IP')) || 6;
+  const publicLimit = (weight: number) => (req: any, res: any, next: () => void) => {
+    const today = storeDayStart(Date.now());
+    if (publicDay !== today) { publicUsed.clear(); publicDay = today; }
+    const ip = String(req.ip || req.header?.('x-forwarded-for') || 'unknown');
+    const n = publicUsed.get(ip) ?? 0;
+    // 사진 생성은 1, 얼굴 위치 찾기는 0.2로 센다 (한 사람이 하루 사진 약 6장)
+    if (n + weight > PUBLIC_PER_IP() + 1e-9) return res.status(429).json({ error: `이 기기(인터넷 연결)에서는 오늘 프로필 사진을 ${PUBLIC_PER_IP()}장까지 만들 수 있습니다. 내일 다시 이용해 주세요.` });
+    publicUsed.set(ip, n + weight);
+    next();
+  };
+
+  const photo = async (req: any, res: any) => {
     if (!aiEnabled) return res.status(503).json(noKey);
     const image = parseImage(req.body.image);
     const face = parseImage(req.body.face); // 얼굴 확대본 (얼굴을 더 정확히 따라 그리게)
@@ -156,10 +171,12 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     const kinds = reasons.map(classify);
     const kind: Failure = kinds.includes('quota') ? 'quota' : kinds.includes('safety') ? 'safety' : kinds.every(k => k === 'access') ? 'access' : 'other';
     res.status(502).json({ error: FAILURE_MESSAGE[kind], reason: kind, detail: reasons.join(' | ').slice(0, 600) });
-  });
+  };
+  app.post(`${api}/ai/profile/photo`, auth, photo);
+  app.post(`${api}/public/profile/photo`, publicLimit(1), photo);
 
   // 2) 원본 그대로 자르기용: 얼굴(머리) 위치만 찾아 준다. 자르기는 기기에서 원본 픽셀 그대로
-  app.post(`${api}/ai/profile/face`, auth, async (req, res) => {
+  const face = async (req: any, res: any) => {
     if (!aiEnabled) return res.status(503).json(noKey);
     const image = parseImage(req.body.image);
     if (!image) return res.status(400).json({ error: '인물 사진을 올려 주세요.' });
@@ -184,5 +201,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
       console.error('MartON profile face error:', e);
       res.status(502).json({ error: '얼굴 위치를 찾지 못했습니다. 직접 위치를 맞춰 주세요.' });
     }
-  });
+  };
+  app.post(`${api}/ai/profile/face`, auth, face);
+  app.post(`${api}/public/profile/face`, publicLimit(0.2), face);
 }
