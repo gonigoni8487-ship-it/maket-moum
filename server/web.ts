@@ -2,14 +2,14 @@
 
 /**
  * 마트ON 화면 HTML: 설치 앱 정보(매니페스트·아이콘)를 직접 넣어 설치 버튼·스토어 패키징 도구가 JS 없이도 인식하게 한다.
- * profile이면 프로필 사진 전용 화면(/marton/?app=profile)용 — 홈 화면에 '프로필 사진' 앱으로 따로 추가된다
+ * profile이면 프로필 사진 전용 화면(/profile/)용 — 홈 화면에 '프로필 사진' 앱으로 따로 추가된다
  */
 export function martonHtml(indexHtml: string, profile = false) {
   const title = profile ? '프로필 사진 만들기' : '마트ON';
   return indexHtml
     .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
     .replace('</head>', [
-      `<link rel="manifest" href="/marton/${profile ? 'profile' : 'manifest'}.webmanifest" />`,
+      `<link rel="manifest" href="${profile ? '/profile/' : '/marton/'}manifest.webmanifest" />`,
       '<meta name="theme-color" content="#1d4ed8" />',
       '<meta name="description" content="말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI" />',
       '<link rel="icon" type="image/png" href="/marton/favicon-48.png" />',
@@ -23,6 +23,8 @@ export function martonHtml(indexHtml: string, profile = false) {
 }
 
 export const isMartonPage = (pathname: string) => pathname === '/marton' || pathname === '/marton/';
+// 프로필 사진 공개 화면: 마트ON 앱 주소 범위(/marton/) 밖에 둬서 설치된 마트ON 앱이 링크를 가로채지 않게 한다
+export const isProfilePage = (pathname: string) => pathname === '/profile' || pathname === '/profile/';
 
 /** 안드로이드 앱(TWA) 패키지와 웹 주소 연결 — 주소창 없는 전체화면 앱으로 실행. 설정이 없으면 null */
 export function assetLinks(pkg?: string, sha256?: string) {
