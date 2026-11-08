@@ -234,13 +234,15 @@ export default function ProfilePhoto({ aiEnabled, standalone, onClose, onError }
     c.getContext('2d')!.drawImage(picked.bitmap, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
   }, [mode, picked, rect]);
 
-  const detectFace = (src: CanvasImageSource, w: number, h: number) => api<ProfileFace>('/ai/profile/face', { image: toJpeg(src, w, h, 1024, 0.85) });
+  // 공개 화면(standalone)은 로그인 없이 쓰는 주소로
+  const base = standalone ? '/public/profile' : '/ai/profile';
+  const detectFace = (src: CanvasImageSource, w: number, h: number) => api<ProfileFace>(`${base}/face`, { image: toJpeg(src, w, h, 1024, 0.85) });
   const findFace = async (bitmap = picked?.bitmap) => {
     if (!bitmap || (face && bitmap === picked?.bitmap)) return;
     if (!aiEnabled) return setFace({ found: false, top: 0, left: 0, bottom: 0, right: 0 });
     setBusy(true);
     try {
-      setFace(await api<ProfileFace>('/ai/profile/face', { image: toJpeg(bitmap, bitmap.width, bitmap.height, 1024, 0.85) }));
+      setFace(await api<ProfileFace>(`${base}/face`, { image: toJpeg(bitmap, bitmap.width, bitmap.height, 1024, 0.85) }));
     } catch (e) {
       onError((e as Error).message);
       setFace({ found: false, top: 0, left: 0, bottom: 0, right: 0 });
@@ -265,7 +267,7 @@ export default function ProfilePhoto({ aiEnabled, standalone, onClose, onError }
       // 원본 얼굴 위치 (얼굴 확대본·원본 얼굴 붙이기에 쓴다). 못 찾아도 사진은 만든다
       const src = face && bitmap === picked?.bitmap ? face : await detectFace(bitmap, bitmap.width, bitmap.height).catch(() => null);
       if (src && bitmap === picked?.bitmap) setFace(src);
-      const r = await api<ProfilePhotoResult>('/ai/profile/photo', {
+      const r = await api<ProfilePhotoResult>(`${base}/photo`, {
         image: toJpeg(bitmap, bitmap.width, bitmap.height, AI_MAX_SIDE, 0.92), use, background, outfit, gender, pose, retouch, slimJaw,
         face: src?.found ? faceCrop(bitmap, src) : undefined,
       });
