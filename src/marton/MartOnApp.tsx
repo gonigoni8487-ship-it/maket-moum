@@ -83,13 +83,9 @@ export default function MartOnApp() {
   const [morningOpen, setMorningOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(() => params.get('broadcast') === '1');
   const [profileOpen, setProfileOpen] = useState(() => params.get('profile') === '1');
-  // 프로필 사진 공개 화면: /marton/?app=profile (로그인 없이 누구나 프로필 사진 화면만, 홈 화면에 따로 추가 가능)
+  // 예전 프로필 사진 공개 주소(/marton/?app=profile)는 새 주소 /profile/로 옮긴다
   const profileOnly = params.get('app') === 'profile';
-  useEffect(() => {
-    if (!profileOnly) return;
-    document.title = '프로필 사진 만들기';
-    document.querySelector('link[rel="manifest"]')?.setAttribute('href', '/marton/profile.webmanifest');
-  }, [profileOnly]);
+  useEffect(() => { if (profileOnly) window.location.replace('/profile/'); }, [profileOnly]);
   // 게이트 태블릿: 호출벨 화면으로 켜 둔 기기 (다시 열어도 유지)
   const [kiosk, setKiosk] = useState<string | null>(() => { try { return localStorage.getItem('marton-kiosk'); } catch { return null; } });
   const kioskRef = useRef(kiosk);
@@ -466,17 +462,7 @@ export default function MartOnApp() {
     }
   };
 
-  // 프로필 사진 공개 주소: 로그인 없이 누구나 바로 (서버가 IP마다 하루 횟수를 제한)
-  if (profileOnly) return (
-    <>
-      <ProfilePhoto aiEnabled standalone onClose={() => { window.location.href = '/marton/'; }} onError={onError} />
-      {toast && (
-        <div className={cx('fixed inset-x-4 bottom-6 z-50 mx-auto max-w-md rounded-xl px-4 py-3 text-center text-sm font-semibold text-white shadow-lg', toast.error ? 'bg-red-600' : 'bg-slate-900')}>
-          {toast.msg}
-        </div>
-      )}
-    </>
-  );
+  if (profileOnly) return null;
   if (loading) return <div className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">마트ON 연결 중…</div>;
   if (!data) return (
     <div className="min-h-screen bg-slate-100">

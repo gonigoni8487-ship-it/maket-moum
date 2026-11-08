@@ -257,9 +257,14 @@ async function startServer() {
     const marton = martonHtml(indexHtml);
     const martonProfile = martonHtml(indexHtml, true);
     app.get('*', (req, res) => {
+      if ((req.path === '/marton' || req.path === '/marton/') && req.query.app === 'profile') return res.redirect(302, '/profile/');
+      if (req.path === '/profile' || req.path.startsWith('/profile/')) {
+        res.setHeader('Cache-Control', 'no-cache');
+        return res.type('html').send(martonProfile);
+      }
       if (req.path === '/marton' || req.path.startsWith('/marton/')) {
         res.setHeader('Cache-Control', 'no-cache');
-        return res.type('html').send(req.query.app === 'profile' ? martonProfile : marton);
+        return res.type('html').send(marton);
       }
       res.sendFile(path.join(distPath, 'index.html'));
     });

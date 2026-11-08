@@ -1,10 +1,10 @@
 {
-  "id": "/marton/?app=profile",
+  "id": "/profile/",
   "name": "프로필 사진 만들기",
   "short_name": "프로필 사진",
   "description": "인물 사진으로 사원증(54×86mm)·SNS 프로필 사진을 만들고 바로 내려받습니다.",
-  "start_url": "/marton/?app=profile",
-  "scope": "/marton/",
+  "start_url": "/profile/",
+  "scope": "/profile/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f8fafc",

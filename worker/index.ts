@@ -6,7 +6,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { GoogleGenAI } from '@google/genai';
 import { registerMartOn, initStore } from '../server/marton';
 import { setPlatform } from '../server/platform';
-import { martonHtml, isMartonPage, assetLinks, SECURITY_HEADERS } from '../server/web';
+import { martonHtml, isMartonPage, isProfilePage, assetLinks, SECURITY_HEADERS } from '../server/web';
 import { setStoreUtcOffset } from '../src/marton/shared';
 import { Router } from './router';
 import { workerPlatform, runDueJobs } from './platform-worker';
@@ -74,9 +74,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return Response.redirect(new URL('/marton/', url).toString(), 302);
   }
 
-  if (isMartonPage(url.pathname)) {
+  // 예전 프로필 주소(/marton/?app=profile)는 새 주소로
+  if (isMartonPage(url.pathname) && url.searchParams.get('app') === 'profile') {
+    return Response.redirect(new URL('/profile/', url).toString(), 302);
+  }
+
+  if (isMartonPage(url.pathname) || isProfilePage(url.pathname)) {
     const index = await env.ASSETS.fetch(new URL('/', url));
-    return new Response(martonHtml(await index.text(), url.searchParams.get('app') === 'profile'), {
+    return new Response(martonHtml(await index.text(), isProfilePage(url.pathname)), {
       headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
     });
   }

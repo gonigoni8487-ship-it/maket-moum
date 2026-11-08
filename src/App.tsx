@@ -7,12 +7,14 @@ import ApplyPage from './ApplyPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import MartOnApp from './marton/MartOnApp';
+import ProfileApp, { isProfilePath } from './marton/ProfileApp';
 
 const queryClient = new QueryClient();
 
 // 마트ON(직원용 앱)은 마켓모움 내비게이션/푸터 없이 단독 화면으로 렌더링
 function MartOnSwitch({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
+  if (isProfilePath(pathname)) return <ProfileApp />;
   return pathname === '/marton' || pathname.startsWith('/marton/') ? <MartOnApp /> : <>{children}</>;
 }
 
