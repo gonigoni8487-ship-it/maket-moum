@@ -27,6 +27,8 @@
    | `GEMINI_API_KEY` | 선택 | 사진 AI·AI 답변·행사 매장 방송(음성·배경음악) |
    | `MARTON_MUSIC_DAILY_LIMIT` | 선택 | 매장 방송 배경음악 하루 생성 한도 (기본 30곡) |
    | `MARTON_PROFILE_DAILY_LIMIT` | 선택 | AI 프로필 사진 하루 생성 한도 (기본 50장) |
+   | `MARTON_PROFILE_PUBLIC_PER_IP` | 선택 | 공개 주소(/profile/)에서 휴대폰 한 대당 하루 사진 수 (기본 6장) |
+   | `MARTON_PROFILE_PUBLIC_PER_NETWORK` | 선택 | 공개 주소에서 같은 와이파이(IP) 전체의 하루 사진 수 (기본 40장) |
    | `MARTON_INTEGRATION_KEY` | 선택 | 센서·CCTV 경보 웹훅 키 |
    | `MARTON_HOME_REDIRECT` | 선택 | `1`이면 주소 첫 화면에서 바로 마트ON으로 이동 |
 
