@@ -95,6 +95,24 @@ export function pinStrength(pin: string): 'none' | 'weak' | 'fair' | 'strong' {
 }
 export const MIN_PIN_LENGTH = 6;
 const storeCode = () => platform().env('MARTON_STORE_CODE') || ''; // 매장 공용 접속 코드 (설정 시 로그인에 필요)
+/**
+ * 잠금 모드 (기본 켜짐): 관리자 비밀번호를 아는 사람만 접속. 일반 직원 로그인·공개 프로필 주소를 막는다.
+ * 다시 열려면 Cloudflare 변수 MARTON_LOCKDOWN=0
+ */
+export const lockdown = () => platform().env('MARTON_LOCKDOWN') !== '0';
+/** 잠금 모드를 처음 켤 때 기존 로그인을 모두 끊기 위한 회차 */
+const SESSION_EPOCH = 'lockdown-2026-11-10';
+/** 모든 로그인 끊기 (except: 남길 토큰) */
+export function logoutAll(except?: string) {
+  let removed = 0;
+  for (const t of Object.keys(db.sessions)) {
+    if (t === except) continue;
+    delete db.sessions[t];
+    delete db.sessionAt?.[t];
+    removed++;
+  }
+  return removed;
+}
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const INCIDENT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000; // 손실 분석용 6개월 보관 후 삭제
 
@@ -123,6 +141,10 @@ export interface Db {
   sessionAt?: Record<string, number>;
   /** 앱에서 만든 관리자 비밀번호 (PBKDF2 해시만, Cloudflare 비밀이 있으면 그쪽이 우선) */
   managerPin?: { salt: string; hash: string; strength: 'none' | 'weak' | 'fair' | 'strong'; setAt: number };
+  /** 잠금 모드로 모든 로그인을 끊은 회차 (같은 회차는 다시 끊지 않는다) */
+  sessionEpoch?: string;
+  /** Cloudflare 관리자 비밀번호(MARTON_MANAGER_PIN)의 지문: 바뀌면 모든 로그인을 끊는다 */
+  envPinTag?: string;
   /** 보안 기록: 로그인 실패·관리자 로그인·전체 로그아웃 (최근 300건) */
   securityLog?: SecurityLogEntry[];
   tasks: Task[];
@@ -180,6 +202,23 @@ export let db: Db = parseDb(null);
 /** 저장된 데이터를 불러온다 (서버 시작 시 한 번) */
 export async function initStore() {
   db = parseDb(await platform().loadDb());
+  let changed = false;
+  // 잠금 모드를 처음 켤 때 한 번: 지금까지의 로그인(다른 사람 휴대폰 포함)을 모두 끊는다
+  if (lockdown() && db.sessionEpoch !== SESSION_EPOCH) {
+    const n = logoutAll();
+    db.sessionEpoch = SESSION_EPOCH;
+    securityLog('logout-all', `잠금 모드 시작 — 모든 로그인 ${n}개 끊음`);
+    changed = true;
+  }
+  // Cloudflare에서 관리자 비밀번호를 바꾸면: 예전 비밀번호로 들어온 로그인을 모두 끊는다
+  const envPin = managerPin();
+  const tag = envPin ? await pinHash(envPin, 'env-pin-tag') : undefined;
+  if (tag && db.envPinTag !== tag) {
+    if (db.envPinTag) securityLog('logout-all', `관리자 비밀번호(Cloudflare) 바뀜 — 모든 로그인 ${logoutAll()}개 끊음`);
+    db.envPinTag = tag;
+    changed = true;
+  }
+  if (changed) save();
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -247,6 +286,7 @@ function staffFromToken(token: string | undefined) {
   const at = (db.sessionAt ??= {})[token];
   if (at === undefined) { db.sessionAt[token] = Date.now(); save(); } // 예전 로그인: 지금부터 30일
   else if (Date.now() - at > SESSION_MAX_MS) { delete db.sessions[token]; delete db.sessionAt[token]; save(); return undefined; }
+  if (lockdown() && db.staff[id].role !== 'manager') return undefined; // 잠금 모드: 관리자만
   return db.staff[id];
 }
 
@@ -334,7 +374,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   const tooMany = (ip: string) => (failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS).length >= 20;
   const fail = (ip: string) => failures.set(ip, [...(failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS), Date.now()]);
 
-  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()), managerPinSet: managerPinSet() }));
+  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()), managerPinSet: managerPinSet(), lockdown: lockdown() }));
 
   // 관리자 비밀번호가 아직 없을 때 한 번만: 처음 로그인하는 점장·부점장이 앱에서 만든다
   app.post(`${api}/manager-pin/setup`, async (req, res) => {
@@ -376,6 +416,10 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
     const existing = db.staff[id];
     if (existing && existing.name !== name) return res.status(409).json({ error: '이미 다른 이름으로 등록된 사번입니다. 관리자에게 문의하세요.' });
 
+    if (lockdown() && !wantManager) {
+      securityLog('manager-blocked', `${name}(${id}) · IP ${ip} — 잠금 모드라 일반 로그인 막음`);
+      return res.status(403).json({ error: '지금은 보안 점검 중이라 관리자만 접속할 수 있습니다. 「점장/부점장으로 로그인」을 켜고 관리자 비밀번호를 넣어 주세요.' });
+    }
     let role: Staff['role'] = 'staff';
     if (wantManager) {
       if (!managerPinSet()) return res.status(409).json({ error: '관리자 비밀번호가 아직 없습니다. 「관리자 비밀번호 처음 만들기」로 먼저 만들어 주세요.', code: 'pin-unset' });

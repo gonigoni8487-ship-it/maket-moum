@@ -8,6 +8,11 @@ export const isProfilePath = (pathname: string) => pathname === '/profile' || pa
 
 export default function ProfileApp() {
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
+  // 보안 점검(잠금 모드) 중이면 화면 대신 안내만
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    fetch('/api/marton/config').then(r => r.json()).then(c => setLocked(Boolean(c?.lockdown))).catch(() => {});
+  }, []);
   const onError = useCallback((msg: string) => {
     setToast({ msg, error: true });
     window.setTimeout(() => setToast(t => (t?.msg === msg ? null : t)), 3500);
@@ -24,6 +29,15 @@ export default function ProfileApp() {
     }
   }, []);
 
+  if (locked) return (
+    <div className="grid min-h-screen place-items-center bg-slate-50 p-6 text-center">
+      <div className="max-w-sm space-y-2">
+        <p className="text-4xl">🔒</p>
+        <h1 className="text-lg font-bold text-slate-900">지금은 사용할 수 없습니다</h1>
+        <p className="text-sm text-slate-600">보안 점검 중이라 프로필 사진 공개 주소를 잠시 닫아 두었습니다. 관리자에게 문의해 주세요.</p>
+      </div>
+    </div>
+  );
   return (
     <>
       <ProfilePhoto aiEnabled standalone onClose={() => { window.location.href = '/profile/'; }} onError={onError} />
