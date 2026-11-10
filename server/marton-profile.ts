@@ -110,18 +110,25 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
   const used = { day: 0, count: 0 };
 
   // 1) AI 프로필 사진 만들기
-  // 로그인 없이 링크만으로 쓰는 공개 주소(/marton/?app=profile)용: IP마다 하루 횟수 제한
+  // 로그인 없이 링크만으로 쓰는 공개 주소(/profile/)용 하루 횟수 제한
+  // 매장 와이파이는 직원 모두가 같은 인터넷 주소(IP)를 쓰므로 휴대폰(기기 번호)마다 센다.
+  // 기기 번호는 바꿀 수 있으니 같은 IP 전체에도 넉넉한 상한을 두고, 요금은 전체 하루 한도(DAILY_LIMIT)가 지킨다
   const publicUsed = new Map<string, number>();
   let publicDay = 0;
-  const PUBLIC_PER_IP = () => Number(platform().env('MARTON_PROFILE_PUBLIC_PER_IP')) || 6;
+  const PUBLIC_PER_DEVICE = () => Number(platform().env('MARTON_PROFILE_PUBLIC_PER_IP')) || 6;
+  const PUBLIC_PER_NETWORK = () => Number(platform().env('MARTON_PROFILE_PUBLIC_PER_NETWORK')) || 40;
   const publicLimit = (weight: number) => (req: any, res: any, next: () => void) => {
     const today = storeDayStart(Date.now());
     if (publicDay !== today) { publicUsed.clear(); publicDay = today; }
     const ip = String(req.ip || req.header?.('x-forwarded-for') || 'unknown');
-    const n = publicUsed.get(ip) ?? 0;
+    const device = typeof req.body?.device === 'string' && /^[a-z0-9]{16,40}$/.test(req.body.device) ? req.body.device : '';
+    const deviceKey = `d:${ip}|${device}`, netKey = `n:${ip}`;
+    const mine = publicUsed.get(deviceKey) ?? 0, net = publicUsed.get(netKey) ?? 0;
     // 사진 생성은 1, 얼굴 위치 찾기는 0.2로 센다 (한 사람이 하루 사진 약 6장)
-    if (n + weight > PUBLIC_PER_IP() + 1e-9) return res.status(429).json({ error: `이 기기(인터넷 연결)에서는 오늘 프로필 사진을 ${PUBLIC_PER_IP()}장까지 만들 수 있습니다. 내일 다시 이용해 주세요.` });
-    publicUsed.set(ip, n + weight);
+    if (mine + weight > PUBLIC_PER_DEVICE() + 1e-9) return res.status(429).json({ error: `이 휴대폰에서는 오늘 프로필 사진을 ${PUBLIC_PER_DEVICE()}장까지 만들 수 있습니다. 내일 다시 이용해 주세요.` });
+    if (net + weight > PUBLIC_PER_NETWORK() + 1e-9) return res.status(429).json({ error: `같은 와이파이(인터넷 연결)에서 오늘 프로필 사진을 ${PUBLIC_PER_NETWORK()}장까지 만들 수 있습니다. 모바일 데이터로 바꾸거나 내일 다시 이용해 주세요.` });
+    publicUsed.set(deviceKey, mine + weight);
+    publicUsed.set(netKey, net + weight);
     next();
   };
 
