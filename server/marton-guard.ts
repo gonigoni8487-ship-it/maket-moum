@@ -1,5 +1,5 @@
 // 마트ON 보안 점검: 관리자 화면의 "보안 점검" — 설정 상태, 로그인 실패 기록, 모든 기기 로그아웃
-import { db, save, auth, managerOnly, securityLog, SESSION_MAX_MS, pinStrength, managerPinSource, checkManagerPin, storeManagerPin, MIN_PIN_LENGTH, type AuthedRequest, type RouteApp } from './marton';
+import { db, save, auth, managerOnly, securityLog, SESSION_MAX_MS, pinStrength, managerPinSource, checkManagerPin, storeManagerPin, logoutAll, MIN_PIN_LENGTH, type AuthedRequest, type RouteApp } from './marton';
 import { platform } from './platform';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -55,7 +55,10 @@ export function registerGuard(app: RouteApp) {
     const next = typeof req.body.next === 'string' ? req.body.next : '';
     if (next.length < MIN_PIN_LENGTH || next.length > 64) return res.status(400).json({ error: `새 비밀번호는 ${MIN_PIN_LENGTH}자 이상으로 정해 주세요.` });
     await storeManagerPin(next);
-    securityLog('pin-change', `${me.title ?? ''} ${me.name} — 관리자 비밀번호 바꿈`);
+    // 예전 비밀번호로 들어와 있던 다른 기기는 모두 로그아웃 (지금 이 기기만 남김)
+    const removed = logoutAll(req.headers.authorization?.slice(7));
+    save();
+    securityLog('pin-change', `${me.title ?? ''} ${me.name} — 관리자 비밀번호 바꿈 · 다른 로그인 ${removed}개 끊음`);
     res.json({ ok: true, strength: db.managerPin!.strength });
   });
 
