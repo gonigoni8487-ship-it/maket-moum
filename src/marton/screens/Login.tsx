@@ -31,7 +31,13 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
   // 관리자 비밀번호가 아직 없으면 처음 로그인하는 점장·부점장이 여기서 만든다
   const [pinSet, setPinSet] = useState(true);
   const [pin2, setPin2] = useState('');
-  const loadConfig = () => api<{ storeCodeRequired: boolean; managerPinSet?: boolean }>('/config').then(c => { setNeedCode(c.storeCodeRequired); setPinSet(c.managerPinSet !== false); }, () => {});
+  // 보안 점검(잠금 모드) 중에는 관리자 비밀번호로만 들어올 수 있으므로 관리자 로그인을 켠 채로 보여 준다
+  const [locked, setLocked] = useState(false);
+  const loadConfig = () => api<{ storeCodeRequired: boolean; managerPinSet?: boolean; lockdown?: boolean }>('/config').then(c => {
+    setNeedCode(c.storeCodeRequired);
+    setPinSet(c.managerPinSet !== false);
+    if (c.lockdown) { setLocked(true); setWantManager(true); }
+  }, () => {});
   useEffect(() => { void loadConfig(); }, []);
   const creatingPin = wantManager && !pinSet;
 
@@ -66,6 +72,13 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
         <div className="text-3xl font-black tracking-tight text-slate-900">마트<span className="text-blue-600">ON</span></div>
         <p className="mt-1 text-sm text-slate-500">말하면 연결하고, 찍으면 알려주고, 요청하면 처리되는 매장 AI</p>
       </div>
+
+      {locked && (
+        <div className="rounded-2xl bg-slate-900 p-4 text-sm text-white">
+          <p className="font-bold">🔒 보안 점검 중</p>
+          <p className="mt-1 text-slate-300">지금은 관리자 비밀번호를 아는 사람만 들어올 수 있습니다. 아래 「점장/부점장으로 로그인」에 비밀번호를 넣어 주세요.</p>
+        </div>
+      )}
 
       {needCode && (
         <label className="block space-y-1.5">
@@ -139,12 +152,12 @@ export default function Login({ onLogin }: { onLogin: (staff: Staff) => void }) 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
         <label className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-sm font-semibold text-slate-800"><ShieldCheck className="size-4 text-blue-600" />점장/부점장으로 로그인</span>
-          <input type="checkbox" className="size-5 accent-blue-600" checked={wantManager} onChange={e => setWantManager(e.target.checked)} />
+          <input type="checkbox" className="size-5 accent-blue-600" checked={wantManager} disabled={locked} onChange={e => setWantManager(e.target.checked)} />
         </label>
         {wantManager && (
           <div className="grid grid-cols-2 gap-3">
             <select className={inputCls} value={title} onChange={e => setTitle(e.target.value)}>
-              <option>점장</option><option>영업부점장</option><option>지원부점장</option>
+              <option>점장</option><option>영업부점장</option><option>지원부점장</option><option>개발자</option>
             </select>
             <input className={inputCls} type="password" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={pin} onChange={e => setPin(e.target.value)} placeholder={creatingPin ? '새 관리자 비밀번호' : '관리자 비밀번호 (영문·숫자·기호)'} />
           </div>
