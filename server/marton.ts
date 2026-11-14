@@ -100,6 +100,8 @@ const storeCode = () => platform().env('MARTON_STORE_CODE') || ''; // 매장 공
  * 다시 열려면 Cloudflare 변수 MARTON_LOCKDOWN=0
  */
 export const lockdown = () => platform().env('MARTON_LOCKDOWN') !== '0';
+/** 프로필 사진 공개 주소(/profile/)는 잠금 모드와 따로: 기본 열림, 닫으려면 MARTON_PROFILE_PUBLIC=0 */
+export const profileClosed = () => platform().env('MARTON_PROFILE_PUBLIC') === '0';
 /** 잠금 모드를 처음 켤 때 기존 로그인을 모두 끊기 위한 회차 */
 const SESSION_EPOCH = 'lockdown-2026-11-10';
 /** 모든 로그인 끊기 (except: 남길 토큰) */
@@ -374,7 +376,7 @@ export function registerMartOn(app: RouteApp, genAI: GoogleGenAI) {
   const tooMany = (ip: string) => (failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS).length >= 20;
   const fail = (ip: string) => failures.set(ip, [...(failures.get(ip) ?? []).filter(t => t > Date.now() - LOGIN_WINDOW_MS), Date.now()]);
 
-  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()), managerPinSet: managerPinSet(), lockdown: lockdown() }));
+  app.get(`${api}/config`, (_req, res) => res.json({ storeCodeRequired: Boolean(storeCode()), managerPinSet: managerPinSet(), lockdown: lockdown(), profileClosed: profileClosed() }));
 
   // 관리자 비밀번호가 아직 없을 때 한 번만: 처음 로그인하는 점장·부점장이 앱에서 만든다
   app.post(`${api}/manager-pin/setup`, async (req, res) => {

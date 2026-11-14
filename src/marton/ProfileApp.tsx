@@ -11,7 +11,7 @@ export default function ProfileApp() {
   // 보안 점검(잠금 모드) 중이면 화면 대신 안내만
   const [locked, setLocked] = useState(false);
   useEffect(() => {
-    fetch('/api/marton/config').then(r => r.json()).then(c => setLocked(Boolean(c?.lockdown))).catch(() => {});
+    fetch('/api/marton/config').then(r => r.json()).then(c => setLocked(Boolean(c?.profileClosed))).catch(() => {});
   }, []);
   const onError = useCallback((msg: string) => {
     setToast({ msg, error: true });

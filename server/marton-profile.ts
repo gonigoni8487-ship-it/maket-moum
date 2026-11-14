@@ -9,7 +9,7 @@ import {
 } from '../src/marton/profile';
 import { Buffer } from 'node:buffer';
 import { platform } from './platform';
-import { AI_MODEL, auth, lockdown, parseImage, parseJson, type RouteApp } from './marton';
+import { AI_MODEL, auth, profileClosed, parseImage, parseJson, type RouteApp } from './marton';
 import { candidates } from './marton-broadcast';
 
 // 사람 얼굴을 가장 잘 지키는 모델부터 (모델이 없거나 못 쓰면 다음 후보). MARTON_IMAGE_MODEL로 바꿀 수 있다
@@ -113,13 +113,13 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
   // 로그인 없이 링크만으로 쓰는 공개 주소(/profile/)용 하루 횟수 제한
   // 매장 와이파이는 직원 모두가 같은 인터넷 주소(IP)를 쓰므로 휴대폰(기기 번호)마다 센다.
   // 기기 번호는 바꿀 수 있으니 같은 IP 전체에도 넉넉한 상한을 두고, 요금은 전체 하루 한도(DAILY_LIMIT)가 지킨다
-  const LOCKED = '지금은 보안 점검 중이라 공개 프로필 사진 주소를 쓸 수 없습니다. 관리자에게 문의해 주세요.';
+  const LOCKED = '지금은 관리자가 공개 프로필 사진 주소를 닫아 두었습니다. 관리자에게 문의해 주세요.';
   const publicUsed = new Map<string, number>();
   let publicDay = 0;
   const PUBLIC_PER_DEVICE = () => Number(platform().env('MARTON_PROFILE_PUBLIC_PER_IP')) || 6;
   const PUBLIC_PER_NETWORK = () => Number(platform().env('MARTON_PROFILE_PUBLIC_PER_NETWORK')) || 40;
   const publicLimit = (weight: number) => (req: any, res: any, next: () => void) => {
-    if (lockdown()) return res.status(403).json({ error: LOCKED });
+    if (profileClosed()) return res.status(403).json({ error: LOCKED });
     const today = storeDayStart(Date.now());
     if (publicDay !== today) { publicUsed.clear(); publicDay = today; }
     const ip = String(req.ip || req.header?.('x-forwarded-for') || 'unknown');
@@ -220,7 +220,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
   const held = new Map<string, { bytes: Uint8Array; name: string; until: number }>();
   const HOLD_MS = 10 * 60_000;
   app.post(`${api}/public/profile/hold`, (req: any, res: any) => {
-    if (lockdown()) return res.status(403).json({ error: LOCKED });
+    if (profileClosed()) return res.status(403).json({ error: LOCKED });
     const image = parseImage(req.body.image);
     if (!image || image.mimeType !== 'image/jpeg' || image.data.length > 8_000_000) return res.status(400).json({ error: '사진 파일이 올바르지 않습니다.' });
     const now = Date.now();
@@ -233,7 +233,7 @@ export function registerProfile(app: RouteApp, genAI: GoogleGenAI, aiEnabled: bo
     res.json({ url: `${api}/public/profile/file/${id}` });
   });
   app.get(`${api}/public/profile/file/:id`, (req: any, res: any) => {
-    if (lockdown()) return res.status(403).type('text/plain; charset=utf-8').send(LOCKED);
+    if (profileClosed()) return res.status(403).type('text/plain; charset=utf-8').send(LOCKED);
     const file = held.get(String(req.params.id));
     if (!file || file.until < Date.now()) return res.status(404).type('text/plain; charset=utf-8').send('파일이 만료되었습니다. 화면에서 다시 다운로드를 눌러 주세요.');
     res.setHeader('Content-Disposition', `attachment; filename="profile.jpg"; filename*=UTF-8''${encodeURIComponent(file.name)}`);
