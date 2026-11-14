@@ -29,6 +29,8 @@
    | `MARTON_PROFILE_DAILY_LIMIT` | 선택 | AI 프로필 사진 하루 생성 한도 (기본 50장) |
    | `MARTON_PROFILE_PUBLIC_PER_IP` | 선택 | 공개 주소(/profile/)에서 휴대폰 한 대당 하루 사진 수 (기본 6장) |
    | `MARTON_PROFILE_PUBLIC_PER_NETWORK` | 선택 | 공개 주소에서 같은 와이파이(IP) 전체의 하루 사진 수 (기본 40장) |
+   | `MARTON_PROFILE_PUBLIC` | 선택 | `0`이면 공개 프로필 사진 주소(/profile/)를 닫음 (기본 열림, 잠금 모드와 별개) |
+   | `MARTON_LOCKDOWN` | 선택 | 잠금 모드: 기본 켜짐(관리자 비밀번호로만 로그인). `0`이면 직원 로그인 허용 |
    | `MARTON_INTEGRATION_KEY` | 선택 | 센서·CCTV 경보 웹훅 키 |
    | `MARTON_HOME_REDIRECT` | 선택 | `1`이면 주소 첫 화면에서 바로 마트ON으로 이동 |
 
